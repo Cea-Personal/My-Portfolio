@@ -249,6 +249,7 @@ automatic merges retain all source references and can be reversed through an aud
 | `app.application_fields` | Form, sequence, label, field type, required, choices, char/word limits, category, conditional rule, sensitive flag. Demographic fields default to manual-only. |
 | `app.application_answer_versions` | Field/question, version, source (`generated`, `owner`, `adapted`), draft/final text, limit result, prompt/model version, evidence links, owner edits, status, hash, time. |
 | `app.saved_answers` | Owner, normalized question category, reusable answer version, tags, allowed contexts, source application, and last reviewed time. |
+| `app.application_documents` | Application, owner, document kind, source (`upload`, `link`), private object/source reference, original filename or safe URL label, media type, size, content hash, sequential version, provenance, availability, created time, and removed time. No generated artifact is stored here. |
 | `app.application_packages` | Application, sequential version, status, created/reviewed/submitted times, content manifest hash, and owner audit event. |
 | `app.application_package_items` | Package + artifact version or analysis snapshot, item type, display order, required flag. Unique package + item identity. |
 
@@ -322,6 +323,7 @@ artifact evidence; technical discussion remains classified as technical knowledg
 |-------|------------------------|
 | `app.ai_provider_configs` | Owner/environment, provider, approved region/data class, secret ref, enabled, timeout/retry/budget, and fallback policy. |
 | `app.ai_model_configs` | Provider config, capability, requested model/alias, snapshot model, temperature, token limits, dimensions, and effective dates. |
+| `app.ai_task_configs` | Owner + task type, provider/model config, creativity, input/output length limits, timeout, retry policy, ordered fallback configs, enabled state, revision, and effective dates. Unique active owner + task type; configuration changes are audited and secret values are never copied here. |
 | `app.prompt_versions` | Immutable prompt name/version/hash, template, variable schema, output schema, author/rationale, status/alias, and supersession. |
 | `app.agent_runs` | Owner/public pseudonym, task type, provider/model, prompt version, related entity, status, token/cost/latency, policy result, correlation ID, and sanitized error. No content by default. |
 | `app.retrieval_runs` | Agent run, query hash, authorized scope, filter/config version, channel limits, RRF/reranker settings, start/end, and status. |
@@ -378,7 +380,8 @@ Profile
 
 ### Document Ingestion (ST-002)
 
-- `pending -> running -> completed|partial|failed`; cancelled is allowed before a terminal state.
+- `pending -> running -> completed|partial|failed|cancelled`; cancellation is allowed before another
+  terminal state and uses the shared `run_status` vocabulary.
 - A changed hash creates a new immutable version. A removed or inaccessible source creates a tombstone.
 - Verified facts are not cascade-deleted; their source availability and publication eligibility update.
 

@@ -28,10 +28,15 @@
 - [x] User scenarios cover primary flows
 - [x] Feature meets measurable outcomes defined in Success Criteria
 - [x] No implementation details leak into specification
+- [ ] Human review of the specification, plan, contracts, data model, dependency graph, security
+  implications, and task metadata is recorded before implementation
 
 ## Notes
 
 - Validation iteration 1 passed all 16 quality checks.
+- Validation iteration 2 added concrete performance, browser, usability, and document-corpus measurement
+  profiles and aligned state terminology, dependencies, routes, and task traceability. The constitutional
+  human-review gate remains intentionally open.
 - The specification contains 9 prioritized user stories, 33 acceptance scenarios, 21 edge cases,
   126 sequential functional requirements, 7 state-transition rules, 8 AI requirements, 9 privacy and
   security requirements, 12 non-functional requirements, and 22 measurable success criteria.

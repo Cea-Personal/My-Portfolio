@@ -160,6 +160,8 @@ cannot modify values, weights, or classifications after validation.
 | `GET /dashboard` | Actionable private summary | Counts/links from authorized owner data |
 | `GET /audit-events` | Cursor-paged audit history | Sanitized append-only events |
 | `POST /exports` | Request portable export | Observable automation run; private download when ready |
+| `GET /exports/{id}` | Inspect export status and expiry | Owner only; sanitized failure details |
+| `GET /exports/{id}/download` | Download completed portable export | Authenticated stream or short-lived signed URL |
 
 ## Career Brain
 
@@ -229,6 +231,8 @@ fields. It never changes Career Brain trust or visibility automatically.
 | `GET /applications/{id}` | Complete workspace summary | Links to paged subresources |
 | `POST /applications/{id}/transitions` | Update status | Does not imply external submission |
 | `POST /applications/{id}/forms` | Save pasted/manual form | Remote analysis only through safe fetch policy |
+| `GET|POST /applications/{id}/documents` | List or attach an owner-uploaded/linked application document | Private provenance and version metadata required |
+| `DELETE /applications/{id}/documents/{documentId}` | Remove workspace association or private source where allowed | Generated artifacts and submitted snapshots are unaffected |
 | `POST /application-fields/{id}/answer-drafts` | Draft evidence-backed answer | Never fills demographic fields |
 | `POST /applications/{id}/artifacts` | Request CV/letter/answer set | Type + template + tone/length; async run |
 | `GET /artifacts/{id}/versions` | Retrieve version history | Private signed downloads after auth |
@@ -273,6 +277,9 @@ or submitting applications/forms.
 | `PATCH /automations/{id}` | Enable/disable/version schedule | Requires `If-Match` |
 | `GET /automation-runs/{id}` | Inspect steps, attempts, status, error | No sensitive payload text |
 | `POST /automation-runs/{id}/cancel` | Cooperative cancellation | Idempotent |
+| `POST /automation-runs/{id}/retry` | Retry an eligible failed/partial run | Uses retained task configuration and a new attempt identity |
+| `GET /settings/ai-capabilities` | List per-task effective AI settings and provider capabilities | Secret references are never returned |
+| `PUT /settings/ai-capabilities/{taskType}` | Validate and version provider/model/creativity/length/timeout/retry/fallback settings | Rejects unavailable or policy-forbidden combinations |
 
 ## Downloads and Rendering
 
@@ -283,6 +290,13 @@ or submitting applications/forms.
   encoding and sanitization.
 - Generated PDF/DOCX responses include artifact version, content hash, template version, and safe filename
   in response metadata.
+
+## Safe External Fetch
+
+- Every server-initiated URL fetch uses the shared policy boundary: HTTPS only; DNS and resolved IP checks
+  before the request and after every redirect; denial of loopback, private, link-local, and cloud metadata
+  ranges; bounded redirects, time, bytes, and decompression; allowlisted response types; and sanitized
+  errors. Job-source and application-form adapters may add stricter rules but cannot bypass this boundary.
 
 ## Contract Verification
 

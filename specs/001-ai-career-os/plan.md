@@ -1,6 +1,6 @@
 # Implementation Plan: AI Career OS and Intelligent Portfolio
 
-**Branch**: `001-ai-career-os` | **Date**: 2026-08-31 | **Spec**: [spec.md](spec.md)
+**Branch**: `master` | **Date**: 2026-08-31 | **Spec**: [spec.md](spec.md)
 
 **Input**: Feature specification from `/specs/001-ai-career-os/spec.md`
 
@@ -43,10 +43,10 @@ Inngest Cloud durable workflow control plane
 
 **Project Type**: Greenfield web application plus asynchronous worker in a modular monorepo
 
-**Performance Goals**: Usable public content within 2.5 seconds for at least 95% of defined mobile test
-visits; ordinary owner action acknowledgement within 1 second; AI/match progress within 3 seconds for at
-least 95% of normal requests; smooth native timeline scrolling; job and analytics calculations within
-their user-visible progress contracts
+**Performance Goals**: Meet MP-001–MP-004 from `spec.md`: p95 usable public content within 2.5 seconds
+under the defined cold-cache mobile/network/concurrency profile; p95 ordinary owner acknowledgement within
+1 second across the defined action set; p95 AI/match progress within 3 seconds at ten concurrent requests;
+and p95 list/detail reads within 2 seconds at the complete NFR-010 corpus sizes
 
 **Constraints**: Single owner initially; privacy and authorization fail closed; public AI sees only active
 published evidence; every material career claim is evidence-linked; deterministic scoring and state
@@ -81,7 +81,7 @@ journeys, 126 functional requirements, seven state machines, and core plus plann
 | XV | Confidential employer protection | PASS | Separate private/public descriptions, confidential visibility, sanitized publication pipeline, and prohibited public fields. |
 | XVI | Versioned generated artifacts | PASS | Structured content, templates, renderer, model/prompt, evidence, owner edits, binaries, hashes, and final/submitted states are immutable versions. |
 | XVII | Accessible/performance UX | PASS | Semantic progressive timeline, reduced motion, WCAG AA tests, performance targets, static public fallback, and explicit budgets. |
-| XVIII | Incremental specification-driven development | PASS | Design is split into independently verifiable release increments; tasks and implementation remain deferred until plan review. |
+| XVIII | Incremental specification-driven development | PENDING REVIEW | Design is split into independently verifiable release increments. Implementation remains blocked until the specification, plan, contracts, data model, dependencies, security implications, and enriched task metadata receive recorded human approval. |
 
 ### Workflow Quality Gates
 
@@ -95,7 +95,8 @@ journeys, 126 functional requirements, seven state machines, and core plus plann
 | AI provider/prompt/evidence/eval contracts documented | PASS | `contracts/ai-contracts.md`, research decisions 7–16, evaluation gates. |
 | Constitutional exceptions | PASS | None required. |
 
-**Gate result**: PASS before research and PASS after Phase 1 design. No violations require justification.
+**Gate result**: Technical design gates pass, but the constitutional implementation gate remains
+**PENDING HUMAN REVIEW**. No implementation, merge, or deployment is authorized by this plan status.
 
 ## Project Structure
 
@@ -271,8 +272,14 @@ All runtimes ──> OpenTelemetry Collector ──> sanitized Sentry/PostHog/tr
 
 ### Private Career OS
 
+- Provide explicit owner sign-in, verified callback, sign-out, expired-session, and unauthorized states.
+  Authentication browser tests cover successful entry, invalid/expired links, callback tampering,
+  session expiry, and attempted access to every private route group.
 - Route groups require a verified session before layout/data rendering and repeat authorization in every
   mutation. Dashboard modules use owner-scoped repositories and private/no-store responses.
+- `/dashboard` is the authenticated landing page and aggregates high-fit jobs, applications awaiting
+  action, interviews/preparation, fact review, portfolio activity, and draft content. `/analytics`
+  provides deeper reports and links back to those actionable records.
 - Career Brain review favors source/fact side-by-side evidence and enables approve, edit-and-approve,
   reject, defer, trust, and visibility actions in three or fewer primary interactions.
 - Jobs provide list and Kanban projections over one status history. Application workspaces use nested
@@ -296,6 +303,9 @@ All runtimes ──> OpenTelemetry Collector ──> sanitized Sentry/PostHog/tr
 - Mutations use revision tokens and idempotency keys. Domain changes and outbox events commit together.
 - HTTP handlers return quickly after creating asynchronous runs. Large files and generated binaries use
   private object transfer, never event payloads or database JSON blobs.
+- All server-side URL retrieval uses a shared safe-fetch boundary enforcing HTTPS, DNS/IP validation on
+  every redirect, private/link-local/metadata-network denial, response size/time limits, content-type
+  allowlists, rate limits, and sanitized failures. Domain adapters may narrow but never bypass it.
 - Error translation maps internal/provider errors to stable Problem Details without leaking source text,
   credentials, internal hosts, SQL, prompts, or stack state.
 
@@ -572,6 +582,7 @@ Failure expectations:
 | Contract | HTTP schemas/streams, events, job adapters, AI providers, artifact schemas, version compatibility |
 | Integration | Career Brain, Drive sync, parser isolation, hybrid retrieval, workflows, providers, application packages, rendering, interview kits |
 | End-to-end | every prioritized user journey and quickstart scenario across desktop/mobile/accessibility modes |
+| Compatibility | MP-005 browser matrix across Chromium, Firefox, WebKit/Safari, iOS Safari, and Android Chrome |
 | Security | SSRF, upload bombs, XSS/sanitization, CSRF, auth/RLS bypass, prompt injection, tool policy, secret/telemetry leakage |
 | Performance | public content, stream start, retrieval, large owner corpus, scheduled source fan-out, analytics aggregation |
 | Resilience | retry/idempotency, worker restart, provider outage, partial failure, cancellation, restore |
@@ -587,7 +598,8 @@ Failure expectations:
   word/character-limit validity; exact version reproduction.
 - Security: all mandatory adversarial fixtures pass; no fixture secret or private content appears in
   exported telemetry.
-- UX: SC-001–SC-022 and NFR-001–NFR-012 mapped to CI reports and preview acceptance evidence.
+- UX: SC-001–SC-022 and NFR-001–NFR-012 mapped to CI reports and preview acceptance evidence using
+  MP-001–MP-007, including recorded usability scripts, browser matrix, load profile, and document corpus.
 
 ## CI/CD and Deployment
 
@@ -629,26 +641,27 @@ it. Exact tasks and dependencies are produced by `$speckit-tasks`.
 
 1. **Foundation**: workspace, CI, configuration, local stack, observability privacy boundary, database
    migration harness, Auth/RLS, design system, public/private route shells.
-2. **Career Brain Core**: manual facts, structured career domains, evidence/version/trust/review, audit,
-   private storage, projection rules, staged publication snapshot.
+2. **Career Brain and Document Intelligence**: manual facts, structured career domains,
+   evidence/version/trust/review, Drive connection/change cursor, uploads, isolated parsing, chunk
+   provenance, extraction candidates, idempotent embeddings, projection rules, and staged publication.
 3. **Public Portfolio**: one-page semantic experience, career timeline, projects, impact, skills, writing,
    contact, public detail routes, performance/accessibility baselines.
-4. **Document Intelligence**: Drive connection/change cursor, uploads, isolated parsing, chunk provenance,
-   extraction candidates, review UI, idempotent embeddings.
-5. **Public Intelligence**: hybrid retrieval, evidence handles, grounded Ask My AI, public JD matcher,
+4. **Public Intelligence**: hybrid retrieval, evidence handles, grounded Ask My AI, public JD matcher,
    deterministic scoring, evaluations, abuse controls.
-6. **Job Core**: manual job entry, canonical job/JD versions, requirements, job lifecycle, list/Kanban,
+5. **Job Core**: manual job entry, canonical job/JD versions, requirements, job lifecycle, list/Kanban,
    career/opportunity scores.
-7. **Application Core**: workspaces, forms/manual fields, deterministic profile, answer drafts, CV/letter
+6. **Application Core**: workspaces, owner-uploaded/linked documents, forms/manual fields, deterministic profile, answer drafts, CV/letter
    schemas/renderers/versions, packages, journal.
-8. **Automated Job Discovery**: source adapter framework, connection tests, profiles, schedules, fan-out,
+7. **Automated Job Discovery**: source adapter framework, connection tests, profiles, schedules, fan-out,
    dedupe, failure isolation, notifications.
-9. **Compensation and Interview Intelligence**: source-tiered compensation, interview processes/stages,
+8. **Compensation and Interview Intelligence**: source-tiered compensation, interview processes/stages,
    kits, STAR stories, mock practice, post-interview insights.
-10. **Content and Analytics**: blog workflow/AI assistance, technical-knowledge indexing, privacy-conscious
-    portfolio events, application/interview analytics, career-gap analysis.
-11. **Hardening and Launch**: full adversarial/AI evaluations, performance, accessibility, recovery,
-    retention/export, operational runbooks, canary/rollback rehearsal.
+9. **Content and Analytics**: blog workflow/AI assistance, technical-knowledge indexing, privacy-conscious
+   portfolio events, application/interview analytics, career-gap analysis.
+10. **Automation Operations and AI Configuration**: per-task AI settings, schedules, bounded workflow
+    coordination, inspection, retry/cancel, provider health, and human-control enforcement.
+11. **Hardening and Launch**: full adversarial/AI evaluations, performance, accessibility, compatibility, recovery,
+   retention/export, operational runbooks, canary/rollback rehearsal.
 
 ## Requirement Traceability
 

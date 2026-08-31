@@ -4,7 +4,11 @@
 
 **Created**: 2026-08-31
 
-**Status**: Draft
+**Status**: Ready for Human Review
+
+**Implementation Gate**: Implementation remains blocked until a human reviewer records approval of the
+specification, plan, contracts, data model, dependency graph, security implications, and executable task
+metadata in `validation/release-checklist.md`. This status change does not itself constitute approval.
 
 **Input**: User description: "Create an evidence-backed Personal AI Career Operating System with an
 intelligent one-page public portfolio, private career management, job and application intelligence,
@@ -306,7 +310,7 @@ and sanitized error details, disable the schedule, and verify that no consequent
 - **FR-004**: The owner MUST be able to view and revoke active access to connected external providers.
 - **FR-005**: The system MUST record security-relevant owner actions, visibility changes, integration
   changes, and consequential approvals in an owner-reviewable audit history.
-- **FR-006**: The private dashboard MUST summarize actionable items including new high-fit jobs,
+- **FR-006**: The authenticated private dashboard at `/dashboard` MUST summarize actionable items including new high-fit jobs,
   applications awaiting action, upcoming interviews, pending preparation, new or reviewable facts,
   portfolio activity, and draft content.
 
@@ -327,7 +331,7 @@ and sanitized error details, disable the schedule, and verify that no consequent
   documents, plain text, Markdown, certifications, and supported cloud-native documents.
 - **FR-012**: The system MUST identify unchanged document versions and MUST NOT create duplicate facts or
   repeated knowledge entries from them.
-- **FR-013**: Each ingestion run MUST expose pending, processing, completed, partial, or failed status and
+- **FR-013**: Each ingestion run MUST expose pending, running, completed, partial, failed, or cancelled status and
   identify affected documents and recoverable errors.
 - **FR-014**: Document processing MUST preserve the original source, source version, source location,
   processing version, and processing time.
@@ -467,7 +471,9 @@ and sanitized error details, disable the schedule, and verify that no consequent
 
 - **FR-069**: Each interested job MUST provide an application workspace containing overview, job
   analysis, requirement match, readiness, form, CV, cover letter, answers, compensation research,
-  interview process, journal, documents, company notes, and timeline where data exists.
+  interview process, journal, documents, company notes, and timeline where data exists. Documents MUST
+  include owner-uploaded or owner-linked source files as well as generated artifacts, with private
+  storage, provenance, version, removal, and access-control behavior defined independently.
 - **FR-070**: The owner MUST be able to create an application from an interested job and preserve a
   separate application lifecycle and status history.
 - **FR-071**: The owner MUST be able to supply an application link, paste application questions, or add
@@ -575,7 +581,9 @@ and sanitized error details, disable the schedule, and verify that no consequent
   proof of professional employment or project experience without independent evidence.
 - **FR-114**: Portfolio analytics MUST be private and MAY track visitors, sessions, page and section
   engagement, project and article views, AI conversations, role analyses, common skill queries, and
-  popular projects using privacy-conscious data.
+  popular projects using privacy-conscious data. Every enabled event source MUST use an allowlisted
+  schema, consent policy where applicable, URL/query stripping, and tests proving that arbitrary or
+  private text cannot be emitted.
 - **FR-115**: Job and application analytics MUST track discovery, shortlisting, interest, applications,
   responses, recruiter screens, interviews, assessments, finals, offers, rejections, conversions, and
   time through the funnel.
@@ -599,8 +607,10 @@ and sanitized error details, disable the schedule, and verify that no consequent
   assistance.
 - **FR-122**: Simple data entry, permissions, scoring, state changes, deduplication, scheduling,
   validation, rendering, field mapping, and analytics aggregation MUST remain deterministic.
-- **FR-123**: The owner MUST be able to configure AI capabilities by task, including selected provider,
-  model class, creativity, length limits, timeout, retry, and fallback where supported.
+- **FR-123**: The owner MUST be able to view and configure AI capabilities by task through authenticated
+  settings, including selected provider, model class, creativity, length limits, timeout, retry, and
+  fallback where supported. Invalid or unavailable combinations MUST be rejected before activation, and
+  secrets MUST remain referenced rather than returned to the client.
 - **FR-124**: Each AI execution MUST retain task type, configuration, instruction version, usage, elapsed
   time, status, sanitized error, and related record without logging unnecessary sensitive content.
 - **FR-125**: Retrieved and uploaded content MUST be treated as data and MUST NOT alter governing
@@ -613,7 +623,7 @@ and sanitized error details, disable the schedule, and verify that no consequent
 - **ST-001 Career Fact**: Candidate -> In Review -> Approved, Edited and Approved, Rejected, or Deferred.
   Only approved facts are eligible for trusted downstream use, and public use also requires public
   visibility and projection eligibility.
-- **ST-002 Document Ingestion**: Pending -> Processing -> Completed, Partial, or Failed. A changed source
+- **ST-002 Document Ingestion**: Pending -> Running -> Completed, Partial, Failed, or Cancelled. A changed source
   creates a new version; a removed source is marked unavailable without silently deleting verified facts.
 - **ST-003 Job**: Discovered -> Shortlisted -> Interested -> Preparing Application -> Ready to Apply ->
   Applied -> Recruiter Contact -> Interview or Technical Assessment -> Final Interview -> Offer,
@@ -695,6 +705,32 @@ and sanitized error details, disable the schedule, and verify that no consequent
 - **NFR-012 Data Portability**: The owner MUST be able to export core career facts, evidence metadata,
   jobs, applications, interviews, journal entries, and generated-artifact metadata in a documented,
   commonly readable form.
+
+### Acceptance Measurement Profiles
+
+- **MP-001 Public Performance Profile**: Public performance tests MUST use a cold cache, a four-core
+  CPU/4 GB memory mobile-class profile, a 10 Mbps down/1 Mbps up connection with 40 ms round-trip latency,
+  and at least 25 concurrent virtual visitors. The 2.5-second target is measured from navigation start to
+  usable primary semantic content and reported at p95.
+- **MP-002 Owner Interaction Profile**: “Ordinary owner actions” means navigation, filtering, opening a
+  record, saving a reversible local edit, and initiating a durable run. Acknowledgement means a visible
+  state change, confirmation, or progress indicator. Tests MUST report p95 across at least 100 actions;
+  durable provider work is excluded after its initial acknowledgement.
+- **MP-003 AI Load Profile**: “Normal load” means at least ten concurrent public AI or role-match requests
+  against a warm application with a representative published corpus. Progress-start latency is measured
+  from accepted request to the first meaningful streamed content or explicit durable progress state.
+- **MP-004 Scale Profile**: At the NFR-010 corpus sizes, p95 owner list/detail reads MUST complete within
+  two seconds, ordinary mutations MUST meet MP-002, asynchronous work MUST acknowledge within one second,
+  and no primary workflow may time out or require reducing the stated dataset.
+- **MP-005 Browser Matrix**: “Current major browsers” means the latest stable and immediately preceding
+  major versions of Chrome, Edge, Firefox, and Safari, plus current iOS Safari and Android Chrome.
+- **MP-006 Usability Protocol**: SC-001 MUST use at least ten representative target visitors who have not
+  seen the interface. SC-006, SC-008, SC-010, SC-014, and SC-020 MUST use the published primary-task
+  script, fresh seeded data, timing from the first task instruction, and recorded assistance/errors.
+  Owner-only measures MUST be repeated across at least three clean seeded runs; first-attempt completion
+  is calculated across the complete primary-task set.
+- **MP-007 Document Corpus**: SC-007 MUST use at least 100 non-corrupt, readable documents distributed
+  across every supported PDF, DOCX, Markdown, and text variant, including repeated unchanged versions.
 
 ### Key Entities *(include if feature involves data)*
 

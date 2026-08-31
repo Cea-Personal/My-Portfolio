@@ -115,13 +115,17 @@ Expected outcomes:
 
 **Requirements**: FR-007–FR-027, FR-003, ST-001, PSR-001–PSR-002, SC-002, SC-006, SC-008.
 
-1. Sign in as the seeded owner and create a private manual achievement with evidence and a metric.
-2. Confirm it is owner-verified but absent from all anonymous portfolio/API responses.
-3. Change visibility to public and add a Portfolio Projection rule.
-4. Build a preview and inspect validation findings.
-5. Confirm publication using the exact staged content hash.
-6. Verify the item and safe citation appear publicly.
-7. Withdraw the publication or remove eligibility and verify cache/public reachability is removed.
+1. Verify anonymous access to `/dashboard` is rejected, then sign in through the seeded callback and
+   verify an invalid/expired callback fails safely.
+2. Open `/dashboard`, verify its actionable summary links only to owner-authorized records, and create a
+   private manual achievement with evidence and a metric.
+3. Confirm it is owner-verified but absent from all anonymous portfolio/API responses.
+4. Change visibility to public and add a Portfolio Projection rule.
+5. Build a preview and inspect validation findings.
+6. Confirm publication using the exact staged content hash.
+7. Verify the item and safe citation appear publicly.
+8. Sign out, confirm the session cannot be reused, then sign in and withdraw the publication or remove
+   eligibility; verify cache/public reachability is removed.
 
 Expected outcomes:
 
@@ -226,11 +230,13 @@ Expected outcomes:
 **Requirements**: FR-069–FR-092, ST-004, SC-012–SC-013.
 
 1. Create an application for an interested job and paste representative form questions.
-2. Fill deterministic identity fields from the approved private profile.
-3. Request an evidence-backed answer, CV, cover letter, and compensation research.
-4. Attempt to generate a sensitive demographic answer without owner input.
-5. Edit artifacts, mark exact versions final, assemble a package, and record a submitted snapshot.
-6. Inspect every claim/evidence link and exact PDF/DOCX version.
+2. Upload one private application document, attach one lawful link, create a new version, then remove the
+   workspace association and verify generated/final artifacts are unaffected.
+3. Fill deterministic identity fields from the approved private profile.
+4. Request an evidence-backed answer, CV, cover letter, and compensation research.
+5. Attempt to generate a sensitive demographic answer without owner input.
+6. Edit artifacts, mark exact versions final, assemble a package, and record a submitted snapshot.
+7. Inspect every source-document provenance record, claim/evidence link, and exact PDF/DOCX version.
 
 Expected outcomes:
 
@@ -265,7 +271,9 @@ Expected outcomes:
 
 1. Draft a technical article with AI help and an approved career example.
 2. Publish only after explicit approval; then archive it.
-3. Generate public engagement and private job/application/interview fixture events.
+3. Generate allowlisted page/section engagement, project/article view, AI conversation, JD analysis,
+   skill-query, project-interest, and private job/application/interview fixture events; attempt one event
+   containing arbitrary private text.
 4. Inspect filtered funnel and time metrics against source records.
 5. Run gap analysis where a skill is possessed but not documented.
 
@@ -281,10 +289,14 @@ Expected outcomes:
 
 **Requirements**: FR-120–FR-126, ST-007, NFR-005–NFR-009, SC-018–SC-019.
 
-1. Run one successful, one partial, one failed/retried, and one cancelled workflow.
-2. Stop and restart the worker between durable steps.
-3. Disable the AI provider and one job source while the public web app remains running.
-4. Search run history by correlation and related record.
+1. Configure two AI task types with different provider/model/creativity/length/timeout/retry/fallback
+   settings; verify an unavailable combination is rejected and no secret is returned.
+2. Run one successful, one partial, one failed/retried, and one cancelled workflow.
+3. Stop and restart the worker between durable steps.
+4. Disable the AI provider and one job source while the public web app remains running.
+5. Search run history by correlation and related record.
+6. Request a portable export, inspect progress, download it after authorization, and verify an expired or
+   cross-owner download is denied.
 
 Expected outcomes:
 
@@ -300,8 +312,11 @@ A release candidate is acceptable only when:
 1. all baseline commands pass in CI and an isolated preview environment;
 2. database/RLS tests include explicit anonymous, owner, cross-owner, worker, and service-role denial paths;
 3. AI evaluation gates meet SC-003, SC-004, SC-005, SC-013, and adversarial privacy targets;
-4. accessibility and performance reports meet NFR/SC thresholds;
+4. accessibility, MP-005 browser compatibility, MP-006 usability, MP-007 document-corpus, and
+   MP-001–MP-004 performance reports meet NFR/SC thresholds;
 5. migration forward-recovery and backup/restore are rehearsed;
 6. OpenTelemetry export inspection finds no fixture secret or private content;
 7. final artifacts link to specification requirements, contract versions, and test evidence;
-8. a human reviewer approves production promotion—deployment is never autonomous.
+8. portable export contents and authenticated status/download behavior satisfy NFR-012;
+9. a human reviewer approves the specification/plan/tasks for implementation and separately approves
+   production promotion—neither implementation authorization nor deployment is autonomous.
