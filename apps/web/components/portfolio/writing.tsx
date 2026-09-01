@@ -6,7 +6,7 @@ export function Writing({
   return (
     <section id="blog" className="blog-section" aria-labelledby="writing-title">
       <header className="blog-editorial-heading">
-        <p>06 / Blog</p>
+        <p>Blog</p>
         <h2 id="writing-title">
           Notes from making solutions <em>people actually use.</em>
         </h2>

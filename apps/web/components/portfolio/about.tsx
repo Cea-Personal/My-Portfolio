@@ -5,7 +5,7 @@ export function About({
 }) {
   return (
     <section id="about" className="about-section" aria-labelledby="about-title">
-      <p className="section-index">03 / About</p>
+      <p className="section-index">About</p>
       <div className="about-layout">
         <h2 id="about-title">
           Software taught me structure. Data taught me scale. AI taught me to keep asking better

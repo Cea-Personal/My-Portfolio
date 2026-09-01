@@ -55,7 +55,7 @@ export function AskShell() {
       <header className="assistant-header">
         <div>
           <p className="eyebrow">Interactive proof</p>
-          <h2 id="ask-title">Ask Basil&apos;s portfolio</h2>
+          <h2 id="ask-title">Ask AI</h2>
         </div>
         <span className="assistant-ready">
           <i aria-hidden="true" /> evidence tool ready

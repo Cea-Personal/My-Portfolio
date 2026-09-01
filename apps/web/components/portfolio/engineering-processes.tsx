@@ -3,15 +3,15 @@
 import { useState } from "react";
 
 const processes = {
-  AI: {
-    label: "AI engineering",
-    statement: "Turn an uncertain question into an evaluated, observable system.",
-    steps: ["Frame", "Retrieve", "Generate", "Evaluate", "Observe"],
+  Software: {
+    label: "Software engineering",
+    statement: "Translate a real need into software that remains safe to change.",
+    steps: ["Specify", "Design", "Build", "Test", "Release"],
     snippet: [
-      "context = retrieve(question, public_evidence)",
-      "answer = model.generate(context, constraints)",
-      "score = evaluate(answer, citations, risk)",
-      "return answer if score.passes else abstain"
+      "contract = specify(problem, constraints)",
+      "system = design(contract, failure_modes)",
+      "build(system).verify(unit, integration, e2e)",
+      "release(observed=True, reversible=True)"
     ]
   },
   Data: {
@@ -25,15 +25,25 @@ const processes = {
       "publish(gold, lineage=True, observable=True)"
     ]
   },
-  Software: {
-    label: "Software engineering",
-    statement: "Translate a real need into software that remains safe to change.",
-    steps: ["Specify", "Design", "Build", "Test", "Release"],
+  Platform: {
+    label: "Platform engineering",
+    statement: "Provide a reliable foundation for software and data systems.",
+    steps: ["Design", "Build", "Test", "Deploy", "Observe"],
     snippet: [
-      "contract = specify(problem, constraints)",
-      "system = design(contract, failure_modes)",
-      "build(system).verify(unit, integration, e2e)",
-      "release(observed=True, reversible=True)"
+      "platform = design(requirements, constraints)",
+      "build(platform).verify(unit, integration, e2e)",
+      "deploy(platform).observe(telemetry, alerts, dashboards)"
+    ]
+  },
+  AI: {
+    label: "AI engineering",
+    statement: "Turn an uncertain question into an evaluated, observable system.",
+    steps: ["Frame", "Retrieve", "Generate", "Evaluate", "Observe"],
+    snippet: [
+      "context = retrieve(question, public_evidence)",
+      "answer = model.generate(context, constraints)",
+      "score = evaluate(answer, citations, risk)",
+      "return answer if score.passes else abstain"
     ]
   }
 } as const;
@@ -47,7 +57,7 @@ export function EngineeringProcesses() {
   return (
     <section id="process" className="process-section" aria-labelledby="process-title">
       <header className="process-heading">
-        <p>02 / Engineering process</p>
+        <p>Engineering process</p>
         <h2 id="process-title">The work behind the outcome.</h2>
         <span>
           Small, inspectable views into how I approach AI, data, and software systems. These are

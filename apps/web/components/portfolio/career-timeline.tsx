@@ -25,7 +25,7 @@ export function CareerTimeline({ stages = [] }: { stages?: readonly CareerTimeli
     <section id="experience" className="experience-section" aria-labelledby="career-title">
       <span id="career" aria-hidden="true" />
       <header className="editorial-heading">
-        <p>04 / Experience</p>
+        <p>Experience</p>
         <h2 id="career-title">The journey, company by company.</h2>
         <span>A brief of every chapter is always visible. Open one to see the work behind it.</span>
       </header>

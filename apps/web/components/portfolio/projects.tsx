@@ -15,7 +15,7 @@ export function Projects({
   return (
     <section id="projects" className="projects-section" aria-labelledby="projects-title">
       <header className="editorial-heading projects-heading">
-        <p>05 / Selected projects</p>
+        <p>Selected projects</p>
         <h2 id="projects-title">A few things I&apos;ve made curious on purpose.</h2>
         <span>
           Working systems and technical experiments, each with a public path to inspect or try it.

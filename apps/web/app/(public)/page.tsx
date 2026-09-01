@@ -67,7 +67,7 @@ export default async function PublicPortfolioPage() {
       summary: "Designing scalable data platforms with measurable outcomes."
     },
     {
-      title: "AI Engineer (Software + Data)",
+      title: "AI Engineer (Software / Data)",
       summary:
         "A parallel capability combining software and data foundations for practical AI systems."
     }
@@ -199,8 +199,8 @@ export default async function PublicPortfolioPage() {
           />
           <div className="portfolio-stream">
             <Hero name={displayName} headline={headline} />
-            <EngineeringProcesses />
             <About bio={bio} />
+            <EngineeringProcesses />
             <CareerTimeline stages={timelineStages} />
             <Projects items={renderedProjects} />
             <div className="intelligence-grid">
