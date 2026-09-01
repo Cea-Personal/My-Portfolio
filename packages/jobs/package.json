@@ -1,0 +1,12 @@
+{
+  "name": "@career-os/jobs",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.ts",
+  "dependencies": {
+    "@career-os/config": "workspace:*",
+    "@career-os/knowledge": "workspace:*",
+    "@supabase/supabase-js": "2.112.4"
+  }
+}

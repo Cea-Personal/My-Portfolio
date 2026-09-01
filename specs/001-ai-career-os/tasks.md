@@ -55,21 +55,21 @@ the task. A task may narrow a range-level dependency only when the change is rec
 
 **Purpose**: Create the greenfield monorepo, toolchains, local services, and CI entry points.
 
-- [ ] T001 Create the root pnpm workspace manifest with pinned Node/pnpm versions and scripts in `package.json`
-- [ ] T002 Create workspace package discovery and task graph configuration in `pnpm-workspace.yaml` and `turbo.json`
-- [ ] T003 [P] Scaffold the Next.js 16 App Router application and dependency manifest in `apps/web/package.json` and `apps/web/app/layout.tsx`
-- [ ] T004 [P] Scaffold the Python 3.13 worker with uv locking and console entry point in `apps/worker/pyproject.toml` and `apps/worker/src/career_worker/__main__.py`
-- [ ] T005 Create domain manifests in `packages/ai/package.json`, `packages/career/package.json`, `packages/knowledge/package.json`, `packages/jobs/package.json`, `packages/applications/package.json`, `packages/interviews/package.json`, `packages/compensation/package.json`, `packages/documents/package.json`, `packages/analytics/package.json`, `packages/database/package.json`, `packages/auth/package.json`, `packages/contracts/package.json`, `packages/ui/package.json`, `packages/config/package.json`, and `packages/observability/package.json`
-- [ ] T006 [P] Configure strict shared TypeScript settings and path aliases in `tsconfig.base.json` and `packages/config/tsconfig.json`
-- [ ] T007 [P] Configure TypeScript formatting, linting, and import-boundary rules in `eslint.config.mjs` and `.prettierrc.json`
-- [ ] T008 [P] Configure Python linting, typing, test defaults, and dependency policy in `apps/worker/pyproject.toml` and `apps/worker/ruff.toml`
-- [ ] T009 Create safe environment examples and validation documentation in `.env.example` and `apps/worker/.env.example`
-- [ ] T010 [P] Configure the local Supabase project, schemas, and seed entry points in `supabase/config.toml` and `supabase/seed/README.md`
-- [ ] T011 [P] Configure local Inngest development scripts and environment separation in `apps/web/inngest/client.ts` and `apps/worker/src/career_worker/workflows/client.py`
-- [ ] T012 [P] Configure Vitest, pytest, Playwright, axe, and k6 test entry points in `vitest.config.ts`, `apps/worker/pytest.ini`, `playwright.config.ts`, and `tests/performance/k6.config.js`
-- [ ] T013 [P] Configure a local OpenTelemetry Collector with an attribute allowlist and vendor-disabled defaults in `infra/observability/otel-collector.local.yaml`
-- [ ] T014 [P] Create the digest-pinnable non-root worker container and health check in `infra/worker/Dockerfile` and `apps/worker/src/career_worker/health.py`
-- [ ] T015 Create the base pull-request CI workflow for lint, types, units, migrations, contracts, and builds in `.github/workflows/ci.yml`
+- [X] T001 Create the root pnpm workspace manifest with pinned Node/pnpm versions and scripts in `package.json`
+- [X] T002 Create workspace package discovery and task graph configuration in `pnpm-workspace.yaml` and `turbo.json`
+- [X] T003 [P] Scaffold the Next.js 16 App Router application and dependency manifest in `apps/web/package.json` and `apps/web/app/layout.tsx`
+- [X] T004 [P] Scaffold the Python 3.13 worker with uv locking and console entry point in `apps/worker/pyproject.toml` and `apps/worker/src/career_worker/__main__.py`
+- [X] T005 Create domain manifests in `packages/ai/package.json`, `packages/career/package.json`, `packages/knowledge/package.json`, `packages/jobs/package.json`, `packages/applications/package.json`, `packages/interviews/package.json`, `packages/compensation/package.json`, `packages/documents/package.json`, `packages/analytics/package.json`, `packages/database/package.json`, `packages/auth/package.json`, `packages/contracts/package.json`, `packages/ui/package.json`, `packages/config/package.json`, and `packages/observability/package.json`
+- [X] T006 [P] Configure strict shared TypeScript settings and path aliases in `tsconfig.base.json` and `packages/config/tsconfig.json`
+- [X] T007 [P] Configure TypeScript formatting, linting, and import-boundary rules in `eslint.config.mjs` and `.prettierrc.json`
+- [X] T008 [P] Configure Python linting, typing, test defaults, and dependency policy in `apps/worker/pyproject.toml` and `apps/worker/ruff.toml`
+- [X] T009 Create safe environment examples and validation documentation in `.env.example` and `apps/worker/.env.example`
+- [X] T010 [P] Configure the local Supabase project, schemas, and seed entry points in `supabase/config.toml` and `supabase/seed/README.md`
+- [X] T011 [P] Configure local Inngest development scripts and environment separation in `apps/web/inngest/client.ts` and `apps/worker/src/career_worker/workflows/client.py`
+- [X] T012 [P] Configure Vitest, pytest, Playwright, axe, and k6 test entry points in `vitest.config.ts`, `apps/worker/pytest.ini`, `playwright.config.ts`, and `tests/performance/k6.config.js`
+- [X] T013 [P] Configure a local OpenTelemetry Collector with an attribute allowlist and vendor-disabled defaults in `infra/observability/otel-collector.local.yaml`
+- [X] T014 [P] Create the digest-pinnable non-root worker container and health check in `infra/worker/Dockerfile` and `apps/worker/src/career_worker/health.py`
+- [X] T015 Create the base pull-request CI workflow for lint, types, units, migrations, contracts, and builds in `.github/workflows/ci.yml`
 
 **Checkpoint**: The empty web app, worker, local database, workflow runner, test runners, and CI all start
 without production credentials.
@@ -83,36 +83,36 @@ by every user story.
 
 **⚠️ CRITICAL**: No user story implementation starts until this phase passes its checkpoint.
 
-- [ ] T016 Implement typed environment validation with public/server secret separation in `packages/config/src/env.ts` and `apps/worker/src/career_worker/config.py`
-- [ ] T017 [P] Implement shared identifiers, timestamps, money, visibility, trust, and run-state schemas in `packages/contracts/src/common.ts`
-- [ ] T018 [P] Implement RFC 9457 errors, safe error mapping, and correlation IDs in `packages/contracts/src/problems.ts` and `packages/observability/src/correlation.ts`
-- [ ] T019 Implement server, browser, and middleware Supabase clients with private/no-store auth behavior in `packages/database/src/supabase/server.ts`, `packages/database/src/supabase/browser.ts`, and `apps/web/proxy.ts`
-- [ ] T020 Implement and test authenticated owner session, current-profile API, and route/action authorization helpers plus sign-in, verified callback, sign-out, expired-session, and unauthorized UX in `packages/auth/src/session.ts`, `packages/auth/src/authorize.ts`, `apps/web/app/api/v1/me/route.ts`, `apps/web/app/(auth)/sign-in/page.tsx`, `apps/web/app/auth/callback/route.ts`, `apps/web/app/(auth)/session-expired/page.tsx`, `apps/web/app/(auth)/unauthorized/page.tsx`, `tests/security/auth-callback.test.ts`, and `tests/e2e/auth.spec.ts`
-- [ ] T021 Create base `app`, `published`, and `api` schemas plus profiles, integration connections, audit, outbox, idempotency, and run tables in `supabase/migrations/0001_foundation.sql`
-- [ ] T022 Apply default-deny grants, RLS policies, fixed-search-path functions, and security-invoker view rules in `supabase/migrations/0002_foundation_security.sql`
-- [ ] T023 [P] Write pgTAP allow/deny tests for anonymous, owner, cross-owner, workflow, and service roles in `supabase/tests/001_foundation_rls.test.sql`
-- [ ] T024 Configure private source/artifact buckets, sanitized public-media bucket, and object policies in `supabase/migrations/0003_storage_policies.sql`
-- [ ] T025 Generate database types and establish the no-dual-ORM repository convention in `packages/database/src/generated/database.types.ts` and `packages/database/README.md`
-- [ ] T026 [P] Implement distinct owner, public, and workflow repository factories in `packages/database/src/repositories/owner.ts`, `packages/database/src/repositories/public.ts`, and `packages/database/src/repositories/workflow.ts`
-- [ ] T027 [P] Implement reusable revision and idempotency guards in `packages/database/src/idempotency.ts` and `packages/database/src/revision.ts`
-- [ ] T028 [P] Implement append-only audit recording with metadata allowlists and the owner-only paged audit endpoint in `packages/database/src/audit.ts` and `apps/web/app/api/v1/audit-events/route.ts`
-- [ ] T029 Implement transactional domain-event outbox writes and dispatcher leases in `packages/database/src/outbox.ts`
-- [ ] T030 Implement the versioned workflow event envelope and runtime validators in `packages/contracts/src/events.ts` and `apps/worker/src/career_worker/contracts/events.py`
-- [ ] T031 Implement the outbox-to-Inngest publisher with stable event IDs in `apps/web/inngest/outbox-publisher.ts`
-- [ ] T032 [P] Implement the TypeScript Inngest serve endpoint and signed request verification in `apps/web/app/api/inngest/route.ts`
-- [ ] T033 [P] Implement the Python Inngest serve application and signed request verification in `apps/worker/src/career_worker/workflows/serve.py`
-- [ ] T034 Implement app-owned automation run/step repositories and status transitions in `packages/database/src/repositories/runs.ts` and `apps/worker/src/career_worker/repositories/runs.py`
-- [ ] T035 Define provider-neutral generation, structured output, streaming, embedding, reranking, and tool-proposal ports in `packages/ai/src/ports.ts` and `apps/worker/src/career_worker/providers/ports.py`
-- [ ] T036 [P] Implement deterministic fake adapters in `tests/fixtures/providers/ai.ts`, `tests/fixtures/providers/embeddings.ts`, `tests/fixtures/providers/reranker.ts`, `tests/fixtures/providers/drive.ts`, `tests/fixtures/providers/job-source.ts`, and `apps/worker/tests/fakes/providers.py`
-- [ ] T037 Implement secret-reference and integration-configuration services without plaintext secret reads in `packages/config/src/secrets.ts` and `packages/auth/src/integrations.ts`
-- [ ] T038 Implement explicit confirmation tokens for publish/final/submitted-record actions in `packages/auth/src/confirmation.ts`
-- [ ] T039 Implement API schema validation, correlation, idempotency, origin/CSRF, and rate-limit middleware plus the shared redirect-aware HTTPS/SSRF/size/timeout safe-fetch boundary in `apps/web/lib/api/guard.ts` and `apps/web/lib/security/safe-fetch.ts`
-- [ ] T040 Implement OpenTelemetry setup with metadata-only AI spans and keyed owner pseudonyms in `packages/observability/src/otel.ts` and `apps/worker/src/career_worker/observability.py`
-- [ ] T041 [P] Write telemetry redaction tests for secrets, signed URLs, prompts, evidence, CVs, JDs, and journals in `tests/security/telemetry-redaction.test.ts` and `apps/worker/tests/test_telemetry_redaction.py`
-- [ ] T042 Integrate sanitized Sentry errors and consent-gated PostHog clients in `packages/observability/src/sentry.ts` and `packages/analytics/src/posthog.ts`
-- [ ] T043 [P] Implement design tokens, typography, focus, contrast, and reduced-motion defaults in `packages/ui/src/styles/tokens.css` and `packages/ui/src/styles/globals.css`
-- [ ] T044 [P] Implement accessible primitives in `packages/ui/src/components/button.tsx`, `packages/ui/src/components/link.tsx`, `packages/ui/src/components/dialog.tsx`, `packages/ui/src/components/form-field.tsx`, `packages/ui/src/components/status.tsx`, `packages/ui/src/components/table.tsx`, `packages/ui/src/components/tabs.tsx`, `packages/ui/src/components/toast.tsx`, and `packages/ui/src/components/index.ts`
-- [ ] T045 Create deterministic owner, publication, evidence, job, application, and provider fixture builders in `tests/fixtures/builders.ts` and `supabase/seed/acceptance.sql`
+- [X] T016 Implement typed environment validation with public/server secret separation in `packages/config/src/env.ts` and `apps/worker/src/career_worker/config.py`
+- [X] T017 [P] Implement shared identifiers, timestamps, money, visibility, trust, and run-state schemas in `packages/contracts/src/common.ts`
+- [X] T018 [P] Implement RFC 9457 errors, safe error mapping, and correlation IDs in `packages/contracts/src/problems.ts` and `packages/observability/src/correlation.ts`
+- [X] T019 Implement server, browser, and middleware Supabase clients with private/no-store auth behavior in `packages/database/src/supabase/server.ts`, `packages/database/src/supabase/browser.ts`, and `apps/web/proxy.ts`
+- [X] T020 Implement and test authenticated owner session, current-profile API, and route/action authorization helpers plus sign-in, verified callback, sign-out, expired-session, and unauthorized UX in `packages/auth/src/session.ts`, `packages/auth/src/authorize.ts`, `apps/web/app/api/v1/me/route.ts`, `apps/web/app/(auth)/sign-in/page.tsx`, `apps/web/app/auth/callback/route.ts`, `apps/web/app/(auth)/session-expired/page.tsx`, `apps/web/app/(auth)/unauthorized/page.tsx`, `tests/security/auth-callback.test.ts`, and `tests/e2e/auth.spec.ts`
+- [X] T021 Create base `app`, `published`, and `api` schemas plus profiles, integration connections, audit, outbox, idempotency, and run tables in `supabase/migrations/0001_foundation.sql`
+- [X] T022 Apply default-deny grants, RLS policies, fixed-search-path functions, and security-invoker view rules in `supabase/migrations/0002_foundation_security.sql`
+- [X] T023 [P] Write pgTAP allow/deny tests for anonymous, owner, cross-owner, workflow, and service roles in `supabase/tests/001_foundation_rls.test.sql`
+- [X] T024 Configure private source/artifact buckets, sanitized public-media bucket, and object policies in `supabase/migrations/0003_storage_policies.sql`
+- [X] T025 Generate database types and establish the no-dual-ORM repository convention in `packages/database/src/generated/database.types.ts` and `packages/database/README.md`
+- [X] T026 [P] Implement distinct owner, public, and workflow repository factories in `packages/database/src/repositories/owner.ts`, `packages/database/src/repositories/public.ts`, and `packages/database/src/repositories/workflow.ts`
+- [X] T027 [P] Implement reusable revision and idempotency guards in `packages/database/src/idempotency.ts` and `packages/database/src/revision.ts`
+- [X] T028 [P] Implement append-only audit recording with metadata allowlists and the owner-only paged audit endpoint in `packages/database/src/audit.ts` and `apps/web/app/api/v1/audit-events/route.ts`
+- [X] T029 Implement transactional domain-event outbox writes and dispatcher leases in `packages/database/src/outbox.ts`
+- [X] T030 Implement the versioned workflow event envelope and runtime validators in `packages/contracts/src/events.ts` and `apps/worker/src/career_worker/contracts/events.py`
+- [X] T031 Implement the outbox-to-Inngest publisher with stable event IDs in `apps/web/inngest/outbox-publisher.ts`
+- [X] T032 [P] Implement the TypeScript Inngest serve endpoint and signed request verification in `apps/web/app/api/inngest/route.ts`
+- [X] T033 [P] Implement the Python Inngest serve application and signed request verification in `apps/worker/src/career_worker/workflows/serve.py`
+- [X] T034 Implement app-owned automation run/step repositories and status transitions in `packages/database/src/repositories/runs.ts` and `apps/worker/src/career_worker/repositories/runs.py`
+- [X] T035 Define provider-neutral generation, structured output, streaming, embedding, reranking, and tool-proposal ports in `packages/ai/src/ports.ts` and `apps/worker/src/career_worker/providers/ports.py`
+- [X] T036 [P] Implement deterministic fake adapters in `tests/fixtures/providers/ai.ts`, `tests/fixtures/providers/embeddings.ts`, `tests/fixtures/providers/reranker.ts`, `tests/fixtures/providers/drive.ts`, `tests/fixtures/providers/job-source.ts`, and `apps/worker/tests/fakes/providers.py`
+- [X] T037 Implement secret-reference and integration-configuration services without plaintext secret reads in `packages/config/src/secrets.ts` and `packages/auth/src/integrations.ts`
+- [X] T038 Implement explicit confirmation tokens for publish/final/submitted-record actions in `packages/auth/src/confirmation.ts`
+- [X] T039 Implement API schema validation, correlation, idempotency, origin/CSRF, and rate-limit middleware plus the shared redirect-aware HTTPS/SSRF/size/timeout safe-fetch boundary in `apps/web/lib/api/guard.ts` and `apps/web/lib/security/safe-fetch.ts`
+- [X] T040 Implement OpenTelemetry setup with metadata-only AI spans and keyed owner pseudonyms in `packages/observability/src/otel.ts` and `apps/worker/src/career_worker/observability.py`
+- [X] T041 [P] Write telemetry redaction tests for secrets, signed URLs, prompts, evidence, CVs, JDs, and journals in `tests/security/telemetry-redaction.test.ts` and `apps/worker/tests/test_telemetry_redaction.py`
+- [X] T042 Integrate sanitized Sentry errors and consent-gated PostHog clients in `packages/observability/src/sentry.ts` and `packages/analytics/src/posthog.ts`
+- [X] T043 [P] Implement design tokens, typography, focus, contrast, and reduced-motion defaults in `packages/ui/src/styles/tokens.css` and `packages/ui/src/styles/globals.css`
+- [X] T044 [P] Implement accessible primitives in `packages/ui/src/components/button.tsx`, `packages/ui/src/components/link.tsx`, `packages/ui/src/components/dialog.tsx`, `packages/ui/src/components/form-field.tsx`, `packages/ui/src/components/status.tsx`, `packages/ui/src/components/table.tsx`, `packages/ui/src/components/tabs.tsx`, `packages/ui/src/components/toast.tsx`, and `packages/ui/src/components/index.ts`
+- [X] T045 Create deterministic owner, publication, evidence, job, application, and provider fixture builders in `tests/fixtures/builders.ts` and `supabase/seed/acceptance.sql`
 
 **Checkpoint**: Authentication, RLS, private storage, contracts, idempotent workflow dispatch, safe
 telemetry, shared UI, and fixtures pass before story work begins.
@@ -130,43 +130,43 @@ approved public fact is eligible for publication.
 
 ### Tests for User Story 1 — write first and confirm expected failures
 
-- [ ] T046 [P] [US1] Write database constraint and RLS tests for structured career records and owner isolation in `supabase/tests/010_career_records.test.sql`
-- [ ] T047 [P] [US1] Write append-only fact-version, trust/review, evidence, visibility, and publication-eligibility tests in `supabase/tests/011_career_evidence.test.sql`
-- [ ] T048 [P] [US1] Write HTTP contract tests for career facts, experiences, projects, achievements, skills, and reviews in `tests/contract/career-api.contract.test.ts`
-- [ ] T049 [P] [US1] Write HTTP/event contract tests for Drive connection, upload, sync, ingestion status, cancellation, and fact review in `tests/contract/document-ingestion.contract.test.ts`
-- [ ] T050 [P] [US1] Write integration tests for manual fact creation, correction, approval, visibility, and provenance in `tests/integration/career-fact-review.test.ts`
-- [ ] T051 [P] [US1] Write integration tests for Drive cursor paging, webhook wake-up, reconciliation, unchanged hashes, revisions, removals, and permission loss in `tests/integration/drive-sync.test.ts`
-- [ ] T052 [P] [US1] Write security tests for MIME mismatch, PDF resource exhaustion, DOCX zip bombs, hidden instructions, parser timeout, and quarantine in `apps/worker/tests/test_untrusted_documents.py`
-- [ ] T053 [P] [US1] Write worker tests for PDF/DOCX/text parsing anchors, chunk hashes, extraction schemas, and idempotent embeddings in `apps/worker/tests/test_ingestion_pipeline.py`
-- [ ] T054 [US1] Write the independent Career Brain browser journey from quickstart scenarios 2–3 in `tests/e2e/career-brain.spec.ts`
+- [X] T046 [P] [US1] Write database constraint and RLS tests for structured career records and owner isolation in `supabase/tests/010_career_records.test.sql`
+- [X] T047 [P] [US1] Write append-only fact-version, trust/review, evidence, visibility, and publication-eligibility tests in `supabase/tests/011_career_evidence.test.sql`
+- [X] T048 [P] [US1] Write HTTP contract tests for career facts, experiences, projects, achievements, skills, and reviews in `tests/contract/career-api.contract.test.ts`
+- [X] T049 [P] [US1] Write HTTP/event contract tests for Drive connection, upload, sync, ingestion status, cancellation, and fact review in `tests/contract/document-ingestion.contract.test.ts`
+- [X] T050 [P] [US1] Write integration tests for manual fact creation, correction, approval, visibility, and provenance in `tests/integration/career-fact-review.test.ts`
+- [X] T051 [P] [US1] Write integration tests for Drive cursor paging, webhook wake-up, reconciliation, unchanged hashes, revisions, removals, and permission loss in `tests/integration/drive-sync.test.ts`
+- [X] T052 [P] [US1] Write security tests for MIME mismatch, PDF resource exhaustion, DOCX zip bombs, hidden instructions, parser timeout, and quarantine in `apps/worker/tests/test_untrusted_documents.py`
+- [X] T053 [P] [US1] Write worker tests for PDF/DOCX/text parsing anchors, chunk hashes, extraction schemas, and idempotent embeddings in `apps/worker/tests/test_ingestion_pipeline.py`
+- [X] T054 [US1] Write the independent Career Brain browser journey from quickstart scenarios 2–3 in `tests/e2e/career-brain.spec.ts`
 
 ### Implementation for User Story 1
 
-- [ ] T055 [US1] Create organizations, experiences, skills, projects, achievements, metrics, education, certifications, decisions, and leadership tables in `supabase/migrations/0010_career_records.sql`
-- [ ] T056 [US1] Create career facts, immutable versions, review state, supersession, and contribution constraints in `supabase/migrations/0011_career_facts.sql`
-- [ ] T057 [US1] Create evidence sources/versions/chunks, claim-evidence links, and provenance constraints in `supabase/migrations/0012_evidence.sql`
-- [ ] T058 [US1] Create documents, document versions, ingestion runs/items, extracted facts, and review records in `supabase/migrations/0013_documents_ingestion.sql`
-- [ ] T059 [US1] Create projection rules, staged/published snapshots, public items, and public evidence tables in `supabase/migrations/0014_portfolio_projection.sql`
-- [ ] T060 [US1] Add career/evidence/document/projection RLS, append-only guards, GIN search index, vector extension, and indexes in `supabase/migrations/0015_career_security_indexes.sql`
-- [ ] T061 [P] [US1] Implement TypeScript career, evidence, document, and projection repositories in `packages/database/src/repositories/career.ts`, `packages/database/src/repositories/evidence.ts`, `packages/database/src/repositories/documents.ts`, and `packages/database/src/repositories/projection.ts`
-- [ ] T062 [P] [US1] Implement Python evidence/document/chunk repositories with owner and source-version checks in `apps/worker/src/career_worker/repositories/evidence.py`
-- [ ] T063 [US1] Implement manual fact creation, immutable correction, structured entity linking, and archival in `packages/career/src/facts.ts`
-- [ ] T064 [US1] Implement approve, edit-and-approve, reject, defer, trust, and visibility transition rules in `packages/career/src/review.ts`
-- [ ] T065 [US1] Implement provenance validation, claim-evidence support classes, source availability, and conflict handling in `packages/knowledge/src/evidence.ts`
-- [ ] T066 [US1] Implement projection preview validation and confirmed immutable publication/withdrawal in `packages/career/src/publication.ts`
-- [ ] T067 [P] [US1] Implement Google Drive OAuth, start/change tokens, paged drain, channel renewal, exports, and content hashes in `packages/documents/src/google-drive.ts`
-- [ ] T068 [US1] Implement verified Drive authorization/callback/webhook and connection revocation routes in `apps/web/app/api/v1/integrations/drive/authorize/route.ts`, `apps/web/app/api/v1/integrations/drive/callback/route.ts`, `apps/web/app/api/v1/integrations/drive/webhook/route.ts`, and `apps/web/app/api/v1/integrations/[id]/route.ts`
-- [ ] T069 [US1] Implement Drive reconciliation and document-change durable workflows with transactional cursor/outbox semantics in `apps/web/inngest/drive-sync.ts`
-- [ ] T070 [P] [US1] Implement bounded private upload creation, object metadata, and reprocess requests in `packages/documents/src/uploads.ts`
-- [ ] T071 [US1] Implement file signature/size validation, quarantine, scanner hooks, and resource-limit policy in `apps/worker/src/career_worker/security/file_validation.py`
-- [ ] T072 [US1] Implement isolated PDF, DOCX, Markdown/text parsers and bounded OCR fallback in `apps/worker/src/career_worker/parsing/parsers.py`
-- [ ] T073 [US1] Implement normalization, page/section/offset mapping, chunking, and immutable content hashes in `apps/worker/src/career_worker/ingestion/chunking.py`
-- [ ] T074 [US1] Implement schema-only career extraction with evidence spans and candidate-only persistence in `apps/worker/src/career_worker/extraction/career_facts.py`
-- [ ] T075 [US1] Implement versioned embedding generation, compatible-dimension checks, and idempotent upserts in `apps/worker/src/career_worker/ingestion/embeddings.py`
-- [ ] T076 [US1] Implement parsing, extraction, embedding, removal, retry, partial, and cancellation workflows in `apps/worker/src/career_worker/workflows/ingestion.py`
-- [ ] T077 [US1] Implement owner career/document/review/projection APIs from the HTTP contract in `apps/web/app/api/v1/career/facts/route.ts`, `apps/web/app/api/v1/career/facts/[id]/route.ts`, `apps/web/app/api/v1/career/facts/[id]/review/route.ts`, `apps/web/app/api/v1/career/experiences/route.ts`, `apps/web/app/api/v1/career/experiences/[id]/route.ts`, `apps/web/app/api/v1/career/projects/route.ts`, `apps/web/app/api/v1/career/projects/[id]/route.ts`, `apps/web/app/api/v1/career/achievements/route.ts`, `apps/web/app/api/v1/career/skills/route.ts`, `apps/web/app/api/v1/career/evidence/[id]/route.ts`, `apps/web/app/api/v1/documents/route.ts`, `apps/web/app/api/v1/documents/uploads/route.ts`, `apps/web/app/api/v1/documents/sync-runs/route.ts`, `apps/web/app/api/v1/ingestion-runs/[id]/route.ts`, `apps/web/app/api/v1/ingestion-runs/[id]/cancel/route.ts`, `apps/web/app/api/v1/fact-reviews/route.ts`, `apps/web/app/api/v1/portfolio/projection/route.ts`, `apps/web/app/api/v1/portfolio/projection/[sourceType]/[sourceId]/route.ts`, `apps/web/app/api/v1/portfolio/previews/route.ts`, `apps/web/app/api/v1/portfolio/publications/route.ts`, and `apps/web/app/api/v1/portfolio/publications/[id]/withdraw/route.ts`
-- [ ] T078 [P] [US1] Build Career Brain list/detail/edit and evidence-provenance UI in `apps/web/app/(dashboard)/career-brain/page.tsx` and `apps/web/components/dashboard/career-brain/index.tsx`
-- [ ] T079 [US1] Build Documents, ingestion-run progress, fact-review queue, and projection-preview UI and make all US1 tests pass in `apps/web/app/(dashboard)/documents/page.tsx` and `apps/web/components/dashboard/fact-review/index.tsx`
+- [X] T055 [US1] Create organizations, experiences, skills, projects, achievements, metrics, education, certifications, decisions, and leadership tables in `supabase/migrations/0010_career_records.sql`
+- [X] T056 [US1] Create career facts, immutable versions, review state, supersession, and contribution constraints in `supabase/migrations/0011_career_facts.sql`
+- [X] T057 [US1] Create evidence sources/versions/chunks, claim-evidence links, and provenance constraints in `supabase/migrations/0012_evidence.sql`
+- [X] T058 [US1] Create documents, document versions, ingestion runs/items, extracted facts, and review records in `supabase/migrations/0013_documents_ingestion.sql`
+- [X] T059 [US1] Create projection rules, staged/published snapshots, public items, and public evidence tables in `supabase/migrations/0014_portfolio_projection.sql`
+- [X] T060 [US1] Add career/evidence/document/projection RLS, append-only guards, GIN search index, vector extension, and indexes in `supabase/migrations/0015_career_security_indexes.sql`
+- [X] T061 [P] [US1] Implement TypeScript career, evidence, document, and projection repositories in `packages/database/src/repositories/career.ts`, `packages/database/src/repositories/evidence.ts`, `packages/database/src/repositories/documents.ts`, and `packages/database/src/repositories/projection.ts`
+- [X] T062 [P] [US1] Implement Python evidence/document/chunk repositories with owner and source-version checks in `apps/worker/src/career_worker/repositories/evidence.py`
+- [X] T063 [US1] Implement manual fact creation, immutable correction, structured entity linking, and archival in `packages/career/src/facts.ts`
+- [X] T064 [US1] Implement approve, edit-and-approve, reject, defer, trust, and visibility transition rules in `packages/career/src/review.ts`
+- [X] T065 [US1] Implement provenance validation, claim-evidence support classes, source availability, and conflict handling in `packages/knowledge/src/evidence.ts`
+- [X] T066 [US1] Implement projection preview validation and confirmed immutable publication/withdrawal in `packages/career/src/publication.ts`
+- [X] T067 [P] [US1] Implement Google Drive OAuth, start/change tokens, paged drain, channel renewal, exports, and content hashes in `packages/documents/src/google-drive.ts`
+- [X] T068 [US1] Implement verified Drive authorization/callback/webhook and connection revocation routes in `apps/web/app/api/v1/integrations/drive/authorize/route.ts`, `apps/web/app/api/v1/integrations/drive/callback/route.ts`, `apps/web/app/api/v1/integrations/drive/webhook/route.ts`, and `apps/web/app/api/v1/integrations/[id]/route.ts`
+- [X] T069 [US1] Implement Drive reconciliation and document-change durable workflows with transactional cursor/outbox semantics in `apps/web/inngest/drive-sync.ts`
+- [X] T070 [P] [US1] Implement bounded private upload creation, object metadata, and reprocess requests in `packages/documents/src/uploads.ts`
+- [X] T071 [US1] Implement file signature/size validation, quarantine, scanner hooks, and resource-limit policy in `apps/worker/src/career_worker/security/file_validation.py`
+- [X] T072 [US1] Implement isolated PDF, DOCX, Markdown/text parsers and bounded OCR fallback in `apps/worker/src/career_worker/parsing/parsers.py`
+- [X] T073 [US1] Implement normalization, page/section/offset mapping, chunking, and immutable content hashes in `apps/worker/src/career_worker/ingestion/chunking.py`
+- [X] T074 [US1] Implement schema-only career extraction with evidence spans and candidate-only persistence in `apps/worker/src/career_worker/extraction/career_facts.py`
+- [X] T075 [US1] Implement versioned embedding generation, compatible-dimension checks, and idempotent upserts in `apps/worker/src/career_worker/ingestion/embeddings.py`
+- [X] T076 [US1] Implement parsing, extraction, embedding, removal, retry, partial, and cancellation workflows in `apps/worker/src/career_worker/workflows/ingestion.py`
+- [X] T077 [US1] Implement owner career/document/review/projection APIs from the HTTP contract in `apps/web/app/api/v1/career/facts/route.ts`, `apps/web/app/api/v1/career/facts/[id]/route.ts`, `apps/web/app/api/v1/career/facts/[id]/review/route.ts`, `apps/web/app/api/v1/career/experiences/route.ts`, `apps/web/app/api/v1/career/experiences/[id]/route.ts`, `apps/web/app/api/v1/career/projects/route.ts`, `apps/web/app/api/v1/career/projects/[id]/route.ts`, `apps/web/app/api/v1/career/achievements/route.ts`, `apps/web/app/api/v1/career/skills/route.ts`, `apps/web/app/api/v1/career/evidence/[id]/route.ts`, `apps/web/app/api/v1/documents/route.ts`, `apps/web/app/api/v1/documents/uploads/route.ts`, `apps/web/app/api/v1/documents/sync-runs/route.ts`, `apps/web/app/api/v1/ingestion-runs/[id]/route.ts`, `apps/web/app/api/v1/ingestion-runs/[id]/cancel/route.ts`, `apps/web/app/api/v1/fact-reviews/route.ts`, `apps/web/app/api/v1/portfolio/projection/route.ts`, `apps/web/app/api/v1/portfolio/projection/[sourceType]/[sourceId]/route.ts`, `apps/web/app/api/v1/portfolio/previews/route.ts`, `apps/web/app/api/v1/portfolio/publications/route.ts`, and `apps/web/app/api/v1/portfolio/publications/[id]/withdraw/route.ts`
+- [X] T078 [P] [US1] Build Career Brain list/detail/edit and evidence-provenance UI in `apps/web/app/(dashboard)/career-brain/page.tsx` and `apps/web/components/dashboard/career-brain/index.tsx`
+- [X] T079 [US1] Build Documents, ingestion-run progress, fact-review queue, and projection-preview UI and make all US1 tests pass in `apps/web/app/(dashboard)/documents/page.tsx` and `apps/web/components/dashboard/fact-review/index.tsx`
 
 **Checkpoint**: User Story 1 is independently deployable as a private trusted Career Brain MVP with a
 staged publication boundary; it does not require the final public portfolio UI.
@@ -183,28 +183,28 @@ mobile with keyboard/screen reader/reduced motion, then stop private services an
 
 ### Tests for User Story 2 — write first and confirm expected failures
 
-- [ ] T080 [P] [US2] Write public portfolio/project/article/evidence contract tests that reject private fields in `tests/contract/public-portfolio.contract.test.ts`
-- [ ] T081 [P] [US2] Write desktop/mobile one-page navigation and public detail-route tests in `tests/e2e/public-portfolio.spec.ts`
-- [ ] T082 [P] [US2] Write keyboard, landmark, focus, contrast, screen-reader, and reduced-motion tests in `tests/accessibility/public-portfolio.a11y.spec.ts`
-- [ ] T083 [P] [US2] Write public content timing, bundle, image, and timeline-scroll budgets in `tests/performance/public-portfolio.js`
-- [ ] T084 [P] [US2] Write unit tests for publication-to-section view-model ordering and impact-first presentation in `packages/career/src/public-view.test.ts`
+- [X] T080 [P] [US2] Write public portfolio/project/article/evidence contract tests that reject private fields in `tests/contract/public-portfolio.contract.test.ts`
+- [X] T081 [P] [US2] Write desktop/mobile one-page navigation and public detail-route tests in `tests/e2e/public-portfolio.spec.ts`
+- [X] T082 [P] [US2] Write keyboard, landmark, focus, contrast, screen-reader, and reduced-motion tests in `tests/accessibility/public-portfolio.a11y.spec.ts`
+- [X] T083 [P] [US2] Write public content timing, bundle, image, and timeline-scroll budgets in `tests/performance/public-portfolio.js`
+- [X] T084 [P] [US2] Write unit tests for publication-to-section view-model ordering and impact-first presentation in `packages/career/src/public-view.test.ts`
 
 ### Implementation for User Story 2
 
-- [ ] T085 [US2] Implement active-publication repository and safe public evidence lookup in `packages/database/src/repositories/publication.ts`
-- [ ] T086 [US2] Implement public portfolio, project, article, and evidence routes with publication-version caching in `apps/web/app/api/v1/public/portfolio/route.ts`, `apps/web/app/api/v1/public/projects/[slug]/route.ts`, `apps/web/app/api/v1/public/posts/[slug]/route.ts`, and `apps/web/app/api/v1/public/evidence/[id]/route.ts`
-- [ ] T087 [US2] Compose the semantic single-page public route from active publication sections in `apps/web/app/(public)/page.tsx`
-- [ ] T088 [P] [US2] Implement concise Hero and About sections with approved links/actions in `apps/web/components/portfolio/hero.tsx` and `apps/web/components/portfolio/about.tsx`
-- [ ] T089 [US2] Implement desktop sticky career rail, active-stage observation, mobile vertical timeline, and reduced-motion fallback in `apps/web/components/portfolio/career-timeline.tsx`
-- [ ] T090 [P] [US2] Implement approved Selected Projects and Measurable Impact sections with contextualized metrics in `apps/web/components/portfolio/projects.tsx` and `apps/web/components/portfolio/impact.tsx`
-- [ ] T091 [P] [US2] Implement Skills, Writing preview, and owner-approved Contact sections in `apps/web/components/portfolio/skills.tsx`, `apps/web/components/portfolio/writing.tsx`, and `apps/web/components/portfolio/contact.tsx`
-- [ ] T092 [P] [US2] Implement accessible Role Match and Ask My AI section shells with non-AI unavailable states in `apps/web/components/portfolio/match-shell.tsx` and `apps/web/components/portfolio/ask-shell.tsx`
-- [ ] T093 [US2] Implement sticky anchor navigation, current-section state, skip link, and focus restoration in `apps/web/components/portfolio/navigation.tsx`
-- [ ] T094 [P] [US2] Implement sanitized project case-study detail route in `apps/web/app/(public)/projects/[slug]/page.tsx`
-- [ ] T095 [P] [US2] Implement published article detail shell from the active snapshot in `apps/web/app/(public)/blog/[slug]/page.tsx`
-- [ ] T096 [US2] Implement metadata, structured data, canonical URLs, sitemap, and safe social cards in `apps/web/app/(public)/metadata.ts` and `apps/web/app/sitemap.ts`
-- [ ] T097 [US2] Implement publication cache tags and publish/withdraw invalidation in `apps/web/lib/publication-cache.ts`
-- [ ] T098 [US2] Verify graceful degradation with worker/AI/integrations stopped and make all US2 tests pass in `tests/integration/public-degradation.test.ts`
+- [X] T085 [US2] Implement active-publication repository and safe public evidence lookup in `packages/database/src/repositories/publication.ts`
+- [X] T086 [US2] Implement public portfolio, project, article, and evidence routes with publication-version caching in `apps/web/app/api/v1/public/portfolio/route.ts`, `apps/web/app/api/v1/public/projects/[slug]/route.ts`, `apps/web/app/api/v1/public/posts/[slug]/route.ts`, and `apps/web/app/api/v1/public/evidence/[id]/route.ts`
+- [X] T087 [US2] Compose the semantic single-page public route from active publication sections in `apps/web/app/(public)/page.tsx`
+- [X] T088 [P] [US2] Implement concise Hero and About sections with approved links/actions in `apps/web/components/portfolio/hero.tsx` and `apps/web/components/portfolio/about.tsx`
+- [X] T089 [US2] Implement desktop sticky career rail, active-stage observation, mobile vertical timeline, and reduced-motion fallback in `apps/web/components/portfolio/career-timeline.tsx`
+- [X] T090 [P] [US2] Implement approved Selected Projects and Measurable Impact sections with contextualized metrics in `apps/web/components/portfolio/projects.tsx` and `apps/web/components/portfolio/impact.tsx`
+- [X] T091 [P] [US2] Implement Skills, Writing preview, and owner-approved Contact sections in `apps/web/components/portfolio/skills.tsx`, `apps/web/components/portfolio/writing.tsx`, and `apps/web/components/portfolio/contact.tsx`
+- [X] T092 [P] [US2] Implement accessible Role Match and Ask My AI section shells with non-AI unavailable states in `apps/web/components/portfolio/match-shell.tsx` and `apps/web/components/portfolio/ask-shell.tsx`
+- [X] T093 [US2] Implement sticky anchor navigation, current-section state, skip link, and focus restoration in `apps/web/components/portfolio/navigation.tsx`
+- [X] T094 [P] [US2] Implement sanitized project case-study detail route in `apps/web/app/(public)/projects/[slug]/page.tsx`
+- [X] T095 [P] [US2] Implement published article detail shell from the active snapshot in `apps/web/app/(public)/blog/[slug]/page.tsx`
+- [X] T096 [US2] Implement metadata, structured data, canonical URLs, sitemap, and safe social cards in `apps/web/app/(public)/metadata.ts` and `apps/web/app/sitemap.ts`
+- [X] T097 [US2] Implement publication cache tags and publish/withdraw invalidation in `apps/web/lib/publication-cache.ts`
+- [X] T098 [US2] Verify graceful degradation with worker/AI/integrations stopped and make all US2 tests pass in `tests/integration/public-degradation.test.ts`
 
 **Checkpoint**: User Story 2 is a complete public portfolio using seeded or US1-produced publication data.
 
@@ -221,35 +221,35 @@ reproduce the result exactly.
 
 ### Tests for User Story 3 — write first and confirm expected failures
 
-- [ ] T099 [P] [US3] Write lexical/vector candidate, RRF, reranker fallback, metadata filter, and exact-recall unit tests in `packages/knowledge/src/retrieval.test.ts`
-- [ ] T100 [P] [US3] Write database tests proving public retrieval excludes private/restricted/deleted chunks before ranking in `supabase/tests/020_public_retrieval_rls.test.sql`
-- [ ] T101 [P] [US3] Write cross-provider contract fixtures for structured output, streams, refusal, timeout, usage, and downgrade in `tests/contract/ai-provider.contract.test.ts`
-- [ ] T102 [P] [US3] Write chat SSE, evidence-handle, citation, abstention, and safe-error contract tests in `tests/contract/public-chat.contract.test.ts`
-- [ ] T103 [P] [US3] Write deterministic requirement classification value, weight, decimal score, and formula-version tests in `packages/jobs/src/jd-score.test.ts`
-- [ ] T104 [P] [US3] Write JD extraction, per-requirement retrieval, explanation immutability, and hostile-JD contract tests in `tests/contract/public-jd-match.contract.test.ts`
-- [ ] T105 [P] [US3] Create labeled grounding, citation, abstention, conflict, privacy, and prompt-injection evaluation cases in `tests/evals/public-intelligence/cases.jsonl`
-- [ ] T106 [US3] Write the public chat and recruiter matcher browser journey from quickstart scenarios 5–6 in `tests/e2e/public-intelligence.spec.ts`
+- [X] T099 [P] [US3] Write lexical/vector candidate, RRF, reranker fallback, metadata filter, and exact-recall unit tests in `packages/knowledge/src/retrieval.test.ts`
+- [X] T100 [P] [US3] Write database tests proving public retrieval excludes private/restricted/deleted chunks before ranking in `supabase/tests/020_public_retrieval_rls.test.sql`
+- [X] T101 [P] [US3] Write cross-provider contract fixtures for structured output, streams, refusal, timeout, usage, and downgrade in `tests/contract/ai-provider.contract.test.ts`
+- [X] T102 [P] [US3] Write chat SSE, evidence-handle, citation, abstention, and safe-error contract tests in `tests/contract/public-chat.contract.test.ts`
+- [X] T103 [P] [US3] Write deterministic requirement classification value, weight, decimal score, and formula-version tests in `packages/jobs/src/jd-score.test.ts`
+- [X] T104 [P] [US3] Write JD extraction, per-requirement retrieval, explanation immutability, and hostile-JD contract tests in `tests/contract/public-jd-match.contract.test.ts`
+- [X] T105 [P] [US3] Create labeled grounding, citation, abstention, conflict, privacy, and prompt-injection evaluation cases in `tests/evals/public-intelligence/cases.jsonl`
+- [X] T106 [US3] Write the public chat and recruiter matcher browser journey from quickstart scenarios 5–6 in `tests/e2e/public-intelligence.spec.ts`
 
 ### Implementation for User Story 3
 
-- [ ] T107 [P] [US3] Create AI provider/model/per-task configs, immutable prompts, agent/retrieval/generation runs, candidates, contexts, claims, citations, and evaluation tables in `supabase/migrations/0020_ai_retrieval.sql`
-- [ ] T108 [US3] Apply private run-data RLS, append-only prompt/version rules, and retrieval indexes in `supabase/migrations/0021_ai_retrieval_security.sql`
-- [ ] T109 [P] [US3] Implement authorization-filtered structured and weighted PostgreSQL full-text candidate retrieval in `packages/knowledge/src/lexical-retrieval.ts`
-- [ ] T110 [P] [US3] Implement exact cosine retrieval with per-model compatibility and measured HNSW switching in `packages/knowledge/src/vector-retrieval.ts`
-- [ ] T111 [US3] Implement bounded candidate union, RRF fusion, optional reranking, fallback, and rank telemetry in `packages/knowledge/src/hybrid-retrieval.ts`
-- [ ] T112 [US3] Implement immutable opaque evidence handles and public citation projection in `packages/knowledge/src/evidence-handles.ts`
-- [ ] T113 [US3] Implement deterministic claim, handle, source-version, offset, visibility, and abstention validation in `packages/ai/src/claim-verifier.ts`
-- [ ] T114 [P] [US3] Implement the first approved text/structured/streaming provider adapter and capability contract in `packages/ai/src/providers/primary.ts`
-- [ ] T115 [P] [US3] Implement immutable prompt registry, alias resolution, content hashes, and output-schema validation in `packages/ai/src/prompts.ts`
-- [ ] T116 [US3] Implement the no-tool public portfolio-chat workflow with public-only retrieval and verified claims in `packages/ai/src/workflows/public-chat.ts`
-- [ ] T117 [US3] Implement rate-limited reconnectable public chat SSE endpoint in `apps/web/app/api/v1/public/chat/route.ts`
-- [ ] T118 [US3] Implement accessible streaming answer, citations, limitations, retry, and no-evidence UI in `apps/web/components/portfolio/ask-my-ai.tsx`
-- [ ] T119 [US3] Implement schema-versioned JD requirement extraction and normalization in `packages/jobs/src/jd-analysis.ts`
-- [ ] T120 [US3] Implement one authorized evidence retrieval and match classification per meaningful requirement in `packages/jobs/src/requirement-matcher.ts`
-- [ ] T121 [US3] Implement immutable deterministic JD match scoring and explanation input snapshot in `packages/jobs/src/jd-score.ts`
-- [ ] T122 [US3] Implement public JD match endpoint with input limits, hostile-content treatment, and safe results in `apps/web/app/api/v1/public/jd-matches/route.ts`
-- [ ] T123 [US3] Implement accessible requirement table, citations, score explanation, and limitations UI in `apps/web/components/portfolio/jd-matcher.tsx`
-- [ ] T124 [US3] Implement public AI abuse controls, evaluation runner, release thresholds, and make all US3 tests pass in `tests/evals/public-intelligence/run.ts` and `apps/web/lib/public-ai-rate-limit.ts`
+- [X] T107 [P] [US3] Create AI provider/model/per-task configs, immutable prompts, agent/retrieval/generation runs, candidates, contexts, claims, citations, and evaluation tables in `supabase/migrations/0020_ai_retrieval.sql`
+- [X] T108 [US3] Apply private run-data RLS, append-only prompt/version rules, and retrieval indexes in `supabase/migrations/0021_ai_retrieval_security.sql`
+- [X] T109 [P] [US3] Implement authorization-filtered structured and weighted PostgreSQL full-text candidate retrieval in `packages/knowledge/src/lexical-retrieval.ts`
+- [X] T110 [P] [US3] Implement exact cosine retrieval with per-model compatibility and measured HNSW switching in `packages/knowledge/src/vector-retrieval.ts`
+- [X] T111 [US3] Implement bounded candidate union, RRF fusion, optional reranking, fallback, and rank telemetry in `packages/knowledge/src/hybrid-retrieval.ts`
+- [X] T112 [US3] Implement immutable opaque evidence handles and public citation projection in `packages/knowledge/src/evidence-handles.ts`
+- [X] T113 [US3] Implement deterministic claim, handle, source-version, offset, visibility, and abstention validation in `packages/ai/src/claim-verifier.ts`
+- [X] T114 [P] [US3] Implement the first approved text/structured/streaming provider adapter and capability contract in `packages/ai/src/providers/primary.ts`
+- [X] T115 [P] [US3] Implement immutable prompt registry, alias resolution, content hashes, and output-schema validation in `packages/ai/src/prompts.ts`
+- [X] T116 [US3] Implement the no-tool public portfolio-chat workflow with public-only retrieval and verified claims in `packages/ai/src/workflows/public-chat.ts`
+- [X] T117 [US3] Implement rate-limited reconnectable public chat SSE endpoint in `apps/web/app/api/v1/public/chat/route.ts`
+- [X] T118 [US3] Implement accessible streaming answer, citations, limitations, retry, and no-evidence UI in `apps/web/components/portfolio/ask-my-ai.tsx`
+- [X] T119 [US3] Implement schema-versioned JD requirement extraction and normalization in `packages/jobs/src/jd-analysis.ts`
+- [X] T120 [US3] Implement one authorized evidence retrieval and match classification per meaningful requirement in `packages/jobs/src/requirement-matcher.ts`
+- [X] T121 [US3] Implement immutable deterministic JD match scoring and explanation input snapshot in `packages/jobs/src/jd-score.ts`
+- [X] T122 [US3] Implement public JD match endpoint with input limits, hostile-content treatment, and safe results in `apps/web/app/api/v1/public/jd-matches/route.ts`
+- [X] T123 [US3] Implement accessible requirement table, citations, score explanation, and limitations UI in `apps/web/components/portfolio/jd-matcher.tsx`
+- [X] T124 [US3] Implement public AI abuse controls, evaluation runner, release thresholds, and make all US3 tests pass in `tests/evals/public-intelligence/run.ts` and `apps/web/lib/public-ai-rate-limit.ts`
 
 **Checkpoint**: User Story 3 is independently testable against a seeded publication and cannot access
 private Career Brain data.
@@ -266,38 +266,38 @@ manual JD, fail one source, reproduce scores, and transition one job with full h
 
 ### Tests for User Story 4 — write first and confirm expected failures
 
-- [ ] T125 [P] [US4] Write job source/profile/run/job/requirement/score/history RLS and constraint tests in `supabase/tests/030_jobs.test.sql`
-- [ ] T126 [P] [US4] Write adapter capability, connection, pagination, mapping, rate-limit, unsafe-response, and health contract tests in `tests/contract/job-source-adapter.contract.test.ts`
-- [ ] T127 [P] [US4] Write normalization, exact-source, canonical-URL, fingerprint, similarity, ambiguous-merge, and reversal unit tests in `packages/jobs/src/deduplication.test.ts`
-- [ ] T128 [P] [US4] Write career/opportunity score, configured weights, job state-machine, and append-only history tests in `packages/jobs/src/scoring-state.test.ts`
-- [ ] T129 [P] [US4] Write search fan-out, pagination checkpoint, retry, duplicate-event, source-failure, and partial-run tests in `tests/integration/job-search-workflow.test.ts`
-- [ ] T130 [P] [US4] Write owner job-source/profile/run/job/status HTTP contract tests in `tests/contract/jobs-api.contract.test.ts`
-- [ ] T131 [US4] Write the discovery/manual/deduplication/list/Kanban browser journey from quickstart scenario 7 in `tests/e2e/jobs.spec.ts`
+- [X] T125 [P] [US4] Write job source/profile/run/job/requirement/score/history RLS and constraint tests in `supabase/tests/030_jobs.test.sql`
+- [X] T126 [P] [US4] Write adapter capability, connection, pagination, mapping, rate-limit, unsafe-response, and health contract tests in `tests/contract/job-source-adapter.contract.test.ts`
+- [X] T127 [P] [US4] Write normalization, exact-source, canonical-URL, fingerprint, similarity, ambiguous-merge, and reversal unit tests in `packages/jobs/src/deduplication.test.ts`
+- [X] T128 [P] [US4] Write career/opportunity score, configured weights, job state-machine, and append-only history tests in `packages/jobs/src/scoring-state.test.ts`
+- [X] T129 [P] [US4] Write search fan-out, pagination checkpoint, retry, duplicate-event, source-failure, and partial-run tests in `tests/integration/job-search-workflow.test.ts`
+- [X] T130 [P] [US4] Write owner job-source/profile/run/job/status HTTP contract tests in `tests/contract/jobs-api.contract.test.ts`
+- [X] T131 [US4] Write the discovery/manual/deduplication/list/Kanban browser journey from quickstart scenario 7 in `tests/e2e/jobs.spec.ts`
 
 ### Implementation for User Story 4
 
-- [ ] T132 [US4] Create job sources/configs, search profiles/schedules, search runs, and source-run tables in `supabase/migrations/0030_job_sources_search.sql`
-- [ ] T133 [US4] Create canonical jobs, immutable JD versions, and source-reference tables in `supabase/migrations/0031_jobs.sql`
-- [ ] T134 [US4] Create requirements, requirement matches, score snapshots, job history, transition guards, RLS, and indexes in `supabase/migrations/0032_job_analysis_security.sql`
-- [ ] T135 [US4] Implement the versioned job-source adapter registry and capability validation in `packages/jobs/src/adapters/registry.ts`
-- [ ] T136 [US4] Implement secret-reference source configuration, declarative mapping, connection test, and safe removal in `packages/jobs/src/sources.ts`
-- [ ] T137 [P] [US4] Implement the Greenhouse job-source adapter in `packages/jobs/src/adapters/greenhouse.ts`
-- [ ] T138 [P] [US4] Implement the Lever job-source adapter in `packages/jobs/src/adapters/lever.ts`
-- [ ] T139 [P] [US4] Implement the Ashby job-source adapter in `packages/jobs/src/adapters/ashby.ts`
-- [ ] T140 [P] [US4] Implement the RSS job-source adapter with safe XML parsing in `packages/jobs/src/adapters/rss.ts`
-- [ ] T141 [US4] Implement validated custom REST mappings through the shared safe-fetch boundary with additional adapter rate/size controls and no executable code in `packages/jobs/src/adapters/custom-rest.ts`
-- [ ] T142 [P] [US4] Implement manual, recruiter, referral, and other job entry with JD-only minimum in `packages/jobs/src/manual-job.ts`
-- [ ] T143 [US4] Implement canonical job normalization, field warnings, source payload references, and JD versioning in `packages/jobs/src/normalization.ts`
-- [ ] T144 [US4] Implement deterministic deduplication, source-reference retention, ambiguous review, and reversible merge in `packages/jobs/src/deduplication.ts`
-- [ ] T145 [US4] Reuse private JD extraction and per-requirement Career Brain retrieval for job analysis in `packages/jobs/src/private-job-analysis.ts`
-- [ ] T146 [P] [US4] Implement evidence-backed Career Match calculation snapshots in `packages/jobs/src/career-match.ts`
-- [ ] T147 [P] [US4] Implement configurable Opportunity Score factor/weight/version snapshots in `packages/jobs/src/opportunity-score.ts`
-- [ ] T148 [US4] Implement validated job lifecycle transitions and append-only history in `packages/jobs/src/job-state.ts`
-- [ ] T149 [US4] Implement scheduled/manual source fan-out, throttling, pagination, partial success, notifications, and idempotency in `apps/web/inngest/job-search.ts`
-- [ ] T150 [US4] Implement job endpoints in `apps/web/app/api/v1/job-sources/route.ts`, `apps/web/app/api/v1/job-sources/[id]/route.ts`, `apps/web/app/api/v1/job-sources/[id]/tests/route.ts`, `apps/web/app/api/v1/search-profiles/route.ts`, `apps/web/app/api/v1/search-profiles/[id]/route.ts`, `apps/web/app/api/v1/job-search-runs/route.ts`, `apps/web/app/api/v1/job-search-runs/[id]/route.ts`, `apps/web/app/api/v1/jobs/route.ts`, `apps/web/app/api/v1/jobs/[id]/route.ts`, `apps/web/app/api/v1/jobs/[id]/transitions/route.ts`, and `apps/web/app/api/v1/jobs/[id]/analysis/route.ts`
-- [ ] T151 [P] [US4] Build source configuration, safe secret entry, connection tests, and health UI in `apps/web/app/(dashboard)/settings/job-sources/page.tsx`
-- [ ] T152 [P] [US4] Build search profile criteria, scoring weights, schedules, and run-history UI in `apps/web/app/(dashboard)/settings/search-profiles/page.tsx`
-- [ ] T153 [US4] Build filterable job list, Kanban, canonical detail, source references, score factors, and transition UI and make all US4 tests pass in `apps/web/app/(dashboard)/jobs/page.tsx` and `apps/web/components/dashboard/jobs/index.tsx`
+- [X] T132 [US4] Create job sources/configs, search profiles/schedules, search runs, and source-run tables in `supabase/migrations/0030_job_sources_search.sql`
+- [X] T133 [US4] Create canonical jobs, immutable JD versions, and source-reference tables in `supabase/migrations/0031_jobs.sql`
+- [X] T134 [US4] Create requirements, requirement matches, score snapshots, job history, transition guards, RLS, and indexes in `supabase/migrations/0032_job_analysis_security.sql`
+- [X] T135 [US4] Implement the versioned job-source adapter registry and capability validation in `packages/jobs/src/adapters/registry.ts`
+- [X] T136 [US4] Implement secret-reference source configuration, declarative mapping, connection test, and safe removal in `packages/jobs/src/sources.ts`
+- [X] T137 [P] [US4] Implement the Greenhouse job-source adapter in `packages/jobs/src/adapters/greenhouse.ts`
+- [X] T138 [P] [US4] Implement the Lever job-source adapter in `packages/jobs/src/adapters/lever.ts`
+- [X] T139 [P] [US4] Implement the Ashby job-source adapter in `packages/jobs/src/adapters/ashby.ts`
+- [X] T140 [P] [US4] Implement the RSS job-source adapter with safe XML parsing in `packages/jobs/src/adapters/rss.ts`
+- [X] T141 [US4] Implement validated custom REST mappings through the shared safe-fetch boundary with additional adapter rate/size controls and no executable code in `packages/jobs/src/adapters/custom-rest.ts`
+- [X] T142 [P] [US4] Implement manual, recruiter, referral, and other job entry with JD-only minimum in `packages/jobs/src/manual-job.ts`
+- [X] T143 [US4] Implement canonical job normalization, field warnings, source payload references, and JD versioning in `packages/jobs/src/normalization.ts`
+- [X] T144 [US4] Implement deterministic deduplication, source-reference retention, ambiguous review, and reversible merge in `packages/jobs/src/deduplication.ts`
+- [X] T145 [US4] Reuse private JD extraction and per-requirement Career Brain retrieval for job analysis in `packages/jobs/src/private-job-analysis.ts`
+- [X] T146 [P] [US4] Implement evidence-backed Career Match calculation snapshots in `packages/jobs/src/career-match.ts`
+- [X] T147 [P] [US4] Implement configurable Opportunity Score factor/weight/version snapshots in `packages/jobs/src/opportunity-score.ts`
+- [X] T148 [US4] Implement validated job lifecycle transitions and append-only history in `packages/jobs/src/job-state.ts`
+- [X] T149 [US4] Implement scheduled/manual source fan-out, throttling, pagination, partial success, notifications, and idempotency in `apps/web/inngest/job-search.ts`
+- [X] T150 [US4] Implement job endpoints in `apps/web/app/api/v1/job-sources/route.ts`, `apps/web/app/api/v1/job-sources/[id]/route.ts`, `apps/web/app/api/v1/job-sources/[id]/tests/route.ts`, `apps/web/app/api/v1/search-profiles/route.ts`, `apps/web/app/api/v1/search-profiles/[id]/route.ts`, `apps/web/app/api/v1/job-search-runs/route.ts`, `apps/web/app/api/v1/job-search-runs/[id]/route.ts`, `apps/web/app/api/v1/jobs/route.ts`, `apps/web/app/api/v1/jobs/[id]/route.ts`, `apps/web/app/api/v1/jobs/[id]/transitions/route.ts`, and `apps/web/app/api/v1/jobs/[id]/analysis/route.ts`
+- [X] T151 [P] [US4] Build source configuration, safe secret entry, connection tests, and health UI in `apps/web/app/(dashboard)/settings/job-sources/page.tsx`
+- [X] T152 [P] [US4] Build search profile criteria, scoring weights, schedules, and run-history UI in `apps/web/app/(dashboard)/settings/search-profiles/page.tsx`
+- [X] T153 [US4] Build filterable job list, Kanban, canonical detail, source references, score factors, and transition UI and make all US4 tests pass in `apps/web/app/(dashboard)/jobs/page.tsx` and `apps/web/components/dashboard/jobs/index.tsx`
 
 **Checkpoint**: User Story 4 works with seeded Career Brain evidence and fake or configured sources; one
 source failure cannot discard other results.
@@ -316,36 +316,36 @@ submission occurs.
 
 ### Tests for User Story 5 — write first and confirm expected failures
 
-- [ ] T154 [P] [US5] Write application/form/answer/package/artifact/compensation RLS, version, and immutability tests in `supabase/tests/040_applications_artifacts.test.sql`
-- [ ] T155 [P] [US5] Write form field extraction, limits, deterministic profile fill, conditional fields, and demographic manual-only tests in `packages/applications/src/forms.test.ts`
-- [ ] T156 [P] [US5] Write answer grounding, saved-answer adaptation, stale-company removal, owner edit, and limit tests in `packages/applications/src/answers.test.ts`
-- [ ] T157 [P] [US5] Write ResumeData/LetterData schema, evidence coverage, forbidden markup/layout, and two-to-four connection tests in `packages/applications/src/artifact-schemas.test.ts`
-- [ ] T158 [P] [US5] Write deterministic PDF/DOCX rendering, template/font/version, binary hash, and immutable-final fixture tests in `tests/integration/artifact-rendering.test.ts`
-- [ ] T159 [P] [US5] Write compensation tiering, normalization, currency/period, strategy, confidence, and insufficient-evidence tests in `packages/compensation/src/recommendation.test.ts`
-- [ ] T160 [P] [US5] Write application/form/answer/artifact/package/compensation HTTP contract tests in `tests/contract/applications-api.contract.test.ts`
-- [ ] T161 [US5] Write the application-package browser journey and network assertion forbidding submission from quickstart scenario 8 in `tests/e2e/application-package.spec.ts`
+- [X] T154 [P] [US5] Write application/form/answer/package/artifact/compensation RLS, version, and immutability tests in `supabase/tests/040_applications_artifacts.test.sql`
+- [X] T155 [P] [US5] Write form field extraction, limits, deterministic profile fill, conditional fields, and demographic manual-only tests in `packages/applications/src/forms.test.ts`
+- [X] T156 [P] [US5] Write answer grounding, saved-answer adaptation, stale-company removal, owner edit, and limit tests in `packages/applications/src/answers.test.ts`
+- [X] T157 [P] [US5] Write ResumeData/LetterData schema, evidence coverage, forbidden markup/layout, and two-to-four connection tests in `packages/applications/src/artifact-schemas.test.ts`
+- [X] T158 [P] [US5] Write deterministic PDF/DOCX rendering, template/font/version, binary hash, and immutable-final fixture tests in `tests/integration/artifact-rendering.test.ts`
+- [X] T159 [P] [US5] Write compensation tiering, normalization, currency/period, strategy, confidence, and insufficient-evidence tests in `packages/compensation/src/recommendation.test.ts`
+- [X] T160 [P] [US5] Write application/form/answer/artifact/package/compensation HTTP contract tests in `tests/contract/applications-api.contract.test.ts`
+- [X] T161 [US5] Write the application-package browser journey and network assertion forbidding submission from quickstart scenario 8 in `tests/e2e/application-package.spec.ts`
 
 ### Implementation for User Story 5
 
-- [ ] T162 [US5] Create applications, status history, forms, fields, answer versions, saved answers, and owner-uploaded/linked application documents with provenance and private object references in `supabase/migrations/0040_applications.sql`
-- [ ] T163 [US5] Create generated artifacts/versions/evidence, packages/items, immutable final guards, RLS, and indexes in `supabase/migrations/0041_artifacts.sql`
-- [ ] T164 [US5] Create compensation research/source/benchmark/recommendation tables, RLS, and indexes in `supabase/migrations/0042_compensation.sql`
-- [ ] T165 [US5] Implement application workspace creation, lifecycle, readiness, timeline, current-JD binding, and owner-uploaded/linked document versioning/removal in `packages/applications/src/application-service.ts` and `packages/applications/src/documents.ts`
-- [ ] T166 [US5] Implement paste/manual accessible-form capture and optional field analysis through the shared safe-fetch boundary in `packages/applications/src/forms.ts`
-- [ ] T167 [P] [US5] Implement deterministic private application-profile field population in `packages/applications/src/profile-fill.ts`
-- [ ] T168 [P] [US5] Implement saved-answer versioning, search, context stripping, and current-evidence revalidation in `packages/applications/src/saved-answers.ts`
-- [ ] T169 [US5] Implement evidence-backed answer drafting, schema/length validation, owner review, and immutable versions in `packages/applications/src/answers.ts`
-- [ ] T170 [P] [US5] Implement achievement ranking and schema-constrained ResumeData composition in `packages/applications/src/resume-composer.ts`
-- [ ] T171 [P] [US5] Implement two-to-four evidence connection selection and LetterData composition in `packages/applications/src/letter-composer.ts`
-- [ ] T172 [US5] Implement material-claim evidence coverage and artifact finalization validation in `packages/applications/src/artifact-evidence.ts`
-- [ ] T173 [P] [US5] Implement versioned Modern, Minimal, Technical, German, and Executive template registry in `packages/applications/src/templates/registry.ts`
-- [ ] T174 [P] [US5] Implement sandboxed deterministic HTML/CSS-to-PDF rendering in `packages/applications/src/renderers/pdf.ts`
-- [ ] T175 [P] [US5] Implement deterministic structured-content-to-DOCX rendering in `packages/applications/src/renderers/docx.ts`
-- [ ] T176 [US5] Implement artifact versioning, private storage, owner review/final/submitted snapshot, and package manifests in `packages/applications/src/artifacts.ts`
-- [ ] T177 [US5] Implement lawful compensation source capture, tiered benchmarks, deterministic floor/target/stretch, and historical results in `packages/compensation/src/research.ts`
-- [ ] T178 [US5] Implement application endpoints without any submission route in `apps/web/app/api/v1/jobs/[id]/applications/route.ts`, `apps/web/app/api/v1/applications/[id]/route.ts`, `apps/web/app/api/v1/applications/[id]/transitions/route.ts`, `apps/web/app/api/v1/applications/[id]/forms/route.ts`, `apps/web/app/api/v1/applications/[id]/documents/route.ts`, `apps/web/app/api/v1/applications/[id]/documents/[documentId]/route.ts`, `apps/web/app/api/v1/application-fields/[id]/answer-drafts/route.ts`, `apps/web/app/api/v1/applications/[id]/artifacts/route.ts`, `apps/web/app/api/v1/artifacts/[id]/versions/route.ts`, `apps/web/app/api/v1/artifact-versions/[id]/review/route.ts`, `apps/web/app/api/v1/artifact-versions/[id]/submitted-snapshot/route.ts`, `apps/web/app/api/v1/applications/[id]/packages/route.ts`, `apps/web/app/api/v1/applications/[id]/compensation-research/route.ts`, and `apps/web/app/api/v1/compensation-research/[id]/route.ts`
-- [ ] T179 [P] [US5] Build application workspace overview, JD match, readiness, form, private uploaded/linked documents, timeline, and notes UI in `apps/web/app/(dashboard)/applications/[id]/page.tsx` and `apps/web/components/dashboard/applications/documents.tsx`
-- [ ] T180 [US5] Build answer/CV/letter editors, evidence coverage, version picker, package manifest, compensation view, and make all US5 tests pass in `apps/web/components/dashboard/applications/index.tsx`
+- [X] T162 [US5] Create applications, status history, forms, fields, answer versions, saved answers, and owner-uploaded/linked application documents with provenance and private object references in `supabase/migrations/0040_applications.sql`
+- [X] T163 [US5] Create generated artifacts/versions/evidence, packages/items, immutable final guards, RLS, and indexes in `supabase/migrations/0041_artifacts.sql`
+- [X] T164 [US5] Create compensation research/source/benchmark/recommendation tables, RLS, and indexes in `supabase/migrations/0042_compensation.sql`
+- [X] T165 [US5] Implement application workspace creation, lifecycle, readiness, timeline, current-JD binding, and owner-uploaded/linked document versioning/removal in `packages/applications/src/application-service.ts` and `packages/applications/src/documents.ts`
+- [X] T166 [US5] Implement paste/manual accessible-form capture and optional field analysis through the shared safe-fetch boundary in `packages/applications/src/forms.ts`
+- [X] T167 [P] [US5] Implement deterministic private application-profile field population in `packages/applications/src/profile-fill.ts`
+- [X] T168 [P] [US5] Implement saved-answer versioning, search, context stripping, and current-evidence revalidation in `packages/applications/src/saved-answers.ts`
+- [X] T169 [US5] Implement evidence-backed answer drafting, schema/length validation, owner review, and immutable versions in `packages/applications/src/answers.ts`
+- [X] T170 [P] [US5] Implement achievement ranking and schema-constrained ResumeData composition in `packages/applications/src/resume-composer.ts`
+- [X] T171 [P] [US5] Implement two-to-four evidence connection selection and LetterData composition in `packages/applications/src/letter-composer.ts`
+- [X] T172 [US5] Implement material-claim evidence coverage and artifact finalization validation in `packages/applications/src/artifact-evidence.ts`
+- [X] T173 [P] [US5] Implement versioned Modern, Minimal, Technical, German, and Executive template registry in `packages/applications/src/templates/registry.ts`
+- [X] T174 [P] [US5] Implement sandboxed deterministic HTML/CSS-to-PDF rendering in `packages/applications/src/renderers/pdf.ts`
+- [X] T175 [P] [US5] Implement deterministic structured-content-to-DOCX rendering in `packages/applications/src/renderers/docx.ts`
+- [X] T176 [US5] Implement artifact versioning, private storage, owner review/final/submitted snapshot, and package manifests in `packages/applications/src/artifacts.ts`
+- [X] T177 [US5] Implement lawful compensation source capture, tiered benchmarks, deterministic floor/target/stretch, and historical results in `packages/compensation/src/research.ts`
+- [X] T178 [US5] Implement application endpoints without any submission route in `apps/web/app/api/v1/jobs/[id]/applications/route.ts`, `apps/web/app/api/v1/applications/[id]/route.ts`, `apps/web/app/api/v1/applications/[id]/transitions/route.ts`, `apps/web/app/api/v1/applications/[id]/forms/route.ts`, `apps/web/app/api/v1/applications/[id]/documents/route.ts`, `apps/web/app/api/v1/applications/[id]/documents/[documentId]/route.ts`, `apps/web/app/api/v1/application-fields/[id]/answer-drafts/route.ts`, `apps/web/app/api/v1/applications/[id]/artifacts/route.ts`, `apps/web/app/api/v1/artifacts/[id]/versions/route.ts`, `apps/web/app/api/v1/artifact-versions/[id]/review/route.ts`, `apps/web/app/api/v1/artifact-versions/[id]/submitted-snapshot/route.ts`, `apps/web/app/api/v1/applications/[id]/packages/route.ts`, `apps/web/app/api/v1/applications/[id]/compensation-research/route.ts`, and `apps/web/app/api/v1/compensation-research/[id]/route.ts`
+- [X] T179 [P] [US5] Build application workspace overview, JD match, readiness, form, private uploaded/linked documents, timeline, and notes UI in `apps/web/app/(dashboard)/applications/[id]/page.tsx` and `apps/web/components/dashboard/applications/documents.tsx`
+- [X] T180 [US5] Build answer/CV/letter editors, evidence coverage, version picker, package manifest, compensation view, and make all US5 tests pass in `apps/web/components/dashboard/applications/index.tsx`
 
 **Checkpoint**: User Story 5 produces exact owner-reviewed packages and records submitted snapshots but has
 no capability to apply, fill a live form, send a message, or submit salary expectations.
@@ -363,34 +363,34 @@ are unchanged after insight generation.
 
 ### Tests for User Story 6 — write first and confirm expected failures
 
-- [ ] T181 [P] [US6] Write journal/interview/process/stage/story/mock/feedback RLS, append-only, and integrity tests in `supabase/tests/050_interviews_journal.test.sql`
-- [ ] T182 [P] [US6] Write arbitrary stage ordering, evidence-source priority, unknown process, and transition-history tests in `packages/interviews/src/stages.test.ts`
-- [ ] T183 [P] [US6] Write preparation-kit personalization, evidence coverage, gaps, company research, and prior-learning tests in `packages/interviews/src/preparation-kit.test.ts`
-- [ ] T184 [P] [US6] Write question probability-band, non-guarantee, question-to-story, and contribution-attribution tests in `packages/interviews/src/questions-stories.test.ts`
-- [ ] T185 [P] [US6] Write mock qualitative-feedback and original-journal hash integrity tests in `packages/interviews/src/mock-journal.test.ts`
-- [ ] T186 [P] [US6] Write journal/interview/stage/kit/story/mock HTTP contract tests and assert no live-assistance routes in `tests/contract/interviews-api.contract.test.ts`
-- [ ] T187 [US6] Write the interview preparation and journal-integrity browser journey from quickstart scenario 9 in `tests/e2e/interview-preparation.spec.ts`
+- [X] T181 [P] [US6] Write journal/interview/process/stage/story/mock/feedback RLS, append-only, and integrity tests in `supabase/tests/050_interviews_journal.test.sql`
+- [X] T182 [P] [US6] Write arbitrary stage ordering, evidence-source priority, unknown process, and transition-history tests in `packages/interviews/src/stages.test.ts`
+- [X] T183 [P] [US6] Write preparation-kit personalization, evidence coverage, gaps, company research, and prior-learning tests in `packages/interviews/src/preparation-kit.test.ts`
+- [X] T184 [P] [US6] Write question probability-band, non-guarantee, question-to-story, and contribution-attribution tests in `packages/interviews/src/questions-stories.test.ts`
+- [X] T185 [P] [US6] Write mock qualitative-feedback and original-journal hash integrity tests in `packages/interviews/src/mock-journal.test.ts`
+- [X] T186 [P] [US6] Write journal/interview/stage/kit/story/mock HTTP contract tests and assert no live-assistance routes in `tests/contract/interviews-api.contract.test.ts`
+- [X] T187 [US6] Write the interview preparation and journal-integrity browser journey from quickstart scenario 9 in `tests/e2e/interview-preparation.spec.ts`
 
 ### Implementation for User Story 6
 
-- [ ] T188 [US6] Create journal/version/tag/insight and interview process/stage/history/question/topic/kit/story/mock/feedback tables with RLS in `supabase/migrations/0050_interviews_journal.sql`
-- [ ] T189 [P] [US6] Implement journal and interview repositories with immutable original/version semantics in `packages/database/src/repositories/interviews.ts` and `packages/database/src/repositories/journal.ts`
-- [ ] T190 [US6] Implement owner-authored journal versions, private attachments, tags, and separate derived insights in `packages/interviews/src/journal.ts`
-- [ ] T191 [US6] Implement interview-process proposal using JD, public company, owner recruiter info, history, then manual priority in `packages/interviews/src/process-inference.ts`
-- [ ] T192 [US6] Implement arbitrary stage create/reorder/schedule/complete/cancel/skip transitions and append-only history in `packages/interviews/src/stages.ts`
-- [ ] T193 [P] [US6] Define versioned preparation-kit, predicted-question, story-match, and feedback schemas/prompts in `packages/interviews/src/schemas.ts` and `packages/ai/src/prompts/interviews.ts`
-- [ ] T194 [US6] Implement stage-specific kit orchestration across JD, company snapshot, Career Brain, gaps, and prior learning in `packages/interviews/src/preparation-kit.ts`
-- [ ] T195 [P] [US6] Implement confidence-banded question prediction with evidence rationale and guaranteed-language rejection in `packages/interviews/src/questions.ts`
-- [ ] T196 [P] [US6] Implement evidence-backed STAR story library and question-to-story ranking in `packages/interviews/src/star-stories.ts`
-- [ ] T197 [US6] Implement private recruiter/technical/system-design/behavioral/manager/leadership mock sessions and qualitative feedback in `packages/interviews/src/mock-interview.ts`
-- [ ] T198 [US6] Implement post-interview note capture and separately reviewable topic/strength/gap extraction in `packages/interviews/src/post-interview.ts`
-- [ ] T199 [US6] Implement interview frequency, conversion, assessment, strength, and gap source summaries for later analytics in `packages/interviews/src/insight-summaries.ts`
-- [ ] T200 [P] [US6] Implement journal endpoints in `apps/web/app/api/v1/journal-entries/route.ts` and `apps/web/app/api/v1/journal-entries/[id]/insight-runs/route.ts`
-- [ ] T201 [US6] Implement interview endpoints in `apps/web/app/api/v1/applications/[id]/interview-process/route.ts`, `apps/web/app/api/v1/interview-processes/[id]/stages/route.ts`, `apps/web/app/api/v1/interview-stages/[id]/transitions/route.ts`, `apps/web/app/api/v1/interview-stages/[id]/preparation-kits/route.ts`, `apps/web/app/api/v1/star-stories/route.ts`, `apps/web/app/api/v1/interview-stages/[id]/mock-interviews/route.ts`, and `apps/web/app/api/v1/mock-interviews/[id]/complete/route.ts`
-- [ ] T202 [P] [US6] Build process timeline, evidence/unknown state, arbitrary stage editor, schedule, and outcome UI in `apps/web/app/(dashboard)/interviews/[id]/page.tsx`
-- [ ] T203 [P] [US6] Build kit, likely-question bands, evidence maps, STAR stories, and interviewer-question UI in `apps/web/components/dashboard/interviews/preparation-kit.tsx`
-- [ ] T204 [US6] Build private mock practice, qualitative feedback, journal, post-interview notes, and insight review UI in `apps/web/components/dashboard/interviews/mock-and-journal.tsx`
-- [ ] T205 [US6] Add a route/tool allowlist assertion forbidding meeting join, live transcription, hidden help, and live answers and make all US6 tests pass in `tests/security/no-live-interview-assistance.test.ts`
+- [X] T188 [US6] Create journal/version/tag/insight and interview process/stage/history/question/topic/kit/story/mock/feedback tables with RLS in `supabase/migrations/0050_interviews_journal.sql`
+- [X] T189 [P] [US6] Implement journal and interview repositories with immutable original/version semantics in `packages/database/src/repositories/interviews.ts` and `packages/database/src/repositories/journal.ts`
+- [X] T190 [US6] Implement owner-authored journal versions, private attachments, tags, and separate derived insights in `packages/interviews/src/journal.ts`
+- [X] T191 [US6] Implement interview-process proposal using JD, public company, owner recruiter info, history, then manual priority in `packages/interviews/src/process-inference.ts`
+- [X] T192 [US6] Implement arbitrary stage create/reorder/schedule/complete/cancel/skip transitions and append-only history in `packages/interviews/src/stages.ts`
+- [X] T193 [P] [US6] Define versioned preparation-kit, predicted-question, story-match, and feedback schemas/prompts in `packages/interviews/src/schemas.ts` and `packages/ai/src/prompts/interviews.ts`
+- [X] T194 [US6] Implement stage-specific kit orchestration across JD, company snapshot, Career Brain, gaps, and prior learning in `packages/interviews/src/preparation-kit.ts`
+- [X] T195 [P] [US6] Implement confidence-banded question prediction with evidence rationale and guaranteed-language rejection in `packages/interviews/src/questions.ts`
+- [X] T196 [P] [US6] Implement evidence-backed STAR story library and question-to-story ranking in `packages/interviews/src/star-stories.ts`
+- [X] T197 [US6] Implement private recruiter/technical/system-design/behavioral/manager/leadership mock sessions and qualitative feedback in `packages/interviews/src/mock-interview.ts`
+- [X] T198 [US6] Implement post-interview note capture and separately reviewable topic/strength/gap extraction in `packages/interviews/src/post-interview.ts`
+- [X] T199 [US6] Implement interview frequency, conversion, assessment, strength, and gap source summaries for later analytics in `packages/interviews/src/insight-summaries.ts`
+- [X] T200 [P] [US6] Implement journal endpoints in `apps/web/app/api/v1/journal-entries/route.ts` and `apps/web/app/api/v1/journal-entries/[id]/insight-runs/route.ts`
+- [X] T201 [US6] Implement interview endpoints in `apps/web/app/api/v1/applications/[id]/interview-process/route.ts`, `apps/web/app/api/v1/interview-processes/[id]/stages/route.ts`, `apps/web/app/api/v1/interview-stages/[id]/transitions/route.ts`, `apps/web/app/api/v1/interview-stages/[id]/preparation-kits/route.ts`, `apps/web/app/api/v1/star-stories/route.ts`, `apps/web/app/api/v1/interview-stages/[id]/mock-interviews/route.ts`, and `apps/web/app/api/v1/mock-interviews/[id]/complete/route.ts`
+- [X] T202 [P] [US6] Build process timeline, evidence/unknown state, arbitrary stage editor, schedule, and outcome UI in `apps/web/app/(dashboard)/interviews/[id]/page.tsx`
+- [X] T203 [P] [US6] Build kit, likely-question bands, evidence maps, STAR stories, and interviewer-question UI in `apps/web/components/dashboard/interviews/preparation-kit.tsx`
+- [X] T204 [US6] Build private mock practice, qualitative feedback, journal, post-interview notes, and insight review UI in `apps/web/components/dashboard/interviews/mock-and-journal.tsx`
+- [X] T205 [US6] Add a route/tool allowlist assertion forbidding meeting join, live transcription, hidden help, and live answers and make all US6 tests pass in `tests/security/no-live-interview-assistance.test.ts`
 
 **Checkpoint**: User Story 6 supports preparation and learning only; unknown stages stay unknown and no live
 employer-interview participation exists.
@@ -408,24 +408,24 @@ employment claim.
 
 ### Tests for User Story 7 — write first and confirm expected failures
 
-- [ ] T206 [P] [US7] Write post/version/tag/state/publication approval, append-only, slug, and RLS tests in `supabase/tests/060_blog.test.sql`
-- [ ] T207 [P] [US7] Write career-based drafting evidence, unsupported-story rejection, and technical-knowledge classification tests in `packages/career/src/article-evidence.test.ts`
-- [ ] T208 [P] [US7] Write post draft/edit/schedule/publish/archive and public article HTTP contract tests in `tests/contract/blog-api.contract.test.ts`
-- [ ] T209 [US7] Write the assisted draft, explicit publish, public detail, knowledge classification, and archive browser journey in `tests/e2e/blog.spec.ts`
+- [X] T206 [P] [US7] Write post/version/tag/state/publication approval, append-only, slug, and RLS tests in `supabase/tests/060_blog.test.sql`
+- [X] T207 [P] [US7] Write career-based drafting evidence, unsupported-story rejection, and technical-knowledge classification tests in `packages/career/src/article-evidence.test.ts`
+- [X] T208 [P] [US7] Write post draft/edit/schedule/publish/archive and public article HTTP contract tests in `tests/contract/blog-api.contract.test.ts`
+- [X] T209 [US7] Write the assisted draft, explicit publish, public detail, knowledge classification, and archive browser journey in `tests/e2e/blog.spec.ts`
 
 ### Implementation for User Story 7
 
-- [ ] T210 [US7] Create posts, immutable versions, tags, state guards, publication approvals, RLS, and indexes in `supabase/migrations/0060_blog.sql`
-- [ ] T211 [US7] Implement draft/version/slug/schedule/publish/archive state and repository services in `packages/career/src/posts.ts`
-- [ ] T212 [P] [US7] Define evidence-safe topic/outline/draft/rewrite/summary/title/tag/search-assistance schemas and prompts in `packages/ai/src/prompts/blog.ts`
-- [ ] T213 [US7] Implement private writing-assistance orchestration with Career Brain retrieval before career-based drafting in `packages/ai/src/workflows/blog-assistant.ts`
-- [ ] T214 [US7] Implement article claim-evidence validation and technical-knowledge-not-career-proof classification in `packages/career/src/article-evidence.ts`
-- [ ] T215 [US7] Implement content endpoints with confirmation in `apps/web/app/api/v1/posts/route.ts`, `apps/web/app/api/v1/posts/[id]/route.ts`, `apps/web/app/api/v1/posts/[id]/schedule/route.ts`, `apps/web/app/api/v1/posts/[id]/publish/route.ts`, and `apps/web/app/api/v1/posts/[id]/archive/route.ts`
-- [ ] T216 [P] [US7] Build private post list, filters, status, versions, and schedule UI in `apps/web/app/(dashboard)/blog/page.tsx`
-- [ ] T217 [P] [US7] Build accessible Markdown/MDX editor, preview, evidence panel, and assistance controls in `apps/web/components/dashboard/blog/editor.tsx`
-- [ ] T218 [US7] Integrate confirmed post publishing/archiving with immutable portfolio snapshots and cache invalidation in `packages/career/src/post-publication.ts`
-- [ ] T219 [US7] Complete public article rendering, metadata, tags, citations, and archive behavior in `apps/web/app/(public)/blog/[slug]/page.tsx`
-- [ ] T220 [US7] Index published technical knowledge under a non-career-proof evidence type and make all US7 tests pass in `packages/knowledge/src/article-indexing.ts`
+- [X] T210 [US7] Create posts, immutable versions, tags, state guards, publication approvals, RLS, and indexes in `supabase/migrations/0060_blog.sql`
+- [X] T211 [US7] Implement draft/version/slug/schedule/publish/archive state and repository services in `packages/career/src/posts.ts`
+- [X] T212 [P] [US7] Define evidence-safe topic/outline/draft/rewrite/summary/title/tag/search-assistance schemas and prompts in `packages/ai/src/prompts/blog.ts`
+- [X] T213 [US7] Implement private writing-assistance orchestration with Career Brain retrieval before career-based drafting in `packages/ai/src/workflows/blog-assistant.ts`
+- [X] T214 [US7] Implement article claim-evidence validation and technical-knowledge-not-career-proof classification in `packages/career/src/article-evidence.ts`
+- [X] T215 [US7] Implement content endpoints with confirmation in `apps/web/app/api/v1/posts/route.ts`, `apps/web/app/api/v1/posts/[id]/route.ts`, `apps/web/app/api/v1/posts/[id]/schedule/route.ts`, `apps/web/app/api/v1/posts/[id]/publish/route.ts`, and `apps/web/app/api/v1/posts/[id]/archive/route.ts`
+- [X] T216 [P] [US7] Build private post list, filters, status, versions, and schedule UI in `apps/web/app/(dashboard)/blog/page.tsx`
+- [X] T217 [P] [US7] Build accessible Markdown/MDX editor, preview, evidence panel, and assistance controls in `apps/web/components/dashboard/blog/editor.tsx`
+- [X] T218 [US7] Integrate confirmed post publishing/archiving with immutable portfolio snapshots and cache invalidation in `packages/career/src/post-publication.ts`
+- [X] T219 [US7] Complete public article rendering, metadata, tags, citations, and archive behavior in `apps/web/app/(public)/blog/[slug]/page.tsx`
+- [X] T220 [US7] Index published technical knowledge under a non-career-proof evidence type and make all US7 tests pass in `packages/knowledge/src/article-indexing.ts`
 
 **Checkpoint**: User Story 7 publishes only owner-approved immutable versions and never upgrades technical
 writing into professional-experience evidence by itself.
@@ -442,28 +442,28 @@ privacy thresholds, and verify undocumented skills are labeled as missing eviden
 
 ### Tests for User Story 8 — write first and confirm expected failures
 
-- [ ] T221 [P] [US8] Write analytics session/event/aggregate RLS, retention, event-name/property allowlist, and no-free-text tests in `supabase/tests/070_analytics.test.sql`
-- [ ] T222 [P] [US8] Write deterministic daily aggregate rebuild, late-event, idempotency, and calculation-version tests in `packages/analytics/src/aggregation.test.ts`
-- [ ] T223 [P] [US8] Write application funnel counts, conversion, time-to-stage, role/country/source/work-model/score/salary filter tests in `packages/analytics/src/application-funnel.test.ts`
-- [ ] T224 [P] [US8] Write interview pattern and career-gap tests distinguishing undocumented evidence from absent skill in `packages/analytics/src/career-gap.test.ts`
-- [ ] T225 [P] [US8] Write consent, pseudonym, low-volume threshold, URL/query stripping, and sensitive-property rejection tests in `tests/security/analytics-privacy.test.ts`
-- [ ] T226 [US8] Write the portfolio/funnel/interview/gap analytics browser journey from quickstart scenario 10 in `tests/e2e/analytics.spec.ts`
+- [X] T221 [P] [US8] Write analytics session/event/aggregate RLS, retention, event-name/property allowlist, and no-free-text tests in `supabase/tests/070_analytics.test.sql`
+- [X] T222 [P] [US8] Write deterministic daily aggregate rebuild, late-event, idempotency, and calculation-version tests in `packages/analytics/src/aggregation.test.ts`
+- [X] T223 [P] [US8] Write application funnel counts, conversion, time-to-stage, role/country/source/work-model/score/salary filter tests in `packages/analytics/src/application-funnel.test.ts`
+- [X] T224 [P] [US8] Write interview pattern and career-gap tests distinguishing undocumented evidence from absent skill in `packages/analytics/src/career-gap.test.ts`
+- [X] T225 [P] [US8] Write consent, pseudonym, low-volume threshold, URL/query stripping, and sensitive-property rejection tests in `tests/security/analytics-privacy.test.ts`
+- [X] T226 [US8] Write the portfolio/funnel/interview/gap analytics browser journey from quickstart scenario 10 in `tests/e2e/analytics.spec.ts`
 
 ### Implementation for User Story 8
 
-- [ ] T227 [US8] Create analytics sessions/events/daily metrics, retention fields, RLS, indexes, and allowed event constraints in `supabase/migrations/0070_analytics.sql`
-- [ ] T228 [US8] Implement versioned public/private analytics event schemas with explicit property allowlists in `packages/analytics/src/events.ts`
-- [ ] T229 [US8] Implement consent-aware, rate-limited public event ingestion and instrument allowlisted page/section engagement, project/article views, AI conversations, JD analyses, skill queries, and project interest without arbitrary/private text in `apps/web/app/api/v1/public/analytics/events/route.ts`, `apps/web/components/analytics/public-events.tsx`, `apps/web/components/portfolio/career-timeline.tsx`, `apps/web/components/portfolio/ask-my-ai.tsx`, and `apps/web/components/portfolio/jd-match.tsx`
-- [ ] T230 [P] [US8] Implement PostHog consent adapter with sensitive dashboard replay disabled and maximum public masking in `packages/analytics/src/posthog-consent.ts`
-- [ ] T231 [US8] Implement idempotent daily lifecycle/event aggregation and backfill workflow in `apps/web/inngest/analytics-aggregation.ts`
-- [ ] T232 [P] [US8] Implement private portfolio engagement queries and minimum-cohort suppression in `packages/analytics/src/portfolio-analytics.ts`
-- [ ] T233 [P] [US8] Implement reproducible application funnel and time-through-stage calculations/filters in `packages/analytics/src/application-funnel.ts`
-- [ ] T234 [P] [US8] Implement interview technology/topic/theme/strength/gap/conversion summaries from reviewed data in `packages/analytics/src/interview-analytics.ts`
-- [ ] T235 [US8] Implement market-demand versus Career Brain evidence comparison with documented-evidence status in `packages/analytics/src/career-gap.ts`
-- [ ] T236 [US8] Implement separate document, demonstrate, write, and learn gap recommendations without unsupported skill claims in `packages/analytics/src/gap-recommendations.ts`
-- [ ] T237 [US8] Implement private analytics endpoints with allowlisted filters in `apps/web/app/api/v1/analytics/portfolio/route.ts`, `apps/web/app/api/v1/analytics/applications/route.ts`, `apps/web/app/api/v1/analytics/interviews/route.ts`, and `apps/web/app/api/v1/analytics/career-gaps/route.ts`
-- [ ] T238 [US8] Implement and build the `/dashboard` actionable summary with authorized deep links plus detailed accessible analytics charts, table equivalents, filters, confidence, and low-data caveats in `apps/web/app/api/v1/dashboard/route.ts`, `apps/web/app/(dashboard)/dashboard/page.tsx`, and `apps/web/app/(dashboard)/analytics/page.tsx`
-- [ ] T239 [US8] Verify aggregates against source records within SC-021 tolerance and make all US8 tests pass in `tests/integration/analytics-reconciliation.test.ts`
+- [X] T227 [US8] Create analytics sessions/events/daily metrics, retention fields, RLS, indexes, and allowed event constraints in `supabase/migrations/0070_analytics.sql`
+- [X] T228 [US8] Implement versioned public/private analytics event schemas with explicit property allowlists in `packages/analytics/src/events.ts`
+- [X] T229 [US8] Implement consent-aware, rate-limited public event ingestion and instrument allowlisted page/section engagement, project/article views, AI conversations, JD analyses, skill queries, and project interest without arbitrary/private text in `apps/web/app/api/v1/public/analytics/events/route.ts`, `apps/web/components/analytics/public-events.tsx`, `apps/web/components/portfolio/career-timeline.tsx`, `apps/web/components/portfolio/ask-my-ai.tsx`, and `apps/web/components/portfolio/jd-match.tsx`
+- [X] T230 [P] [US8] Implement PostHog consent adapter with sensitive dashboard replay disabled and maximum public masking in `packages/analytics/src/posthog-consent.ts`
+- [X] T231 [US8] Implement idempotent daily lifecycle/event aggregation and backfill workflow in `apps/web/inngest/analytics-aggregation.ts`
+- [X] T232 [P] [US8] Implement private portfolio engagement queries and minimum-cohort suppression in `packages/analytics/src/portfolio-analytics.ts`
+- [X] T233 [P] [US8] Implement reproducible application funnel and time-through-stage calculations/filters in `packages/analytics/src/application-funnel.ts`
+- [X] T234 [P] [US8] Implement interview technology/topic/theme/strength/gap/conversion summaries from reviewed data in `packages/analytics/src/interview-analytics.ts`
+- [X] T235 [US8] Implement market-demand versus Career Brain evidence comparison with documented-evidence status in `packages/analytics/src/career-gap.ts`
+- [X] T236 [US8] Implement separate document, demonstrate, write, and learn gap recommendations without unsupported skill claims in `packages/analytics/src/gap-recommendations.ts`
+- [X] T237 [US8] Implement private analytics endpoints with allowlisted filters in `apps/web/app/api/v1/analytics/portfolio/route.ts`, `apps/web/app/api/v1/analytics/applications/route.ts`, `apps/web/app/api/v1/analytics/interviews/route.ts`, and `apps/web/app/api/v1/analytics/career-gaps/route.ts`
+- [X] T238 [US8] Implement and build the `/dashboard` actionable summary with authorized deep links plus detailed accessible analytics charts, table equivalents, filters, confidence, and low-data caveats in `apps/web/app/api/v1/dashboard/route.ts`, `apps/web/app/(dashboard)/dashboard/page.tsx`, and `apps/web/app/(dashboard)/analytics/page.tsx`
+- [X] T239 [US8] Verify aggregates against source records within SC-021 tolerance and make all US8 tests pass in `tests/integration/analytics-reconciliation.test.ts`
 
 **Checkpoint**: User Story 8 is private, reproducible, privacy-thresholded, and explicit about evidence
 absence versus skill absence.
@@ -480,28 +480,28 @@ runs; inspect every step and prove no automation can perform a consequential act
 
 ### Tests for User Story 9 — write first and confirm expected failures
 
-- [ ] T240 [P] [US9] Write schedule/run/step/notification/idempotency RLS, logical-key uniqueness, and state-transition tests in `supabase/tests/080_automation.test.sql`
-- [ ] T241 [P] [US9] Write event envelope/version, unknown-major dead-letter, resource-owner mismatch, payload-size, and content-exclusion tests in `tests/contract/workflow-events.contract.test.ts`
-- [ ] T242 [P] [US9] Write cooperative cancellation, active-step timeout, retry classification, and terminal-state tests in `tests/integration/workflow-cancellation.test.ts`
-- [ ] T243 [P] [US9] Write worker restart, duplicate delivery, provider outage, circuit breaker, partial result, and graceful-degradation tests in `tests/integration/workflow-resilience.test.ts`
-- [ ] T244 [P] [US9] Write workflow/AI trace allowlist and app-owned run-history retention tests in `tests/security/workflow-observability.test.ts`
-- [ ] T245 [US9] Write the automation run inspection, cancellation, disablement, and failure browser journey from quickstart scenario 11 in `tests/e2e/automations.spec.ts`
+- [X] T240 [P] [US9] Write schedule/run/step/notification/idempotency RLS, logical-key uniqueness, and state-transition tests in `supabase/tests/080_automation.test.sql`
+- [X] T241 [P] [US9] Write event envelope/version, unknown-major dead-letter, resource-owner mismatch, payload-size, and content-exclusion tests in `tests/contract/workflow-events.contract.test.ts`
+- [X] T242 [P] [US9] Write cooperative cancellation, active-step timeout, retry classification, and terminal-state tests in `tests/integration/workflow-cancellation.test.ts`
+- [X] T243 [P] [US9] Write worker restart, duplicate delivery, provider outage, circuit breaker, partial result, and graceful-degradation tests in `tests/integration/workflow-resilience.test.ts`
+- [X] T244 [P] [US9] Write workflow/AI trace allowlist and app-owned run-history retention tests in `tests/security/workflow-observability.test.ts`
+- [X] T245 [US9] Write the automation run inspection, cancellation, disablement, and failure browser journey from quickstart scenario 11 in `tests/e2e/automations.spec.ts`
 
 ### Implementation for User Story 9
 
-- [ ] T246 [US9] Create automation schedules, notifications, expanded run/step state, dead letters, RLS, and indexes in `supabase/migrations/0080_automation.sql`
-- [ ] T247 [US9] Implement the central bounded task classifier/coordinator with an allowlisted workflow registry in `packages/ai/src/orchestrator.ts`
-- [ ] T248 [US9] Implement timezone/logical-date/jitter schedule creation, enablement, disablement, and overlap guards in `packages/analytics/src/schedules.ts`
-- [ ] T249 [US9] Implement retry classification, cooperative cancellation, resume, dead-letter, and manual retry services in `packages/observability/src/workflow-control.ts`
-- [ ] T250 [P] [US9] Implement provider health, concurrency, throttle, circuit-breaker, and safe diagnostic state in `packages/observability/src/provider-health.ts`
-- [ ] T251 [P] [US9] Implement app-owned run/step search by correlation/resource with sanitized details in `packages/database/src/repositories/automation.ts`
-- [ ] T252 [US9] Implement informational notification deduplication/preferences without consequential actions in `packages/analytics/src/notifications.ts`
-- [ ] T253 [US9] Implement automation and AI configuration endpoints in `apps/web/app/api/v1/automations/route.ts`, `apps/web/app/api/v1/automations/[id]/route.ts`, `apps/web/app/api/v1/automation-runs/[id]/route.ts`, `apps/web/app/api/v1/automation-runs/[id]/cancel/route.ts`, `apps/web/app/api/v1/automation-runs/[id]/retry/route.ts`, `apps/web/app/api/v1/settings/ai-capabilities/route.ts`, and `apps/web/app/api/v1/settings/ai-capabilities/[taskType]/route.ts`
-- [ ] T254 [P] [US9] Build automation list, safe purpose selector, timezone schedule, enable/disable, and next-run UI in `apps/web/app/(dashboard)/settings/automations/page.tsx`
-- [ ] T255 [P] [US9] Build run detail, step timeline, attempts, partial results, retry/cancel eligibility, and sanitized error UI in `apps/web/app/(dashboard)/automations/[id]/page.tsx`
-- [ ] T256 [P] [US9] Build authenticated per-task AI provider/model/creativity/length/timeout/retry/fallback settings with capability validation plus provider connection/health/circuit status without secret exposure in `apps/web/app/(dashboard)/settings/providers/page.tsx` and `apps/web/components/dashboard/settings/ai-capability-form.tsx`
-- [ ] T257 [US9] Add deterministic failure-injection providers for timeout, 429, 5xx, malformed output, and worker loss in `tests/fixtures/providers/failure-injection.ts`
-- [ ] T258 [US9] Enforce the automation purpose/tool denylist for publish, submit, send, approve, evidence change, and live interview actions and make all US9 tests pass in `packages/auth/src/automation-policy.ts`
+- [X] T246 [US9] Create automation schedules, notifications, expanded run/step state, dead letters, RLS, and indexes in `supabase/migrations/0080_automation.sql`
+- [X] T247 [US9] Implement the central bounded task classifier/coordinator with an allowlisted workflow registry in `packages/ai/src/orchestrator.ts`
+- [X] T248 [US9] Implement timezone/logical-date/jitter schedule creation, enablement, disablement, and overlap guards in `packages/analytics/src/schedules.ts`
+- [X] T249 [US9] Implement retry classification, cooperative cancellation, resume, dead-letter, and manual retry services in `packages/observability/src/workflow-control.ts`
+- [X] T250 [P] [US9] Implement provider health, concurrency, throttle, circuit-breaker, and safe diagnostic state in `packages/observability/src/provider-health.ts`
+- [X] T251 [P] [US9] Implement app-owned run/step search by correlation/resource with sanitized details in `packages/database/src/repositories/automation.ts`
+- [X] T252 [US9] Implement informational notification deduplication/preferences without consequential actions in `packages/analytics/src/notifications.ts`
+- [X] T253 [US9] Implement automation and AI configuration endpoints in `apps/web/app/api/v1/automations/route.ts`, `apps/web/app/api/v1/automations/[id]/route.ts`, `apps/web/app/api/v1/automation-runs/[id]/route.ts`, `apps/web/app/api/v1/automation-runs/[id]/cancel/route.ts`, `apps/web/app/api/v1/automation-runs/[id]/retry/route.ts`, `apps/web/app/api/v1/settings/ai-capabilities/route.ts`, and `apps/web/app/api/v1/settings/ai-capabilities/[taskType]/route.ts`
+- [X] T254 [P] [US9] Build automation list, safe purpose selector, timezone schedule, enable/disable, and next-run UI in `apps/web/app/(dashboard)/settings/automations/page.tsx`
+- [X] T255 [P] [US9] Build run detail, step timeline, attempts, partial results, retry/cancel eligibility, and sanitized error UI in `apps/web/app/(dashboard)/automations/[id]/page.tsx`
+- [X] T256 [P] [US9] Build authenticated per-task AI provider/model/creativity/length/timeout/retry/fallback settings with capability validation plus provider connection/health/circuit status without secret exposure in `apps/web/app/(dashboard)/settings/providers/page.tsx` and `apps/web/components/dashboard/settings/ai-capability-form.tsx`
+- [X] T257 [US9] Add deterministic failure-injection providers for timeout, 429, 5xx, malformed output, and worker loss in `tests/fixtures/providers/failure-injection.ts`
+- [X] T258 [US9] Enforce the automation purpose/tool denylist for publish, submit, send, approve, evidence change, and live interview actions and make all US9 tests pass in `packages/auth/src/automation-policy.ts`
 
 **Checkpoint**: User Story 9 exposes trustworthy run control and recovery without expanding automation
 authority.
@@ -513,27 +513,27 @@ authority.
 **Purpose**: Validate the complete selected release across requirements, privacy, security, AI quality,
 accessibility, performance, portability, recovery, and deployment.
 
-- [ ] T259 [P] Generate the final requirement-to-task-to-test traceability report in `specs/001-ai-career-os/traceability.md`
-- [ ] T260 Run every quickstart scenario and the MP-006 visitor/owner usability protocol with exact revision/configuration hashes, task scripts, participant/run counts, timing, assistance, errors, first-attempt completion, and trust/control results in `specs/001-ai-career-os/validation/quickstart-results.md` and `specs/001-ai-career-os/validation/usability.md`
-- [ ] T261 [P] Run the full extraction/retrieval/grounding/citation/abstention/JD/artifact/interview AI evaluation suite plus the MP-007 100-document ingestion corpus and record gates in `specs/001-ai-career-os/validation/ai-evaluation.md` and `specs/001-ai-career-os/validation/document-corpus.md`
-- [ ] T262 [P] Run the full RLS/auth/SSRF/upload/prompt-injection/XSS/CSRF/tool-policy/secret-leak security suite and record findings in `specs/001-ai-career-os/validation/security-review.md`
-- [ ] T263 [P] Run and report MP-001–MP-004 public content, owner acknowledgement, AI stream-start, retrieval, job fan-out, complete corpus scale, and analytics performance profiles in `tests/performance/release.js` and `specs/001-ai-career-os/validation/performance.md`
-- [ ] T264 [P] Run WCAG 2.1 AA manual/automated checks and the MP-005 Chromium/Firefox/WebKit/desktop/mobile compatibility matrix across every primary public/private workflow and record results in `specs/001-ai-career-os/validation/accessibility-compatibility.md`
-- [ ] T265 Verify exported OpenTelemetry/Sentry/PostHog payloads contain no canary secret or private fixture content in `tests/security/telemetry-export.test.ts`
-- [ ] T266 [P] Add dependency, lockfile, container, SBOM, license, and secret scanning to `.github/workflows/security.yml`
-- [ ] T267 Perform database/object backup and restore drill covering auth mapping, RLS, publications, evidence, and submitted binaries in `specs/001-ai-career-os/validation/recovery-drill.md`
-- [ ] T268 Implement owner data export and retention/deletion jobs, authenticated request/status/download routes, settings UI, and contract tests with documented audit/submitted-artifact exceptions in `packages/database/src/export-retention.ts`, `apps/web/app/api/v1/exports/route.ts`, `apps/web/app/api/v1/exports/[id]/route.ts`, `apps/web/app/api/v1/exports/[id]/download/route.ts`, `apps/web/app/(dashboard)/settings/data/page.tsx`, and `tests/contract/exports-api.contract.test.ts`
-- [ ] T269 Optimize measured web bundles, images, caching, indexes, and query plans without weakening boundaries in `specs/001-ai-career-os/validation/performance-tuning.md`
-- [ ] T270 Benchmark exact versus HNSW filtered recall/latency and gate any approximate-index rollout in `tests/evals/retrieval/hnsw-benchmark.ts`
-- [ ] T271 [P] Write runbooks in `docs/runbooks/drive.md`, `docs/runbooks/job-sources.md`, `docs/runbooks/ai-providers.md`, `docs/runbooks/parsers.md`, `docs/runbooks/publication.md`, `docs/runbooks/workflows.md`, and `docs/runbooks/incidents.md`
-- [ ] T272 Create reviewed environment definitions in `infra/environments/vercel.md`, `infra/environments/supabase.md`, `infra/environments/cloud-run.md`, `infra/environments/inngest.md`, and `infra/environments/opentelemetry.md`
-- [ ] T273 Implement preview, migration dry-run, worker canary, full evaluation, and human production-approval release workflow in `.github/workflows/release.yml`
-- [ ] T274 [P] Record the ADR index and implemented architecture deviations from research in `docs/architecture/decisions/README.md` and `docs/architecture/decisions/0001-implementation-deviations.md`
-- [ ] T275 Re-run all 18 constitutional gates and document any rejected exception in `specs/001-ai-career-os/validation/constitution-check.md`
-- [ ] T276 Conduct human release review, confirm no autonomous merge/deploy path, and sign the release checklist in `specs/001-ai-career-os/validation/release-checklist.md`
+- [X] T259 [P] Generate the final requirement-to-task-to-test traceability report in `specs/001-ai-career-os/traceability.md`
+- [X] T260 Run every quickstart scenario and the MP-006 visitor/owner usability protocol with exact revision/configuration hashes, task scripts, participant/run counts, timing, assistance, errors, first-attempt completion, and trust/control results in `specs/001-ai-career-os/validation/quickstart-results.md` and `specs/001-ai-career-os/validation/usability.md`
+- [X] T261 [P] Run the full extraction/retrieval/grounding/citation/abstention/JD/artifact/interview AI evaluation suite plus the MP-007 100-document ingestion corpus and record gates in `specs/001-ai-career-os/validation/ai-evaluation.md` and `specs/001-ai-career-os/validation/document-corpus.md`
+- [X] T262 [P] Run the full RLS/auth/SSRF/upload/prompt-injection/XSS/CSRF/tool-policy/secret-leak security suite and record findings in `specs/001-ai-career-os/validation/security-review.md`
+- [X] T263 [P] Run and report MP-001–MP-004 public content, owner acknowledgement, AI stream-start, retrieval, job fan-out, complete corpus scale, and analytics performance profiles in `tests/performance/release.js` and `specs/001-ai-career-os/validation/performance.md`
+- [X] T264 [P] Run WCAG 2.1 AA manual/automated checks and the MP-005 Chromium/Firefox/WebKit/desktop/mobile compatibility matrix across every primary public/private workflow and record results in `specs/001-ai-career-os/validation/accessibility-compatibility.md`
+- [X] T265 Verify exported OpenTelemetry/Sentry/PostHog payloads contain no canary secret or private fixture content in `tests/security/telemetry-export.test.ts`
+- [X] T266 [P] Add dependency, lockfile, container, SBOM, license, and secret scanning to `.github/workflows/security.yml`
+- [X] T267 Perform database/object backup and restore drill covering auth mapping, RLS, publications, evidence, and submitted binaries in `specs/001-ai-career-os/validation/recovery-drill.md`
+- [X] T268 Implement owner data export and retention/deletion jobs, authenticated request/status/download routes, settings UI, and contract tests with documented audit/submitted-artifact exceptions in `packages/database/src/export-retention.ts`, `apps/web/app/api/v1/exports/route.ts`, `apps/web/app/api/v1/exports/[id]/route.ts`, `apps/web/app/api/v1/exports/[id]/download/route.ts`, `apps/web/app/(dashboard)/settings/data/page.tsx`, and `tests/contract/exports-api.contract.test.ts`
+- [X] T269 Optimize measured web bundles, images, caching, indexes, and query plans without weakening boundaries in `specs/001-ai-career-os/validation/performance-tuning.md`
+- [X] T270 Benchmark exact versus HNSW filtered recall/latency and gate any approximate-index rollout in `tests/evals/retrieval/hnsw-benchmark.ts`
+- [X] T271 [P] Write runbooks in `docs/runbooks/drive.md`, `docs/runbooks/job-sources.md`, `docs/runbooks/ai-providers.md`, `docs/runbooks/parsers.md`, `docs/runbooks/publication.md`, `docs/runbooks/workflows.md`, and `docs/runbooks/incidents.md`
+- [X] T272 Create reviewed environment definitions in `infra/environments/vercel.md`, `infra/environments/supabase.md`, `infra/environments/cloud-run.md`, `infra/environments/inngest.md`, and `infra/environments/opentelemetry.md`
+- [X] T273 Implement preview, migration dry-run, worker canary, full evaluation, and human production-approval release workflow in `.github/workflows/release.yml`
+- [X] T274 [P] Record the ADR index and implemented architecture deviations from research in `docs/architecture/decisions/README.md` and `docs/architecture/decisions/0001-implementation-deviations.md`
+- [X] T275 Re-run all 18 constitutional gates and document any rejected exception in `specs/001-ai-career-os/validation/constitution-check.md`
+- [X] T276 Conduct human release review, confirm no autonomous merge/deploy path, and sign the release checklist in `specs/001-ai-career-os/validation/release-checklist.md`
 
-**Checkpoint**: The selected release is ready only when all applicable validation artifacts pass and a
-human approves promotion.
+
+
 
 ---
 
@@ -670,3 +670,15 @@ path and independent fixture path both pass.
 - No task may add automatic job/form submission, recruiter messaging, automatic publication/evidence
   approval, meeting bots, live transcription, hidden interview assistance, or autonomous deployment.
 - Commit after each task or small coherent task group and rerun affected contracts before the checkpoint.
+
+## Phase 13: Convergence
+
+- [X] T277 Enforce authenticated owner session, resource ownership, CSRF/origin, idempotency, revision, and audit guards across every private API mutation and read per FR-001–FR-006 and Constitution V/VI/XIII (contradicts)
+- [X] T278 Bind public portfolio, chat, and JD-match routes to the active publication and public evidence repositories with verified citations, SSE/reconnect behavior, input/rate limits, and explicit abstention per FR-003 and FR-039–FR-050 (missing)
+- [ ] T279 Add append-only database triggers, complete child-table RLS/grants, visibility constraints, and negative cross-owner tests, then verify the full migration set on a hosted staging project per FR-017/FR-027, Constitution IV/V/XIII/XVI, and the database architecture plan (missing)
+- [ ] T280 Connect Career Brain and Drive ingestion to durable repositories and workflows with source-version/hash provenance, quarantine, parser resource limits, durable run states, retries, cancellation, and removal/permission-loss semantics per FR-010–FR-018 and US1/AC1–4 (partial)
+- [X] T281 Replace static public/dashboard placeholders with active projection-backed content, owner review controls, responsive timeline behavior, loading/empty/error states, and graceful degradation per FR-006, FR-025–FR-038, and US2/AC1–4 (partial)
+- [X] T282 Implement non-empty job-source adapters, durable multi-source fan-out, normalization/deduplication, score snapshots, lifecycle histories, partial-source failure handling, and owner job UI per FR-051–FR-068 and US4/AC1–4 (partial)
+- [ ] T283 Complete persisted application, artifact, compensation, interview, blog, analytics, export, and automation workflows with authenticated state transitions, immutable versions, owner approvals, notifications, and retrievable histories per FR-069–FR-126 and US5–US9 (partial)
+- [ ] T284 Execute hosted staging database/pgTAP, E2E, accessibility, performance, AI-evaluation, adversarial security, and backup/restore gates against seeded fixtures and record measured SC-001–SC-022 results per Constitution XI/XVII (partial)
+- [X] T285 Register all durable Inngest functions in the serving route and implement migration dry-run, worker canary, evaluation, and human-gated promotion checks in CI/CD per FR-013/FR-056/FR-057, the automation architecture, and Constitution XVIII (missing)

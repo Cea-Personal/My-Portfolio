@@ -1,0 +1,15 @@
+node_modules/
+.pnpm-store/
+.turbo/
+.next/
+dist/
+build/
+coverage/
+playwright-report/
+test-results/
+pnpm-lock.yaml
+apps/worker/uv.lock
+supabase/migrations/
+.agents/
+.specify/
+specs/

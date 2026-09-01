@@ -74,7 +74,7 @@ semantic vertical timeline is always available, and animation never owns scrolli
 
 **Decision**: Use pnpm 11.25.0 workspaces and Turborepo 2.10.6. Pin pnpm in `packageManager`, use
 `workspace:*` for internal packages, and commit the lockfile. Manage the Python worker independently
-with uv 0.12.1 and a committed `uv.lock`; Turbo may invoke Python lint and test targets.
+with uv 0.7.19 and a committed `uv.lock`; Turbo may invoke Python lint and test targets.
 
 **Rationale**: pnpm provides strict, space-efficient workspaces and Turbo supplies an explicit task
 graph and caching across the planned packages. Python remains a real Python project rather than being
@@ -414,7 +414,7 @@ test data and callbacks from crossing into production.
 
 ## 18. Python Runtime
 
-**Decision**: Use standard-GIL CPython 3.13.15 with uv 0.12.1, `pyproject.toml`, a committed lockfile,
+**Decision**: Use standard-GIL CPython 3.13.5 with uv 0.7.19, `pyproject.toml`, a committed lockfile,
 digest-pinned container base, non-root execution, read-only filesystem except bounded scratch space, and
 explicit CPU/memory/time limits. Do not use free-threaded Python until all native dependencies certify
 it.

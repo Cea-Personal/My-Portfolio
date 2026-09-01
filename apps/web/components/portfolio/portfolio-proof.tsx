@@ -1,0 +1,117 @@
+const proofSteps = [
+  {
+    number: "01",
+    title: "Structure",
+    text: "Career history, projects, skills, and outcomes are modelled as connected data."
+  },
+  {
+    number: "02",
+    title: "Curate",
+    text: "Only reviewed, public-safe evidence is projected into the portfolio experience."
+  },
+  {
+    number: "03",
+    title: "Match",
+    text: "A role description is compared with published evidence to explain fit."
+  },
+  {
+    number: "04",
+    title: "Answer",
+    text: "The portfolio assistant answers from public context and returns evidence references."
+  }
+] as const;
+
+const buildStack = [
+  "Next.js",
+  "React",
+  "TypeScript",
+  "Supabase",
+  "PostgreSQL",
+  "pgvector",
+  "Inngest"
+];
+
+const architecturePoints = [
+  "Private source material is ingested, chunked, and embedded before it becomes retrievable evidence.",
+  "Hybrid retrieval combines lexical search with vector similarity, then ranks context before answer generation.",
+  "Public projection and Supabase row-level security ensure only approved, safe evidence reaches this portfolio.",
+  "Async workflow runs keep ingestion, embedding, review, and publication observable and recoverable."
+];
+
+const privateCapabilities = [
+  "Career knowledge base and evidence curation",
+  "Job, application, and document workspaces",
+  "Interview preparation assistant and interview runs",
+  "Automations, analytics, and owner-only settings"
+];
+
+export function PortfolioProof() {
+  return (
+    <div id="proof" className="proof-section" aria-labelledby="proof-title">
+      <header className="section-heading section-heading-inverse">
+        <p className="eyebrow">Portfolio, as proof</p>
+        <h3 id="proof-title">This portfolio is part of the work.</h3>
+        <p>
+          It is a working software, data, and AI product—not a static résumé dressed as a website.
+        </p>
+      </header>
+
+      <div className="proof-console" aria-label="Portfolio system flow">
+        <div className="proof-console-bar" aria-hidden="true">
+          <span />
+          <span />
+          <span />
+          <p>portfolio.system / public-safe pipeline</p>
+        </div>
+        <ol className="proof-flow">
+          {proofSteps.map((step) => (
+            <li key={step.number}>
+              <span>{step.number}</span>
+              <h3>{step.title}</h3>
+              <p>{step.text}</p>
+            </li>
+          ))}
+        </ol>
+      </div>
+
+      <div className="proof-details">
+        <section aria-labelledby="proof-stack-title">
+          <p className="proof-detail-label">Technology</p>
+          <h4 id="proof-stack-title">Built as a real product.</h4>
+          <ul className="proof-stack" aria-label="Portfolio technology stack">
+            {buildStack.map((technology) => (
+              <li key={technology}>{technology}</li>
+            ))}
+          </ul>
+          <h5>Architecture &amp; AI process</h5>
+          <ul className="proof-architecture" aria-label="Portfolio architecture and AI process">
+            {architecturePoints.map((point) => (
+              <li key={point}>{point}</li>
+            ))}
+          </ul>
+        </section>
+        <section aria-labelledby="proof-private-title">
+          <p className="proof-detail-label">Private workspace</p>
+          <h4 id="proof-private-title">More exists behind the public proof.</h4>
+          <p>
+            This page is the safe public surface. Owner-only tools remain private so personal
+            context, preparation, and operational work stay protected.
+          </p>
+          <ul className="proof-private-capabilities">
+            {privateCapabilities.map((capability) => (
+              <li key={capability}>{capability}</li>
+            ))}
+          </ul>
+        </section>
+      </div>
+
+      <div className="proof-actions">
+        <p>
+          <span aria-hidden="true">●</span> Live modules
+        </p>
+        <a href="#ask">Test role fit</a>
+        <a href="#ask">Ask the portfolio</a>
+      </div>
+    </div>
+  );
+}

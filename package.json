@@ -1,0 +1,48 @@
+{
+  "name": "ai-career-os",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@11.25.0",
+  "engines": {
+    "node": ">=24.0.0 <25.0.0",
+    "pnpm": "11.25.0"
+  },
+  "scripts": {
+    "dev": "turbo dev",
+    "dev:web": "pnpm --filter @career-os/web dev",
+    "dev:workflows": "pnpm --filter @career-os/web inngest:dev",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "typecheck": "turbo typecheck",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test:unit": "turbo test:unit",
+    "test:worker": "apps/worker/.venv/bin/pytest -c apps/worker/pytest.ini --rootdir=apps/worker -o cache_dir=apps/worker/.pytest_cache apps/worker/tests",
+    "lint:worker": "apps/worker/.venv/bin/ruff check apps/worker/src apps/worker/tests && apps/worker/.venv/bin/mypy apps/worker/src apps/worker/tests",
+    "test:db": "supabase test db",
+    "test:contracts": "vitest run tests/contract",
+    "test:integration": "vitest run tests/integration",
+    "test:e2e": "playwright test tests/e2e",
+    "test:a11y": "playwright test tests/accessibility",
+    "test:ai-evals": "vitest run tests/evals",
+    "test:security": "vitest run tests/security",
+    "test:performance": "k6 run tests/performance/release.js",
+    "db:reset": "supabase db reset",
+    "seed:acceptance": "supabase db reset"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.1",
+    "@axe-core/playwright": "4.13.0",
+    "@playwright/test": "1.55.0",
+    "@types/node": "24.10.1",
+    "eslint": "9.39.1",
+    "eslint-config-prettier": "10.1.8",
+    "globals": "16.5.0",
+    "prettier": "3.6.2",
+    "supabase": "2.116.0",
+    "turbo": "2.10.6",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.48.1",
+    "vitest": "4.0.14"
+  }
+}

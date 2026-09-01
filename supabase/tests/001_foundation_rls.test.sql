@@ -1,0 +1,10 @@
+begin;
+select plan(6);
+select has_schema('app');
+select has_schema('published');
+select has_table('app', 'profiles');
+select has_table('app', 'outbox_events');
+select has_table('published', 'portfolio_publications');
+select policies_are('app', 'profiles', array['profiles_owner']);
+select * from finish();
+rollback;

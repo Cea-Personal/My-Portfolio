@@ -1,0 +1,15 @@
+packages:
+  - apps/*
+  - packages/*
+
+catalog:
+  typescript: 6.0.3
+  zod: 4.1.13
+
+preferWorkspacePackages: true
+saveWorkspaceProtocol: rolling
+confirmModulesPurge: false
+allowBuilds:
+  esbuild: true
+  inngest-cli: true
+  protobufjs: true

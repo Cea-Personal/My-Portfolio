@@ -1,0 +1,12 @@
+{
+  "name": "@career-os/database",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.ts",
+  "dependencies": {
+    "@career-os/contracts": "workspace:*",
+    "@supabase/ssr": "0.12.5",
+    "@supabase/supabase-js": "2.112.4"
+  }
+}

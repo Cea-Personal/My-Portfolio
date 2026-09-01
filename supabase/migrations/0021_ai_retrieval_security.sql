@@ -1,0 +1,10 @@
+alter table app.prompt_versions enable row level security;
+alter table app.ai_runs enable row level security;
+alter table app.retrieval_runs enable row level security;
+alter table app.retrieval_candidates enable row level security;
+alter table app.ai_claims enable row level security;
+alter table app.ai_citations enable row level security;
+create policy ai_runs_owner on app.ai_runs for all to authenticated using (owner_id = (select auth.uid())) with check (owner_id = (select auth.uid()));
+create policy retrieval_runs_owner on app.retrieval_runs for all to authenticated using (owner_id = (select auth.uid())) with check (owner_id = (select auth.uid()));
+create policy retrieval_candidates_owner on app.retrieval_candidates for all to authenticated using (exists (select 1 from app.retrieval_runs r where r.id = run_id and r.owner_id = (select auth.uid()))) with check (exists (select 1 from app.retrieval_runs r where r.id = run_id and r.owner_id = (select auth.uid())));
+create index if not exists retrieval_candidate_run_rank on app.retrieval_candidates(run_id, rank);

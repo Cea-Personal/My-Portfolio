@@ -7,7 +7,7 @@
 
 - Node.js 24.x with Corepack
 - pnpm 11.25.x
-- CPython 3.13.x and uv 0.12.x
+- CPython 3.13.x and uv 0.7.x
 - Docker-compatible local container runtime
 - Supabase CLI
 - Inngest CLI or approved local dev server

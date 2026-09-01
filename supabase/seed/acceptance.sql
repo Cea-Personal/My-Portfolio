@@ -1,0 +1,2 @@
+-- Acceptance fixtures are intentionally deterministic and contain no real personal data.
+-- Auth users/profiles are inserted by the test harness with a transaction-scoped owner id.

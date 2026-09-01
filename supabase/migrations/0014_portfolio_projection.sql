@@ -1,0 +1,4 @@
+create table if not exists app.portfolio_projection_rules (
+  id uuid primary key default gen_random_uuid(), owner_id uuid not null references app.profiles(id) on delete cascade, source_entity_type text not null, source_entity_id uuid not null, public_eligible boolean not null default false, featured boolean not null default false, priority integer not null default 0, career_stage text, section text, display_order integer not null default 0, public_summary_override text, selected_metrics uuid[] not null default '{}', selected_technologies uuid[] not null default '{}', selected_media jsonb not null default '[]'::jsonb, last_reviewer_id uuid references app.profiles(id), updated_at timestamptz not null default now(), unique (owner_id, source_entity_type, source_entity_id)
+);
+create index if not exists projection_owner_eligible on app.portfolio_projection_rules(owner_id, public_eligible, display_order);
