@@ -38,6 +38,12 @@ test("public portfolio exposes semantic section anchors", async ({ page }) => {
       .locator(".cinematic-hero")
       .evaluate((element) => element.scrollWidth <= element.clientWidth)
   ).toBe(true);
+  const portrait = page.getByRole("img", { name: "Portrait of Basil Ogbonna" });
+  await expect(portrait).toBeVisible();
+  await expect(portrait).toHaveAttribute("src", "/images/basil-ogbonna.jpg");
+  expect(
+    await portrait.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)
+  ).toBe(true);
   await expect(page.getByRole("link", { name: /owner login/i })).toHaveAttribute(
     "href",
     "/sign-in"

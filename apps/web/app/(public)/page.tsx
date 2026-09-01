@@ -124,7 +124,9 @@ export default async function PublicPortfolioPage() {
   const personalProjectItems = projectItems.filter(
     (project) => !timelineProjectIds.has(text(project.title))
   );
-  const profileImage = process.env.NEXT_PUBLIC_PROFILE_IMAGE_URL?.trim();
+  // Use the included local portrait when a deployment does not supply an external image URL.
+  const profileImage =
+    process.env.NEXT_PUBLIC_PROFILE_IMAGE_URL?.trim() || "/images/basil-ogbonna.jpg";
   const bio =
     typeof profile?.bio === "string"
       ? profile.bio

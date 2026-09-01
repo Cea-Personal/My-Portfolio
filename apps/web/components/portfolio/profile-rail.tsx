@@ -16,11 +16,13 @@ export function ProfileRail({
     <aside className="profile-rail" aria-label={`${name} profile`}>
       <div
         className={`profile-portrait${photoSrc ? " has-photo" : ""}`}
-        style={photoSrc ? { backgroundImage: `url(${JSON.stringify(photoSrc)})` } : undefined}
-        role="img"
-        aria-label={photoSrc ? `Portrait of ${name}` : `Portrait placeholder for ${name}`}
+        {...(!photoSrc ? { role: "img", "aria-label": `Portrait placeholder for ${name}` } : {})}
       >
-        {photoSrc ? null : <span aria-hidden="true">BO</span>}
+        {photoSrc ? (
+          <img src={photoSrc} alt={`Portrait of ${name}`} />
+        ) : (
+          <span aria-hidden="true">BO</span>
+        )}
       </div>
       <nav className="profile-links" aria-label="Basil Ogbonna profiles">
         {links.map((link) =>

@@ -7,7 +7,9 @@ export interface OwnerSession {
 
 export async function getOwnerSession(client: SupabaseClient): Promise<OwnerSession | null> {
   const { data, error } = await client.auth.getUser();
-  if (error || !data.user || !data.user.email_confirmed_at) return null;
+  // Supabase has already authenticated this user before issuing a session. Requiring a separate
+  // email-confirmation flag here can reject valid owner accounts created directly in Supabase.
+  if (error || !data.user) return null;
   return { user: data.user, ownerId: data.user.id };
 }
 

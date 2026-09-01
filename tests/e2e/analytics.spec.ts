@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
-test("analytics dashboard is reachable for the owner", async ({ page }) => {
+test("analytics redirects an unauthenticated visitor to sign in", async ({ page, context }) => {
+  await context.clearCookies();
   await page.goto("/analytics");
-  await expect(page.locator("body")).toBeVisible();
+  await expect(page).toHaveURL(/\/sign-in\?next=%2Fanalytics/);
 });

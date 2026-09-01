@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { createServerSupabaseClient } from "@career-os/database";
 import { getOwnerSession } from "@career-os/auth";
 import { parsePublicEnv } from "@career-os/config";
+import { PrivateWorkspaceGate } from "../../components/auth/private-workspace-gate";
+import { OwnerSignOutButton } from "../../components/auth/owner-sign-out-button";
 
 const links = [
   ["Overview", "/dashboard"],
@@ -26,7 +28,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
   );
   if (!session) redirect("/sign-in?next=/dashboard");
   return (
-    <>
+    <PrivateWorkspaceGate>
       <nav aria-label="Private workspace">
         <a href="/dashboard">Basil Ogbonna · Workspace</a>
         {links.slice(1).map(([label, href]) => (
@@ -35,8 +37,9 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
           </a>
         ))}
         <a href="/">Public portfolio</a>
+        <OwnerSignOutButton />
       </nav>
       {children}
-    </>
+    </PrivateWorkspaceGate>
   );
 }
