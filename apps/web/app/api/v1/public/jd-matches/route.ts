@@ -1,4 +1,5 @@
 import { extractRequirements, matchRequirements, scoreRequirements } from "@career-os/jobs";
+import { hostilePublicInput } from "@career-os/ai";
 import { allowPublicAiRequest } from "@/lib/public-ai-rate-limit";
 import { loadPublicPortfolio } from "@/lib/api/public-data";
 import { publicApiResponse } from "@/lib/api/response";
@@ -13,6 +14,15 @@ export async function POST(request: Request) {
       429
     );
   const description = typeof body.description === "string" ? body.description.slice(0, 50_000) : "";
+  if (!description.trim() || hostilePublicInput(description))
+    return publicApiResponse(
+      {
+        code: !description.trim() ? "EMPTY_JOB_DESCRIPTION" : "UNSAFE_INSTRUCTION",
+        detail: "Provide a job description without instructions directed at the assistant."
+      },
+      request,
+      400
+    );
   const requirements = extractRequirements(description);
   const snapshot = await loadPublicPortfolio();
   const evidence = snapshot.evidence.flatMap((item) => {

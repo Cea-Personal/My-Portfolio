@@ -1,8 +1,10 @@
 begin;
+create extension if not exists pgtap with schema extensions;
+set local search_path = extensions, public, app, published, auth;
 select plan(4);
-select has_table('app', 'automation_runs');
-select has_table('app', 'automation_run_steps');
-select has_table('app', 'outbox_events');
-select has_table('app', 'idempotency_keys');
+select has_table('app', 'automation_runs', 'runs exist');
+select has_table('app', 'automation_run_steps', 'steps exist');
+select has_table('app', 'outbox_events', 'outbox exists');
+select has_table('app', 'idempotency_keys', 'idempotency exists');
 select * from finish();
 rollback;

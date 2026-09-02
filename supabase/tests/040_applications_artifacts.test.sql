@@ -1,9 +1,11 @@
 begin;
+create extension if not exists pgtap with schema extensions;
+set local search_path = extensions, public, app, published, auth;
 select plan(5);
-select has_table('app', 'applications');
-select has_table('app', 'application_forms');
-select has_table('app', 'application_answer_versions');
-select has_table('app', 'generated_artifacts');
-select has_table('app', 'compensation_sources');
+select has_table('app', 'applications', 'applications exist');
+select has_table('app', 'application_forms', 'forms exist');
+select has_table('app', 'application_answer_versions', 'answers exist');
+select has_table('app', 'generated_artifacts', 'artifacts exist');
+select has_table('app', 'compensation_sources', 'compensation sources exist');
 select * from finish();
 rollback;

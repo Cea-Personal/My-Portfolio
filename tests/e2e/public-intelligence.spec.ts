@@ -2,8 +2,8 @@ import { expect, test } from "@playwright/test";
 
 test("public intelligence controls render without private context", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: /ask basil's portfolio/i })).toBeVisible();
-  await expect(page.getByText("How do I fit this role?", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Ask AI" })).toBeVisible();
+  await expect(page.getByText("How do I fit?", { exact: true })).toBeVisible();
   await expect(
     page.getByRole("button", { name: "What data systems has Basil built?" })
   ).toBeVisible();

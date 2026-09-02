@@ -1,8 +1,10 @@
 begin;
+create extension if not exists pgtap with schema extensions;
+set local search_path = extensions, public, app, published, auth;
 select plan(4);
-select has_table('app', 'interview_processes');
-select has_table('app', 'interview_stages');
-select has_table('app', 'journal_entries');
-select has_table('app', 'mock_interviews');
+select has_table('app', 'interview_processes', 'interview processes exist');
+select has_table('app', 'interview_stages', 'interview stages exist');
+select has_table('app', 'journal_entries', 'journal entries exist');
+select has_table('app', 'mock_interviews', 'mock interviews exist');
 select * from finish();
 rollback;

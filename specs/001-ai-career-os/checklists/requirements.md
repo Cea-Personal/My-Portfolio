@@ -38,9 +38,12 @@
   profiles and aligned state terminology, dependencies, routes, and task traceability. The constitutional
   human-review gate was approved by explicit instruction on 2026-08-31; production release approval
   remains a separate gate.
-- The specification contains 9 prioritized user stories, 33 acceptance scenarios, 21 edge cases,
-  126 sequential functional requirements, 7 state-transition rules, 8 AI requirements, 9 privacy and
-  security requirements, 12 non-functional requirements, and 22 measurable success criteria.
+- Validation iteration 3 reconciled the owner-approved public portfolio structure, career arc, hero and
+  profile presentation, Ask Basil experience, owner-only authorization, empty-publication behavior, and
+  evidence required before a workflow may be treated as complete.
+- The specification contains 9 prioritized user stories, 37 acceptance scenarios, 26 edge cases,
+  136 sequential functional requirements, 7 state-transition rules, 8 AI requirements, 9 privacy and
+  security requirements, 12 non-functional requirements, and 29 measurable success criteria.
 - No clarification markers, unresolved template tokens, duplicate requirement identifiers, framework
   names, language choices, storage products, or deployment products remain.
 - Functional requirements are written as observable MUST or MAY outcomes and are exercised by the

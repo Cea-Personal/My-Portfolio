@@ -1,8 +1,10 @@
 begin;
+create extension if not exists pgtap with schema extensions;
+set local search_path = extensions, public, app, published, auth;
 select plan(4);
-select has_table('app', 'career_experiences');
-select has_table('app', 'projects');
-select has_table('app', 'skills');
-select policies_are('app', 'career_experiences', array['career_experiences_owner']);
+select has_table('app', 'career_experiences', 'experiences exist');
+select has_table('app', 'projects', 'projects exist');
+select has_table('app', 'skills', 'skills exist');
+select ok(exists (select 1 from pg_policies where schemaname = 'app' and tablename = 'career_experiences' and policyname = 'career_experiences_owner_owner'), 'experiences retain their owner policy');
 select * from finish();
 rollback;

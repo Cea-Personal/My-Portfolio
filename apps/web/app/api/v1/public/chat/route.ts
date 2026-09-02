@@ -1,4 +1,4 @@
-import { answerPublicQuestion } from "@career-os/ai";
+import { answerPublicQuestion, hostilePublicInput } from "@career-os/ai";
 import { issueEvidenceHandle } from "@career-os/knowledge";
 import { allowPublicAiRequest } from "@/lib/public-ai-rate-limit";
 import { loadPublicPortfolio } from "@/lib/api/public-data";
@@ -54,6 +54,17 @@ export async function POST(request: Request) {
       429
     );
   const question = typeof body.question === "string" ? body.question.trim().slice(0, 2000) : "";
+  if (!question || hostilePublicInput(question))
+    return publicApiResponse(
+      {
+        answer: "I can only answer career questions from approved public evidence.",
+        citations: [],
+        abstained: true,
+        reason: !question ? "EMPTY_QUESTION" : "UNSAFE_INSTRUCTION"
+      },
+      request,
+      400
+    );
   const snapshot = await loadPublicPortfolio();
   const evidence = snapshot.evidence.flatMap((item) => {
     const text = typeof item.sanitized_excerpt === "string" ? item.sanitized_excerpt : "";
@@ -65,7 +76,13 @@ export async function POST(request: Request) {
       start: 0,
       end: text.length
     });
-    return [{ handle, text }];
+    return [
+      {
+        handle,
+        text,
+        source: typeof item.safe_title === "string" ? item.safe_title : item.public_evidence_id
+      }
+    ];
   });
   const result = answerPublicQuestion(question, evidence);
   if (request.headers.get("accept")?.includes("text/event-stream"))

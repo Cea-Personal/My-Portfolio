@@ -1,7 +1,9 @@
 begin;
+create extension if not exists pgtap with schema extensions;
+set local search_path = extensions, public, app, published, auth;
 select plan(3);
-select has_table('app', 'evidence_chunks');
-select has_column('app', 'evidence_chunks', 'visibility');
+select has_table('app', 'evidence_chunks', 'chunks exist');
+select has_column('app', 'evidence_chunks', 'visibility', 'chunks have visibility');
 select ok(
   exists (
     select 1 from pg_indexes

@@ -10,13 +10,17 @@
 |-------|------------|---------------|
 | Public read | none | active published portfolio snapshot only |
 | Public AI | none + abuse controls | approved public evidence snapshot only |
-| Owner | secure authenticated session | rows authorized to session subject by RLS |
+| Owner | secure authenticated session + active configured-owner authorization | rows authorized to the sole owner subject by RLS |
 | Provider callback | verified provider signature/state | one integration and callback purpose |
 | Workflow | signed Inngest request + environment allowlist | declared event owner/resource only |
 
 Every Server Action and Route Handler repeats authentication and authorization. Authenticated responses
 are private/no-store. Public content may be cached by publication version; public AI responses are not
 shared across request bodies or visitors.
+
+A valid authenticated subject without active configured-owner authorization receives `FORBIDDEN`, is not
+provisioned into `app.profiles`, and cannot create/read owner records. Owner bootstrap is an audited
+deployment/recovery operation outside ordinary product APIs.
 
 ## Common Headers and Semantics
 
@@ -64,9 +68,21 @@ Returns the active immutable publication.
 }
 ```
 
-The response schema allows Hero, About, Career Journey, Projects, Impact, Skills, Writing, Role Match,
-Ask My AI, and Contact sections. It cannot include internal IDs, confidence, private notes, source object
-keys, embeddings, or restricted evidence metadata.
+The response schema allows Hero, About, Experience, Projects, Blog, and Let’s Talk content. Ask Basil is
+an interactive shell bound to the returned publication version. Impact, metrics, professional projects,
+skills, and tools are nested under their Experience stage. Portfolio as Proof is a Project item. It cannot
+include internal IDs, confidence, private notes, source object keys, embeddings, restricted evidence
+metadata, or frontend-authored fallback career claims.
+
+Experience stages use ordered stable keys: `web_developer`, `software_engineer`,
+`lead_software_engineer`, `data_engineer`, `senior_data_engineer`, and
+`ai_engineer_software_data`. A stage includes its closed summary plus approved child collections for
+work, professional projects, impacts/metrics, skills/tools, and case-study references. The final stage
+declares whether it is a capability or an evidence-supported formal role.
+
+When no active publication exists, the endpoint returns `200` with `publication: null`, empty career and
+project content, approved non-career shell metadata only, and `state: "unpublished"`. It never fabricates
+an owner headline, career stage, project, impact, skill, or metric.
 
 ### `GET /public/projects/{slug}`
 
@@ -186,9 +202,11 @@ cannot modify values, weights, or classifications after validation.
 |-----------------|---------|-------|
 | `POST /integrations/drive/authorize` | Begin owner-approved OAuth connection | Returns provider authorization URL/state |
 | `GET /integrations/drive/callback` | Complete verified callback | State and redirect allowlist required |
+| `GET /integrations/drive` | Inspect connection, selected folder, sync cursor, scope, and revocation state | Never returns tokens or secrets |
 | `DELETE /integrations/{id}` | Revoke connection | Does not silently delete verified facts |
 | `GET /documents` | List source documents and status | No raw text in list response |
 | `POST /documents/uploads` | Create bounded private upload | Returns one-time upload target and constraints |
+| `POST /documents/uploads/{id}/complete` | Verify stored bytes and create immutable source version | Hash/signature/size checked before ingestion dispatch |
 | `POST /documents/sync-runs` | Request Drive reconciliation or selected reprocess | Idempotent automation run |
 | `GET /ingestion-runs/{id}` | Inspect run/items/retries/warnings | Sanitized errors only |
 | `POST /ingestion-runs/{id}/cancel` | Cooperative cancellation | Fails if terminal/non-cancellable step |

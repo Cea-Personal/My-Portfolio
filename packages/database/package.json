@@ -3,7 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "exports": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./browser": "./src/supabase/browser.ts",
+    "./server": "./src/supabase/server.ts",
+    "./service": "./src/supabase/service.ts"
+  },
   "dependencies": {
     "@career-os/contracts": "workspace:*",
     "@supabase/ssr": "0.12.5",

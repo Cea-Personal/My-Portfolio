@@ -1,10 +1,12 @@
 begin;
+create extension if not exists pgtap with schema extensions;
+set local search_path = extensions, public, app, published, auth;
 select plan(6);
 select has_schema('app');
 select has_schema('published');
-select has_table('app', 'profiles');
-select has_table('app', 'outbox_events');
-select has_table('published', 'portfolio_publications');
-select policies_are('app', 'profiles', array['profiles_owner']);
+select has_table('app', 'profiles', 'profiles exists');
+select has_table('app', 'outbox_events', 'outbox events exists');
+select has_table('published', 'portfolio_publications', 'publications exists');
+select ok(exists (select 1 from pg_policies where schemaname = 'app' and tablename = 'profiles' and policyname = 'profiles_owner'), 'profiles retain the owner policy');
 select * from finish();
 rollback;

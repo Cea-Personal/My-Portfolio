@@ -1,6 +1,6 @@
 # Implementation Plan: AI Career OS and Intelligent Portfolio
 
-**Branch**: `master` | **Date**: 2026-08-31 | **Spec**: [spec.md](spec.md)
+**Branch**: `001-ai-career-os` | **Date**: 2026-08-31 | **Reconciled**: 2026-09-02 | **Spec**: [spec.md](spec.md)
 
 **Input**: Feature specification from `/specs/001-ai-career-os/spec.md`
 
@@ -23,6 +23,13 @@ provenance, deterministic code validates citations and calculates scores, and AI
 reasoning capability with no authority to publish, submit applications, communicate externally, or
 change verified facts.
 
+The reconciliation amendment fixes the public composition as Basil Ogbonna’s portfolio with About,
+Experience, Projects, Ask Basil, Blog, and Let’s Talk; integrates professional projects, impact, skills,
+and tools into evidence-backed Experience chapters; and treats Portfolio as Proof as a project. It also
+requires a configured single-owner authorization boundary, honest empty-publication behavior, complete
+workflow acceptance evidence, and fail-closed release gates. Existing schemas or route names do not
+constitute delivery without durable behavior and end-to-end verification.
+
 ## Technical Context
 
 **Language/Version**: TypeScript 6.0.3 on Node.js 24.x; Python 3.13.5; SQL for PostgreSQL 17
@@ -41,7 +48,9 @@ fixtures, versioned AI evaluation datasets, k6 performance tests
 managed Supabase in Frankfurt; non-root OCI Python worker on Google Cloud Run in the same region;
 Inngest Cloud durable workflow control plane
 
-**Project Type**: Greenfield web application plus asynchronous worker in a modular monorepo
+**Project Type**: Brownfield completion and reconciliation of an existing web application plus
+asynchronous worker in a modular monorepo; existing files are retained only where they satisfy the
+amended contracts
 
 **Performance Goals**: Meet MP-001–MP-004 from `spec.md`: p95 usable public content within 2.5 seconds
 under the defined cold-cache mobile/network/concurrency profile; p95 ordinary owner acknowledgement within
@@ -52,11 +61,14 @@ and p95 list/detail reads within 2 seconds at the complete NFR-010 corpus sizes
 published evidence; every material career claim is evidence-linked; deterministic scoring and state
 machines; no automatic application/form submission, recruiter communication, publishing, evidence
 approval, or live interview assistance; external data is untrusted; private content is absent from
-ordinary telemetry; public portfolio stays available when AI/integrations fail
+ordinary telemetry; public portfolio stays available when AI/integrations fail; authenticated non-owner
+accounts fail closed; no placeholder, simulated integration, or shallow smoke check satisfies workflow
+completion
 
 **Scale/Scope**: One owner; at least 10,000 career facts/evidence links, 10,000 evidence chunks, 25,000
 jobs, 2,500 applications, 1,000 generated artifacts, and five years of analytics; nine prioritized user
-journeys, 126 functional requirements, seven state machines, and core plus planned-expansion releases
+journeys, 136 functional requirements, seven state machines, 29 measurable success criteria, and core
+plus planned-expansion releases
 
 ## Constitution Check
 
@@ -64,7 +76,7 @@ journeys, 126 functional requirements, seven state machines, and core plus plann
 
 | # | Constitutional gate | Pre-design | Post-design evidence |
 |---|---------------------|------------|----------------------|
-| I | Career Brain is canonical | PASS | All projections, retrieval, artifacts, jobs, and interview material reference versioned Career Brain facts/evidence; no hard-coded career copy. |
+| I | Career Brain is canonical | PASS | All projections, retrieval, artifacts, jobs, and interview material reference versioned Career Brain facts/evidence; an absent publication produces an honest empty state, never hard-coded career copy. |
 | II | Evidence-grounded AI | PASS | Immutable source/chunk provenance, generation contexts, claim-evidence links, deterministic citation validation, and abstention contracts. |
 | III | Impact-first representation | PASS | Projection, achievement, metric, ResumeData, and public portfolio contracts prioritize contextualized verified impact. |
 | IV | Owner-controlled career truth | PASS | Extracted facts remain candidates; only owner review transitions to approved/public eligibility. Original sources and journals are append-only. |
@@ -76,27 +88,29 @@ journeys, 126 functional requirements, seven state machines, and core plus plann
 | X | Observable/resilient automation | PASS | Durable step contracts, app-owned run/step records, outbox, idempotency keys, retries, partial states, and graceful degradation. |
 | XI | Testable AI behavior | PASS | Versioned evaluation datasets and gates for grounding, citations, abstention, leakage, injection, schemas, quality, latency, and cost. |
 | XII | No fabricated claims | PASS | Unsupported/conflicting claim states, deterministic support validation, and required abstention are represented in schema and contracts. |
-| XIII | Public/private boundary | PASS | Published snapshot is separate from private Career Brain; authorization filters run inside retrieval; negative RLS/contract tests required. |
+| XIII | Public/private boundary | PASS | Published snapshot is separate from private Career Brain; owner access requires both a valid session and configured-owner identity; authorization filters run inside retrieval; anonymous and authenticated-non-owner negative tests are mandatory. |
 | XIV | Accurate contribution attribution | PASS | Contribution type is modeled on projects/achievements/stories and validated in generated/public claims. |
 | XV | Confidential employer protection | PASS | Separate private/public descriptions, confidential visibility, sanitized publication pipeline, and prohibited public fields. |
 | XVI | Versioned generated artifacts | PASS | Structured content, templates, renderer, model/prompt, evidence, owner edits, binaries, hashes, and final/submitted states are immutable versions. |
-| XVII | Accessible/performance UX | PASS | Semantic progressive timeline, reduced motion, WCAG AA tests, performance targets, static public fallback, and explicit budgets. |
-| XVIII | Incremental specification-driven development | PASS | Human approval to proceed with `$speckit-implement` was recorded on 2026-08-31 after review of the specification, plan, contracts, data model, dependencies, security implications, and enriched task metadata. Production merge/deployment remains separately gated. |
+| XVII | Accessible/performance UX | PASS | Semantic Experience accordion, complete accessible hero-role labels, reduced motion, light/dark contrast, zoom/viewport overflow tests, WCAG AA checks, honest empty state, and explicit budgets. |
+| XVIII | Incremental specification-driven development | PASS | The amended design defines durable completion evidence. Existing tasks must be reconciled and re-approved before implementation continues; file existence, read-only placeholders, and smoke reachability cannot close behavior tasks. |
 
 ### Workflow Quality Gates
 
 | Gate | Status | Evidence |
 |------|--------|----------|
 | Testable requirements and state transitions | PASS | `spec.md`, `data-model.md`, contracts, and quickstart scenarios trace functional, AI, privacy, state, and outcome requirements. |
-| Architecture trade-offs documented | PASS | `research.md` records 20 decisions with rationale and alternatives. |
+| Architecture trade-offs documented | PASS | `research.md` records 25 decisions with rationale and alternatives. |
 | Authorization and public/private flow documented | PASS | Publication snapshot, RLS model, API auth classes, retrieval scope, and negative tests are explicit. |
 | Observability and failure isolation documented | PASS | Inngest event/step contracts, app-owned runs, Collector privacy boundary, and failure-mode scenarios. |
 | Migration, rollout, and recovery documented | PASS | Data model migration section and deployment/rollout strategy below. |
 | AI provider/prompt/evidence/eval contracts documented | PASS | `contracts/ai-contracts.md`, research decisions 7–16, evaluation gates. |
 | Constitutional exceptions | PASS | None required. |
 
-**Gate result**: PASS for implementation after recorded human approval on 2026-08-31. This authorizes
-bounded execution of `tasks.md`; it does not authorize autonomous merge or production deployment.
+**Gate result**: DESIGN PASS with no constitutional exception. Because the specification changed on
+2026-09-01, the current `tasks.md` is stale and does not authorize further implementation until its
+metadata, dependencies, completion criteria, and verification methods are reconciled and explicitly
+approved. Production merge and deployment remain separately gated.
 
 ## Project Structure
 
@@ -113,7 +127,8 @@ specs/001-ai-career-os/
 │   ├── ai-contracts.md
 │   ├── events.md
 │   ├── http-api.md
-│   └── job-source-adapter.md
+│   ├── job-source-adapter.md
+│   └── portfolio-experience.md
 ├── checklists/
 │   └── requirements.md
 ├── spec.md
@@ -260,12 +275,29 @@ All runtimes ──> OpenTelemetry Collector ──> sanitized Sentry/PostHog/tr
 ### Public Portfolio
 
 - Render approved publication data in Server Components so core content works without client JavaScript.
-- Use semantic landmark sections with stable anchors: About, Experience, Projects, Impact, Skills,
-  Writing, Match, Ask, and Contact.
-- Desktop career journey uses a sticky visual rail and Intersection Observer to update active stage.
-  Mobile and reduced-motion modes use a semantic ordered vertical timeline; no scroll interception.
-- Keep Match and Ask as isolated client islands with progressive loading, streaming status, citations,
-  abuse/rate feedback, and an accessible no-evidence state.
+- Use semantic landmark sections with stable anchors for About, Experience, Projects, Ask Basil, Blog,
+  and Let’s Talk. Navigation exposes those anchors plus a discreet Owner Login entry.
+- Experience is a connected vertical journey ordered Web Developer, Software Engineer, Lead Software
+  Engineer, Data Engineer, Senior Data Engineer, then AI Engineer — Software and Data. Closed chapters
+  retain role, organization/date when available, and summary; expanding reveals professional projects,
+  impact, metrics, skills, tools, contribution, and approved case-study material directly below.
+- Treat the final AI stage as a capability unless the Career Brain provides approved employer-title
+  evidence. Do not infer the ordered narrative from frontend constants; publication items carry stage and
+  display order. When no active publication exists, render an honest unpublished state with no fallback
+  professional claims.
+- The hero is a bounded client enhancement over accessible static content. It cycles Data Engineer, Data
+  Platform Engineer, AI Data Engineer, AI Engineer, AI Software Engineer, and Software Engineer while
+  visually retaining “Engineer.” Each state exposes a complete accessible name; reduced motion uses a
+  static or gentle alternative. Viewport/zoom tests prohibit horizontal overflow and clipping.
+- Use a sticky profile rail only where layout width supports it; otherwise place its image, summary,
+  centered approved links, and availability statement in normal flow. Light and dark palettes share
+  semantic contrast tokens for text, proof labels, role-fit results, focus, borders, and backgrounds.
+- Personal projects use substantial visual chapters with approved destinations. Professional projects
+  remain inside Experience. Portfolio as Proof is the first-party project case study and may summarize
+  private architecture only through sanitized, owner-approved descriptions.
+- Keep question answering and “How do I fit?” as modes in one Ask Basil client island with progressive
+  loading, streaming status, citations, deterministic scoring, abuse/rate feedback, and accessible
+  insufficient-evidence states.
 - Cache by immutable publication version. Publishing/withdrawal invalidates the corresponding tag; no
   authenticated or AI response is CDN/ISR cached.
 - Dedicated article/project routes read the same active publication snapshot, not private source tables.
@@ -273,10 +305,15 @@ All runtimes ──> OpenTelemetry Collector ──> sanitized Sentry/PostHog/tr
 ### Private Career OS
 
 - Provide explicit owner sign-in, verified callback, sign-out, expired-session, and unauthorized states.
-  Authentication browser tests cover successful entry, invalid/expired links, callback tampering,
-  session expiry, and attempted access to every private route group.
+  Authentication establishes identity but not owner authority: a server-side configured-owner policy or
+  owner-membership record must match the authenticated subject before profile bootstrap or private data
+  access. Tests cover successful owner entry, authenticated non-owner denial, invalid/expired links,
+  callback tampering, session expiry, and attempted access to every private route group.
 - Route groups require a verified session before layout/data rendering and repeat authorization in every
   mutation. Dashboard modules use owner-scoped repositories and private/no-store responses.
+- Private navigation or contextual links make Dashboard, Career Brain, Documents, Jobs, Applications,
+  Interviews, Journal, CVs, Cover Letters, Blog, Analytics, Agents, Automations, Search Profiles, Job
+  Sources, and Settings discoverable as their release scope is enabled.
 - `/dashboard` is the authenticated landing page and aggregates high-fit jobs, applications awaiting
   action, interviews/preparation, fact review, portfolio activity, and draft content. `/analytics`
   provides deeper reports and links back to those actionable records.
@@ -290,6 +327,9 @@ All runtimes ──> OpenTelemetry Collector ──> sanitized Sentry/PostHog/tr
   new version on save. Final/submitted versions are read-only.
 - Forms, dialogs, charts, timelines, editors, toasts, and loading/empty/error states are keyboard and
   screen-reader tested; charts always provide a table/text equivalent.
+- A screen is not accepted as complete when it only lists data or advertises a future action. Each
+  selected workflow must perform its specified mutation, persist, survive reload, expose history/run
+  state, enforce owner and evidence boundaries, and pass authorized and unauthorized acceptance paths.
 
 ## Backend and Interface Architecture
 
@@ -299,7 +339,8 @@ All runtimes ──> OpenTelemetry Collector ──> sanitized Sentry/PostHog/tr
   endpoints.
 - Runtime schemas from `packages/contracts` validate at every boundary. Database-generated types do not
   replace input validation.
-- Owner identity is taken only from the session; body/query `ownerId` is rejected.
+- Owner identity is taken only from a verified session that also satisfies the configured-owner policy;
+  body/query `ownerId` is rejected, and arbitrary authenticated users are never auto-provisioned.
 - Mutations use revision tokens and idempotency keys. Domain changes and outbox events commit together.
 - HTTP handlers return quickly after creating asynchronous runs. Large files and generated binaries use
   private object transfer, never event payloads or database JSON blobs.
@@ -588,6 +629,12 @@ Failure expectations:
 | Resilience | retry/idempotency, worker restart, provider outage, partial failure, cancellation, restore |
 | AI evaluation | extraction, retrieval recall, grounding, citations, abstention, privacy, JD matching, answer/CV quality, question relevance |
 
+Every behavior-bearing test must prove an observable contract, not merely page reachability, component
+existence, or the absence of a prohibited button. Authenticated workflows use seeded owner and
+authenticated-non-owner identities, perform the mutation through the UI or HTTP boundary, reload, and
+verify durable state/history. Public portfolio tests exercise an active publication and an empty
+publication separately; no frontend fallback facts are permitted.
+
 ### Release Metrics
 
 - Required: 100% material public AI claims have valid public citations; zero private leakage; at least 99%
@@ -598,7 +645,7 @@ Failure expectations:
   word/character-limit validity; exact version reproduction.
 - Security: all mandatory adversarial fixtures pass; no fixture secret or private content appears in
   exported telemetry.
-- UX: SC-001–SC-022 and NFR-001–NFR-012 mapped to CI reports and preview acceptance evidence using
+- UX: SC-001–SC-029 and NFR-001–NFR-012 mapped to CI reports and preview acceptance evidence using
   MP-001–MP-007, including recorded usability scripts, browser matrix, load profile, and document corpus.
 
 ## CI/CD and Deployment
@@ -620,6 +667,10 @@ Failure expectations:
   migration dry run, and telemetry privacy inspection.
 - Create Vercel preview, isolated preview Supabase branch/project, preview Inngest environment, and worker
   revision with environment-specific secrets and callbacks.
+- Required hosted database, E2E, accessibility, security, AI-evaluation, performance, and recovery jobs
+  fail closed for a production promotion when credentials, browsers, fixtures, or required tools are
+  missing. Non-release development workflows may report an explicit skip but cannot produce a releasable
+  status.
 - Production promotion requires human approval, migration backup/forward-recovery review, then expand
   migration -> compatible app/worker -> backfill -> verification -> contract cleanup in a later release.
 - Use canary/limited traffic for AI prompt/model/retrieval aliases and worker changes. Alias rollback must
@@ -644,9 +695,11 @@ it. Exact tasks and dependencies are produced by `$speckit-tasks`.
 2. **Career Brain and Document Intelligence**: manual facts, structured career domains,
    evidence/version/trust/review, Drive connection/change cursor, uploads, isolated parsing, chunk
    provenance, extraction candidates, idempotent embeddings, projection rules, and staged publication.
-3. **Public Portfolio**: one-page semantic experience, career timeline, projects, impact, skills, writing,
-   contact, public detail routes, performance/accessibility baselines.
-4. **Public Intelligence**: hybrid retrieval, evidence handles, grounded Ask My AI, public JD matcher,
+3. **Public Portfolio**: reconciled Hero, About, evidence-backed Experience accordion, personal Projects
+   with Portfolio as Proof, Ask Basil shell, Blog, Let’s Talk, profile rail, public detail routes,
+   honest empty publication, and light/dark/responsive/accessibility baselines.
+4. **Public Intelligence**: hybrid retrieval, evidence handles, grounded Ask Basil questions, integrated
+   “How do I fit?” JD matcher,
    deterministic scoring, evaluations, abuse controls.
 5. **Job Core**: manual job entry, canonical job/JD versions, requirements, job lifecycle, list/Kanban,
    career/opportunity scores.
@@ -676,7 +729,9 @@ it. Exact tasks and dependencies are produced by `$speckit-tasks`.
 | FR-093–FR-108, ST-005 | Journal/interview domains | quickstart 9; integrity/qualitative evals |
 | FR-109–FR-119, ST-006 | Content/analytics | quickstart 10; publication/privacy/aggregate tests |
 | FR-120–FR-126, ST-007, NFR-005–NFR-009 | AI ports, automation, observability/failure | quickstart 4 and 11; retry/leakage tests |
-| NFR-004, NFR-010–NFR-012, SC-001–SC-022 | Performance, scale, compatibility, export, all domains | full release-gate suite |
+| FR-127–FR-133, SC-023–SC-027 | Reconciled portfolio composition, career narrative, hero, profile rail, project proof, Ask Basil, empty-state and responsive behavior | quickstart 1 and 12; projection/E2E/a11y/contrast/overflow tests |
+| FR-134–FR-136, SC-028–SC-029 | Private discoverability, configured-owner boundary, durable workflow completion | quickstart 2 and 12; owner/non-owner security tests and persisted workflow journeys |
+| NFR-004, NFR-010–NFR-012, SC-001–SC-029 | Performance, scale, compatibility, export, all domains | full fail-closed release-gate suite |
 
 ## Complexity Tracking
 

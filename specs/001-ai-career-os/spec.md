@@ -4,7 +4,7 @@
 
 **Created**: 2026-08-31
 
-**Status**: Approved for Implementation
+**Status**: Approved for Implementation; reconciled by owner-approved amendment on 2026-09-01
 
 **Implementation Gate**: APPROVED on 2026-08-31 by explicit human instruction to proceed with
 `$speckit-implement` after review of the specification, plan, contracts, data model, dependency graph,
@@ -15,6 +15,95 @@ gated by the release checklist.
 intelligent one-page public portfolio, private career management, job and application intelligence,
 interview preparation, content, analytics, and owner-controlled AI assistance."
 
+## Reconciliation Amendment — Portfolio, Career Arc, and Completion Evidence
+
+**Approved**: 2026-09-01
+
+**Purpose**: Reconcile the original master prompt with the owner’s later portfolio, career-story, and
+private-workspace decisions. This amendment is normative and takes precedence wherever an earlier
+example, section list, career sequence, label, or presentation rule conflicts with it. Requirements not
+explicitly changed here remain in force, especially Career Brain authority, evidence grounding,
+owner-controlled publication, private-data protection, deterministic scoring, and the prohibition on
+automatic application submission or live interview assistance.
+
+### Reconciled Public Experience
+
+- The public product is Basil Ogbonna’s professional portfolio. Public branding MUST use the owner’s
+  name and MUST NOT present the public site itself as “AI Career OS.” The AI Career OS name MAY describe
+  the authenticated private product or the portfolio’s underlying product architecture.
+- The primary navigation MUST be **About**, **Experience**, **Projects**, **Blog**, and **Let’s Talk**, with
+  a discreet, discoverable **Owner Login** entry. These items navigate within the one-page portfolio;
+  article and project detail pages remain permitted.
+- Impact, verified metrics, professional projects, skills, and tools MUST be presented within the
+  relevant Experience chapter rather than as disconnected top-level portfolio sections.
+- Public role matching and evidence-backed portfolio questions MUST be delivered through one cohesive
+  **Ask Basil** experience. “How do I fit?” is the human-facing role-fit mode within that experience,
+  not a separate top-level section.
+- **Portfolio as Proof** MUST be part of Projects. It MUST explain that this portfolio is a real product,
+  identify owner-approved technologies and architectural or engineering practices, and describe private
+  capabilities such as Career Brain ingestion, retrieval, application preparation, interview assistance,
+  analytics, and automation without exposing private content or implying that visitors can access them.
+- Personal projects MUST be presented as substantial visual project chapters with an approved summary,
+  technologies, media where available, and a working detail, demonstration, or external destination.
+  Professional projects MUST appear within the relevant Experience chapter and use only approved,
+  sanitized descriptions with accurate contribution attribution.
+
+### Approved Career Narrative
+
+The public career journey MUST use this ordered narrative when supported by approved Career Brain data:
+
+1. Web Developer
+2. Software Engineer
+3. Lead Software Engineer
+4. Data Engineer
+5. Senior Data Engineer
+6. AI Engineer — Software and Data
+
+The final stage communicates an AI engineering capability grounded in the owner’s software and data
+background. It MUST NOT be represented as a formal employer title unless approved evidence supports that
+claim.
+
+Each closed Experience chapter MUST show the role, organization when available, dates when available,
+and a concise summary. Expanding a chapter MUST reveal its selected work, professional projects, impact,
+verified metrics, skills and tools, supported contribution, and approved architecture or case-study
+links. The chapter opens directly below its summary and MUST remain accessible by keyboard and assistive
+technology.
+
+### Approved Hero and Profile Presentation
+
+- The hero MUST display **Basil Ogbonna** prominently and present an evolving role sequence of **Data
+  Engineer**, **Data Platform Engineer**, **AI Data Engineer**, **AI Engineer**, **AI Software Engineer**,
+  and **Software Engineer**.
+- “Engineer” remains visually fixed while qualifying words enter, leave, or change position. Every state
+  MUST expose a complete understandable role to assistive technology. Reduced-motion experiences MUST
+  receive an equivalent static or gently changing presentation.
+- The hero MUST remain horizontally and vertically balanced without clipped text, horizontal overflow,
+  or missing padding at supported desktop and mobile widths. Its primary actions are **See the work** and
+  **Read the blog**. The career signal links to Experience.
+- On layouts with sufficient space, a sticky profile rail MUST contain the owner image, a concise
+  professional summary, centered owner-approved social/contact links, and “Open to meaningful work.” It
+  MUST NOT repeat an unnecessary name/title block after that statement. On smaller screens it becomes a
+  readable normal-flow introduction.
+- The portfolio MUST provide visually intentional light and dark presentations. Essential text,
+  controls, proof labels, role-fit states, borders, and backgrounds MUST retain readable contrast in both.
+
+### Private Product and Completion Reconciliation
+
+- The authenticated product MUST provide discoverable routes to Dashboard, Career Brain, Documents,
+  Jobs, Applications, Interviews, Journal, CVs, Cover Letters, Blog, Analytics, Agents, Automations,
+  Search Profiles, Job Sources, and Settings as those capabilities enter the selected release scope.
+- Authentication alone MUST NOT grant owner authority. Only the configured career owner may receive the
+  owner role or access owner data; another valid authenticated account MUST be denied.
+- Placeholder controls, generic read-only lists, simulated provider callbacks, generated identifiers
+  without durable records, file existence, and page-reachability smoke checks MUST NOT count as
+  completion of a workflow requirement.
+- A private workflow is complete only when its stated owner action can be performed through the product,
+  persists in the system of record, remains correct after reload, enforces authorization and evidence
+  rules, exposes required history or run state, and passes its acceptance tests.
+- When no active Portfolio Projection exists, the public portfolio MUST remain usable but MUST show an
+  honest unpublished or empty state. It MUST NOT substitute hard-coded career claims, employers,
+  projects, impacts, skills, or metrics.
+
 ## Product Vision
 
 The product is a personal career operating system whose public face is an intelligent professional
@@ -23,10 +112,11 @@ private workflows for opportunity discovery, application preparation, interview 
 development. The Career Brain is the single source of professional truth, and the owner retains control
 over every consequential action and every claim made public.
 
-The intended career narrative progresses from Software Engineer to Lead Software Engineer to Data
-Engineer to Senior Data Engineer, with connected positioning across Data Engineering, Data Platform
-Engineering, AI Data Engineering, and AI Engineering. The narrative MUST emerge from approved evidence,
-not from hard-coded marketing copy.
+The intended career narrative progresses from Web Developer through Software Engineer, Lead Software
+Engineer, Data Engineer, and Senior Data Engineer to an evidence-grounded AI Engineer capability spanning
+software and data. Connected positioning across Data Engineering, Data Platform Engineering, AI Data
+Engineering, AI Engineering, and Software Engineering MUST emerge from approved evidence, not from
+hard-coded marketing copy or an unsupported employer title.
 
 ## Actors and Personas
 
@@ -72,8 +162,9 @@ eligible for projection while the private fact is not.
 
 ### User Story 2 - Understand the Career on One Public Page (Priority: P1)
 
-As a public visitor, I can understand the owner’s positioning, career progression, selected projects,
-impact, skills, writing, and contact options in one cohesive scrolling experience.
+As a public visitor, I can understand the owner’s positioning, career progression, selected personal
+projects, role-specific professional work, impact, skills, blog, interactive evidence, and contact options
+in one cohesive scrolling experience.
 
 **Why this priority**: The portfolio is the primary public product surface and the fastest route to
 professional credibility and recruiter engagement.
@@ -93,13 +184,23 @@ and mobile without authenticating.
    operable without scroll-jacking.
 4. **Given** a projected record is changed or withdrawn, **When** the public page is refreshed, **Then**
    the public representation reflects the current approved projection without a second career copy.
+5. **Given** an Experience chapter is closed, **When** it is displayed, **Then** its role, available
+   organization and dates, and concise summary remain visible; **When** it is expanded, **Then** its work,
+   professional projects, impact, skills, tools, and approved supporting detail open immediately below it.
+6. **Given** no active Portfolio Projection exists, **When** a visitor opens the portfolio, **Then** the
+   page remains usable and honestly indicates that approved career content is not yet published without
+   substituting hard-coded career claims.
+7. **Given** the visitor uses light mode, dark mode, a smaller desktop, or a mobile viewport, **When** they
+   view the hero, navigation, profile rail, proof content, and Ask Basil states, **Then** text remains
+   readable, spacing remains intentional, and no content is clipped or causes horizontal overflow.
 
 ---
 
 ### User Story 3 - Ask Evidence-Backed Questions and Assess Role Fit (Priority: P1)
 
-As a recruiter or visitor, I can ask questions about public professional experience or paste a job
-description and receive a clear answer or match assessment grounded in approved public evidence.
+As a recruiter or visitor, I can use one Ask Basil experience to ask questions about public professional
+experience or assess a pasted job description and receive a clear answer or match assessment grounded in
+approved public evidence.
 
 **Why this priority**: Interactive evidence turns a static portfolio into a useful recruiting interface
 without sacrificing truth or privacy.
@@ -119,6 +220,9 @@ deterministic scoring, and non-disclosure of private evidence.
    weight, contribution to the score, and explanation.
 4. **Given** private evidence would improve an answer, **When** a public user asks a related question,
    **Then** the response does not reveal or imply that private evidence exists.
+5. **Given** the visitor switches between portfolio questions and “How do I fit?”, **When** either mode is
+   used, **Then** the interaction remains within one cohesive Ask Basil section and clearly distinguishes
+   conversational answers from deterministic role-fit results.
 
 ---
 
@@ -295,6 +399,12 @@ and sanitized error details, disable the schedule, and verify that no consequent
 - A scheduled run overlaps a prior run or is retried after some steps completed successfully.
 - A provider fails after partial output, returns unsafe markup, or exposes content outside the owner’s
   authorized scope.
+- No active Portfolio Projection exists, or a previously active publication is withdrawn.
+- A valid authenticated account belongs to someone other than the configured career owner.
+- A long owner name, translated browser UI, zoom level, or intermediate viewport causes hero or
+  navigation text to approach its available width.
+- Motion is disabled while the hero is between role states or an Experience chapter is expanded.
+- A personal project has approved content but no working public demonstration or external destination.
 
 ## Requirements *(mandatory)*
 
@@ -369,30 +479,40 @@ and sanitized error details, disable the schedule, and verify that no consequent
 
 #### One-Page Public Portfolio
 
-- **FR-028**: The primary public portfolio MUST be a single-page scrolling experience containing Hero,
-  About, Career Journey, Selected Projects, Measurable Impact, Skills, Writing, Role Match, Ask My AI,
-  and Contact sections.
-- **FR-029**: Primary navigation MUST move to sections on the same page, while articles and project case
-  studies MAY have shareable detail views.
-- **FR-030**: The Hero MUST communicate the owner’s name, senior data and AI engineering positioning,
-  connected capability areas, and concise actions to explore work, ask AI, and assess role fit.
-- **FR-031**: The career journey MUST present the approved progression from Software Engineer through
-  Lead Software Engineer, Data Engineer, Senior Data Engineer, and Data Platform or AI Engineering.
-- **FR-032**: Each career stage MUST be able to present approved role, organization, dates, description,
-  responsibilities, technologies, work, projects, achievements, diagrams, and case studies.
-- **FR-033**: On larger screens the journey MUST support an active stage indicator associated with the
-  visible content; on smaller or reduced-motion experiences it MUST provide an accessible linear
-  timeline without scroll-jacking.
+- **FR-028**: The primary public portfolio MUST be a single-page scrolling experience organized around
+  Hero, About, Experience, Projects, Ask Basil, Blog, and Let’s Talk. Impact, metrics, professional
+  projects, skills, and tools MUST be integrated into the relevant Experience chapters rather than
+  presented as disconnected top-level sections.
+- **FR-029**: Primary navigation MUST provide About, Experience, Projects, Blog, and Let’s Talk anchors
+  plus a discreet Owner Login entry. Articles and project case studies MAY have shareable detail views
+  without fragmenting the primary portfolio navigation.
+- **FR-030**: The Hero MUST communicate the owner’s name and connected software, data, platform, and AI
+  engineering positioning through the approved evolving role sequence. It MUST provide concise actions
+  to see the work and read the blog, and its career signal MUST lead to Experience.
+- **FR-031**: The career journey MUST present the approved progression of Web Developer, Software
+  Engineer, Lead Software Engineer, Data Engineer, Senior Data Engineer, and AI Engineer — Software and
+  Data. The final stage MUST be described as a capability rather than an employer title unless approved
+  evidence establishes it as a formal role.
+- **FR-032**: Each closed career stage MUST present its approved role, available organization and dates,
+  and concise summary. Expanding it MUST reveal approved responsibilities, selected work, professional
+  projects, impact, metrics, skills, tools, contribution attribution, diagrams, and case-study links
+  directly below the stage summary.
+- **FR-033**: On larger screens the journey MUST provide a connected vertical career path and accessible
+  expandable chapters; on smaller and reduced-motion experiences it MUST provide an accessible linear
+  presentation without scroll-jacking. Opening or closing one chapter MUST NOT obscure the summaries of
+  the other stages.
 - **FR-034**: Public experience and project content MUST prioritize verified impact and metrics before
   technology lists and MUST show context needed to interpret each metric.
 - **FR-035**: Public project views MUST use only approved public descriptions and sanitized diagrams or
   media and MUST exclude confidential employer information.
-- **FR-036**: The Writing section MUST show published articles and allow visitors to open a complete
-  article without fragmenting the primary portfolio navigation.
-- **FR-037**: The Contact section MUST provide owner-approved contact methods without exposing private
-  profile fields.
+- **FR-036**: The Blog section MUST show published articles and allow visitors to open a complete article
+  without fragmenting the primary portfolio navigation.
+- **FR-037**: The Let’s Talk section MUST provide an accessible project-enquiry form and owner-approved
+  contact methods without exposing private profile fields. The profile rail MUST show centered,
+  owner-approved social/contact links where supplied.
 - **FR-038**: The public portfolio MUST remain browseable when AI, document ingestion, job sources, or
-  other private services are unavailable.
+  other private services are unavailable. If no active publication exists, it MUST provide an honest
+  empty state and MUST NOT substitute hard-coded professional claims.
 
 #### Evidence Retrieval, Public AI, and Role Matching
 
@@ -619,6 +739,40 @@ and sanitized error details, disable the schedule, and verify that no consequent
 - **FR-126**: Consequential outputs MUST remain drafts or recommendations until the owner explicitly
   approves the corresponding action.
 
+#### Reconciliation and Workflow Completeness
+
+- **FR-127**: Public branding MUST identify the site as Basil Ogbonna’s portfolio and MUST NOT use “AI
+  Career OS” as the public-facing owner or portfolio name.
+- **FR-128**: The Hero MUST cycle through Data Engineer, Data Platform Engineer, AI Data Engineer, AI
+  Engineer, AI Software Engineer, and Software Engineer while keeping “Engineer” visually stable. Every
+  state MUST expose a complete role name to assistive technology and MUST have a reduced-motion
+  equivalent.
+- **FR-129**: The Hero, profile rail, public navigation, proof content, project chapters, Experience
+  chapters, and Ask Basil states MUST remain readable and free from horizontal clipping or overflow at
+  supported mobile, smaller-desktop, and large-desktop widths in both light and dark presentation modes.
+- **FR-130**: On layouts with sufficient space, the public portfolio MUST provide a sticky profile rail
+  containing the owner image, concise summary, centered approved social/contact links, and availability
+  statement; on smaller layouts the same information MUST remain available in normal document flow.
+- **FR-131**: Portfolio as Proof MUST be contained within Projects and MUST disclose owner-approved
+  technologies, architectural or engineering practices, evidence safeguards, and inaccessible private
+  product capabilities without exposing private data or suggesting public access to them.
+- **FR-132**: Public role-fit analysis and portfolio questions MUST share one Ask Basil section while
+  preserving distinct inputs, states, results, evidence displays, and deterministic scoring behavior.
+- **FR-133**: Personal projects MUST support a substantial public presentation and an approved working
+  destination. Professional projects MUST be associated with the relevant Experience chapter and MUST
+  retain confidentiality and contribution-attribution controls.
+- **FR-134**: The private workspace MUST make every in-scope owner capability discoverable through its
+  navigation or an authorized contextual path, including Career Brain, documents, jobs, applications,
+  interviews, journal, generated documents, blog, analytics, agents, automations, search profiles, job
+  sources, and settings.
+- **FR-135**: A valid authenticated session MUST grant private owner authority only when it belongs to
+  the configured career owner. Other authenticated accounts MUST be denied and MUST NOT be automatically
+  provisioned as owners.
+- **FR-136**: A workflow MUST NOT be considered complete solely because a page, component, route, schema,
+  or generated identifier exists. Completion requires the stated owner or visitor action to work through
+  the product, persist when persistence is required, remain correct after reload, enforce applicable
+  authorization and evidence rules, expose required history or run state, and pass its acceptance tests.
+
 ### State Transitions
 
 - **ST-001 Career Fact**: Candidate -> In Review -> Approved, Edited and Approved, Rejected, or Deferred.
@@ -829,6 +983,26 @@ and sanitized error details, disable the schedule, and verify that no consequent
   and time-to-stage calculations across the acceptance dataset.
 - **SC-022**: In gap-analysis evaluation, 100% of missing-documentation cases are labeled “no evidence
   documented” and are never restated as proof that the owner lacks the skill.
+- **SC-023**: In public-page acceptance testing, 100% of sampled career roles, organizations, dates,
+  projects, impacts, skills, tools, and metrics originate from the active approved Portfolio Projection;
+  an empty projection produces zero substituted professional claims.
+- **SC-024**: Across the supported mobile, smaller-desktop, and large-desktop viewport matrix at normal
+  and 200% zoom, the hero, navigation, profile rail, Experience chapters, project chapters, proof content,
+  and Ask Basil section produce no horizontal page overflow or clipped essential text.
+- **SC-025**: In light and dark presentation checks, all essential text, controls, focus indicators,
+  borders, role-fit results, status messages, and proof labels meet the project’s required contrast and
+  remain understandable without color alone.
+- **SC-026**: In usability testing, at least 90% of target visitors can locate Experience, distinguish
+  personal projects from professional work, use Ask Basil for a question or role fit, open the Blog, and
+  reach Let’s Talk without assistance.
+- **SC-027**: Keyboard and screen-reader users can identify every complete hero role, expand and collapse
+  every Experience chapter, reach its revealed content, and use the reduced-motion experience without
+  loss of information in 100% of the acceptance scenarios.
+- **SC-028**: An authenticated non-owner account is denied access to 100% of sampled private pages,
+  records, downloads, analytics, and workflow actions and is never provisioned as the career owner.
+- **SC-029**: For every workflow claimed complete in the selected release, its acceptance journey creates
+  or changes the required durable record, remains correct after reload, exposes its required history or
+  run state, and passes both authorized and unauthorized cases.
 
 ## Assumptions
 
@@ -865,10 +1039,13 @@ and sanitized error details, disable the schedule, and verify that no consequent
 
 ### Included in the Core Release
 
-- One-page public portfolio, career timeline, selected projects, impact, skills, writing, and contact.
+- One-page public portfolio with the reconciled Hero, About, Experience, Projects, Ask Basil, Blog, and
+  Let’s Talk structure; role-specific impact, skills, tools, and professional projects; and the sticky
+  profile rail where space permits.
 - Authentication, private dashboard, manual Career Brain management, evidence, trust, visibility,
   Portfolio Projection, document ingestion, extraction review, and evidence-backed retrieval.
-- Public Ask My AI and recruiter role matching with citations and deterministic scoring.
+- Public Ask Basil with evidence-backed portfolio questions and integrated “How do I fit?” role matching,
+  citations, and deterministic scoring.
 - Manual job entry, canonical job tracking, application workspace, versioned CV and cover-letter
   generation, saved answers, application journal, and private content management.
 

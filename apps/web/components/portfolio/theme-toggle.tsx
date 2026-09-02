@@ -15,9 +15,6 @@ export function ThemeToggle() {
   useEffect(() => {
     document.documentElement.dataset.portfolioTheme = theme;
     window.localStorage.setItem("basil-portfolio-theme", theme);
-    return () => {
-      delete document.documentElement.dataset.portfolioTheme;
-    };
   }, [theme]);
 
   const nextTheme = theme === "dark" ? "light" : "dark";

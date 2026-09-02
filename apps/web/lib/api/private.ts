@@ -46,6 +46,26 @@ export async function requirePrivateApiContext(request: Request): Promise<Privat
   );
   const session = await getOwnerSession(client);
   if (!session) throw unauthorized(request);
+  const { data: profile, error: profileError } = await client
+    .schema("app")
+    .from("profiles")
+    .select("id")
+    .eq("id", session.ownerId)
+    .maybeSingle();
+  if (profileError) throw profileError;
+  // Profiles are created only by the audited owner-bootstrap procedure. A
+  // missing profile is an authorization/configuration fault, never a reason
+  // to provision an authenticated subject from a request path.
+  if (!profile) {
+    throw new ProblemError(
+      problem(
+        "FORBIDDEN",
+        "This account is not configured for the private workspace.",
+        403,
+        getCorrelationId(request.headers)
+      )
+    );
+  }
   return {
     client,
     session,
@@ -69,7 +89,8 @@ export async function withPrivateApi(
   try {
     let idempotencyKey: string | undefined;
     if (request.method !== "GET" && request.method !== "HEAD") {
-      if (request.method !== "DELETE") requireJson(request);
+      const isMultipart = request.headers.get("content-type")?.startsWith("multipart/form-data");
+      if (request.method !== "DELETE" && !isMultipart) requireJson(request);
       assertSameOrigin(request, new URL(request.url).origin);
       idempotencyKey = requireIdempotencyKey(request);
       if (

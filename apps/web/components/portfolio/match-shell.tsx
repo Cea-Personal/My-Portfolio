@@ -38,12 +38,12 @@ export function RoleFit() {
       <summary>
         <span>
           <small>Role fit</small>
-          <strong>Does Basil fit this role?</strong>
+          <strong>How do I fit?</strong>
         </span>
         <i aria-hidden="true">+</i>
       </summary>
       <div className="assistant-role-fit-body" aria-live="polite">
-        <p>Paste a role description and I&apos;ll compare it with my experience.</p>
+        <p>Share a role description to explore the approved evidence behind the fit.</p>
         <form
           onSubmit={(event) => {
             event.preventDefault();

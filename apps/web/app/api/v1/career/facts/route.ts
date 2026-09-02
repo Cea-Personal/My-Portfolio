@@ -3,14 +3,32 @@ import { withPrivateApi } from "@/lib/api/private";
 
 export function GET(request: Request) {
   return withPrivateApi(request, async ({ client, ownerId }) => {
-    const { data, error } = await client
+    const { data: facts, error } = await client
       .schema("app")
       .from("career_facts")
       .select("*")
       .eq("owner_id", ownerId)
       .order("updated_at", { ascending: false });
     if (error) throw error;
-    return apiResponse(data ?? [], request);
+    const versionIds = (facts ?? [])
+      .map((fact) => fact.current_version_id as string | null)
+      .filter((id): id is string => Boolean(id));
+    const { data: versions, error: versionError } = versionIds.length
+      ? await client.schema("app").from("career_fact_versions").select("*").in("id", versionIds)
+      : { data: [], error: null };
+    if (versionError) throw versionError;
+    const byId = new Map((versions ?? []).map((version) => [version.id, version]));
+    return apiResponse(
+      (facts ?? []).map((fact) => ({
+        ...fact,
+        currentVersion: byId.get(fact.current_version_id) ?? null,
+        projectionEligible:
+          ["approved", "edited_approved"].includes(fact.review_status) &&
+          fact.verified_by_owner === true &&
+          fact.visibility === "public"
+      })),
+      request
+    );
   });
 }
 export async function POST(request: Request) {
@@ -23,8 +41,10 @@ export async function POST(request: Request) {
       .from("career_facts")
       .insert({
         owner_id: ownerId,
-        fact_type: typeof body.factType === "string" ? body.factType : "achievement",
-        subject_type: typeof body.subjectType === "string" ? body.subjectType : "career",
+        fact_type:
+          typeof body.factType === "string" ? body.factType.trim().slice(0, 80) : "achievement",
+        subject_type:
+          typeof body.subjectType === "string" ? body.subjectType.trim().slice(0, 80) : "career",
         subject_id: typeof body.subjectId === "string" ? body.subjectId : crypto.randomUUID(),
         visibility: body.visibility === "public" ? "public" : "private",
         review_status: "candidate",

@@ -5,7 +5,9 @@ export function GET(request: Request) {
     const { data, error } = await client
       .schema("app")
       .from("documents")
-      .select("*")
+      .select(
+        "id,name,source_mime,availability,created_at,document_versions(download_status,created_at)"
+      )
       .eq("owner_id", ownerId)
       .order("created_at", { ascending: false });
     if (error) throw error;

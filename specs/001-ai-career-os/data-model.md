@@ -1,8 +1,12 @@
 # Data Model: AI Career OS and Intelligent Portfolio
 
-**Date**: 2026-08-31  
-**Database**: PostgreSQL 17 with pgvector 0.8.6  
-**Authority**: `spec.md` requirements FR-001–FR-126, ST-001–ST-007
+**Date**: 2026-08-31
+
+**Reconciled**: 2026-09-02
+
+**Database**: PostgreSQL 17 with pgvector 0.8.6
+
+**Authority**: `spec.md` requirements FR-001–FR-136, ST-001–ST-007
 
 ## Modeling Conventions
 
@@ -40,13 +44,31 @@
 
 ## Identity, Configuration, and Audit
 
+### `app.owner_authorizations`
+
+Server-managed authorization binding between the sole career owner and the authentication subject. It is
+not writable through ordinary owner APIs.
+
+| Field | Type | Rules |
+|-------|------|-------|
+| `auth_subject_id` | uuid | PK; equals the authorized authentication subject |
+| `role` | text | constrained to `owner` in this release |
+| `status` | text | `active` or `revoked`; one active owner enforced by unique singleton key |
+| `provisioned_by`, `provisioned_at` | text/time | deployment or audited bootstrap provenance |
+| `revoked_at`, `reason` | time/text | optional; no secret or credential content |
+
+All private session establishment, profile creation, RLS ownership checks, workflow dispatch, and owner
+exports require an active authorization row. A valid authenticated subject without one receives no
+profile and no owner access. Changing the active owner is a separately reviewed administrative recovery
+operation, not a self-service mutation.
+
 ### `app.profiles`
 
 One row per authenticated owner.
 
 | Field | Type | Rules |
 |-------|------|-------|
-| `id` | uuid | PK; equals authentication subject |
+| `id` | uuid | PK/FK to active owner authorization; equals authentication subject |
 | `display_name` | text | required, 1–120 characters |
 | `headline`, `bio`, `location` | text | private source values; public copies come from publication snapshots |
 | `timezone` | text | required IANA timezone, default `Africa/Kigali` |
@@ -191,6 +213,14 @@ Owner-controlled draft projection: source entity type/id, public eligibility, fe
 career stage, section/category, display order, public summary override, metric selection, technology
 selection, media selection, and last reviewer. Unique source entity per active projection revision.
 
+Allowed public composition groups are `hero`, `about`, `experience`, `projects`, `blog`, and `contact`;
+Ask Basil is an interactive shell bound to the publication rather than editable career content. Career
+stage values use stable keys for `web_developer`, `software_engineer`, `lead_software_engineer`,
+`data_engineer`, `senior_data_engineer`, and `ai_engineer_software_data`. Projection validation requires
+professional projects, achievements, metrics, skills, and tools associated with a stage to publish inside
+that Experience chapter. The AI stage carries `stage_kind = capability` unless evidence supports a formal
+role.
+
 ### `published.portfolio_publications`
 
 Immutable publication header: `id`, owner, monotonically increasing version, status (`staged`,
@@ -204,6 +234,12 @@ section, career stage, display order, title, subtitle, public summary, display m
 sanitized media, public citations, detail slug, and payload schema version. No private description,
 source text, embedding, internal URI, confidence, note, or secret may be copied. Anonymous RLS reads only
 items in the active publication.
+
+Personal project items include an approved destination state (`detail`, `demo`, or `external`) and may
+carry sanitized visual media. Professional project items are emitted as children/references of their
+Experience stage rather than as standalone personal-project chapters. Publication metadata contains the
+owner-approved profile-rail image/media reference, summary, social/contact links, and availability state.
+An owner with no active publication has no synthetic publication row or fallback career items.
 
 ### `published.public_evidence`
 
@@ -351,7 +387,7 @@ artifact evidence; technical discussion remains classified as technical knowledg
 ## Relationships Summary
 
 ```text
-Profile
+Active Owner Authorization ── Profile
 ├── Career Experiences ── Projects ── Achievements ── Metrics
 ├── Career Facts ── Fact Versions ── Claim Evidence ── Evidence Chunks
 │                                              └── Chunk Embeddings
@@ -415,6 +451,12 @@ Profile
 
 - Every public item must reference an approved source entity and active publication; a publish function
   rejects private/restricted evidence, missing claim support, unsafe URLs, and confidential fields.
+- Only the active `app.owner_authorizations` subject may own private records or create an owner profile;
+  RLS and negative tests deny authenticated subjects without that authorization.
+- Experience publication validates the six stable stage keys, display order, capability/title semantics,
+  and child relationships for professional projects, impact, metrics, skills, and tools.
+- Personal projects marked public/featured require an approved detail, demo, or external destination;
+  unavailable destinations fail publication validation rather than rendering a false working link.
 - Every generated material career claim must have at least one valid `artifact_evidence` or be explicitly
   classified as owner intent rather than career fact.
 - Trust and visibility may become stricter automatically; making them less strict requires owner review.
@@ -451,3 +493,8 @@ Profile
    edits and submitted binaries, which are backed up as protected originals.
 6. Restore drills verify private object references, auth subject mapping, RLS, publication selection,
    evidence links, and exact submitted artifact retrieval.
+7. The owner-authorization migration is expand-first: create the authorization relation and deny
+   non-authorized bootstrap, insert the reviewed existing owner subject, update profile/RLS predicates,
+   run owner/non-owner negative tests, then remove any legacy authenticated-user-equals-owner behavior.
+   Recovery restores the reviewed authorization row from protected configuration/audit evidence; it does
+   not infer a new owner from the most recent sign-in.

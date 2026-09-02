@@ -1,8 +1,10 @@
 begin;
+create extension if not exists pgtap with schema extensions;
+set local search_path = extensions, public, app, published, auth;
 select plan(4);
-select has_table('app', 'posts');
-select has_table('app', 'post_versions');
-select has_table('app', 'post_publication_approvals');
-select has_column('app', 'post_versions', 'evidence_ids');
+select has_table('app', 'posts', 'posts exist');
+select has_table('app', 'post_versions', 'post versions exist');
+select has_table('app', 'post_publication_approvals', 'post approvals exist');
+select has_column('app', 'post_versions', 'evidence_ids', 'post versions link evidence');
 select * from finish();
 rollback;

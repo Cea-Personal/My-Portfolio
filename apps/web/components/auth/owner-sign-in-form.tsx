@@ -8,11 +8,13 @@ export function OwnerSignInForm() {
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(
+  const initialError =
     searchParams.get("error") === "callback_failed"
       ? "The sign-in link was invalid or expired."
-      : null
-  );
+      : searchParams.get("error") === "not_authorized"
+        ? "This authenticated account has not been authorized for Basil’s private workspace."
+        : null;
+  const [error, setError] = useState<string | null>(initialError);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const requestedNext = searchParams.get("next");
   const next = requestedNext?.startsWith("/") ? requestedNext : "/dashboard";

@@ -15,30 +15,34 @@ export function GET(request: Request) {
 export async function POST(request: Request) {
   return withPrivateApi(request, async ({ client, ownerId }) => {
     const body = await request.json().catch(() => ({}));
-    if (body.confirmation !== true || typeof body.publicationId !== "string")
+    if (body.confirmation !== true)
       return apiResponse(
-        { code: "CONFIRMATION_REQUIRED", detail: "publicationId and confirmation are required" },
+        { code: "CONFIRMATION_REQUIRED", detail: "An explicit confirmation is required" },
         request,
         400
       );
-    const { data, error } = await client
+    const action = typeof body.action === "string" ? body.action : "activate";
+    if (action === "stage") {
+      const { data: publicationId, error } = await client
+        .schema("app")
+        .rpc("stage_portfolio_publication");
+      if (error) throw error;
+      return apiResponse({ status: "staged", publicationId }, request, 201);
+    }
+    if (!["activate", "rollback"].includes(action) || typeof body.publicationId !== "string")
+      return apiResponse({ code: "INVALID_PUBLICATION_ACTION" }, request, 400);
+    const { data: publicationId, error } = await client
+      .schema("app")
+      .rpc("activate_portfolio_publication", { target_id: body.publicationId });
+    if (error) throw error;
+    const { data: publication, error: readError } = await client
       .schema("published")
       .from("portfolio_publications")
-      .update({
-        status: "published",
-        published_at: new Date().toISOString(),
-        reviewed_at: new Date().toISOString()
-      })
-      .eq("id", body.publicationId)
-      .eq("owner_id", ownerId)
-      .eq("status", "staged")
       .select("*")
-      .maybeSingle();
-    if (error) throw error;
-    return apiResponse(
-      data ? { status: data.status, publication: data } : null,
-      request,
-      data ? 201 : 409
-    );
+      .eq("id", publicationId)
+      .eq("owner_id", ownerId)
+      .single();
+    if (readError) throw readError;
+    return apiResponse({ status: "published", publication }, request, 201);
   });
 }

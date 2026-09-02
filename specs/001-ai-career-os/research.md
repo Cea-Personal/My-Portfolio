@@ -1,7 +1,11 @@
 # Phase 0 Research: AI Career OS and Intelligent Portfolio
 
-**Date**: 2026-08-31  
-**Status**: Complete — all technical-context unknowns resolved  
+**Date**: 2026-08-31
+
+**Reconciled**: 2026-09-02
+
+**Status**: Complete — all technical-context and reconciliation unknowns resolved
+
 **Inputs**: `spec.md`, project constitution v1.0.0, attached master brief
 
 ## 1. Application Architecture
@@ -475,8 +479,93 @@ experience, and AI evaluations prove grounding and abstention.
 [pytest](https://docs.pytest.org/), [pgTAP](https://pgtap.org/documentation.html),
 [k6](https://grafana.com/docs/k6/latest/).
 
+## 21. Reconciled Portfolio Composition
+
+**Decision**: Keep one public page with About, Experience, Projects, Ask Basil, Blog, and Let’s Talk.
+Integrate professional projects, impact, metrics, skills, and tools into expandable Experience chapters;
+place Portfolio as Proof within Projects; combine portfolio questions and role fit as modes of Ask Basil.
+
+**Rationale**: This preserves a cohesive recruiter narrative and reflects the owner-approved experience
+without weakening the master brief’s required content. The information remains present but is grouped by
+the visitor’s actual questions: career evidence belongs with the role, personal experiments belong with
+projects, and interactive evidence belongs in one assistant surface.
+
+**Alternatives considered**:
+
+- Separate Impact and Skills sections: rejected because they detach evidence from the role and context.
+- Separate Chat and JD Match sections: rejected as duplicate public interaction shells.
+- Portfolio as Proof as a standalone section: rejected because it is itself a testable first-party project.
+
+## 22. Career Narrative and Motion Semantics
+
+**Decision**: Publish the ordered narrative Web Developer, Software Engineer, Lead Software Engineer,
+Data Engineer, Senior Data Engineer, and AI Engineer — Software and Data from projection records. The
+hero cycles the six approved capability labels while exposing a complete accessible role at every state.
+
+**Rationale**: The sequence captures the owner’s actual approved story and separates formal roles from a
+current AI capability. Keeping the visual word “Engineer” stable is a presentation technique only; the
+accessible name and published evidence remain complete and authoritative.
+
+**Alternatives considered**:
+
+- Frontend constants as fallback career content: rejected under Constitution I and FR-038/SC-023.
+- Treating AI Engineer as an employer title by default: rejected as a potentially unsupported claim.
+- Motion-only meaning: rejected for accessibility and reduced-motion requirements.
+
+## 23. Single-Owner Authorization
+
+**Decision**: Authentication identifies a user; a separate server-enforced configured-owner policy or
+owner-membership record authorizes the sole career owner. Profile bootstrap happens only after that
+check. Seeded security tests include an authenticated non-owner.
+
+**Rationale**: A valid external authentication account is not proof of ownership of Basil Ogbonna’s
+career data. Separating authentication from authorization prevents accidental owner creation and makes
+the single-owner product rule testable at page, service, query, and database boundaries.
+
+**Alternatives considered**:
+
+- Treat every authenticated user as an owner: rejected as a direct FR-002/FR-135 boundary violation.
+- Client-side email comparison: rejected because it can be bypassed and exposes policy details.
+- Manual profile existence alone: rejected unless profile creation itself is restricted by owner policy.
+
+## 24. Workflow Completion Evidence
+
+**Decision**: A workflow reaches “complete” only when its acceptance action works through the declared
+product boundary, writes durable state when required, survives reload, records history/run state,
+enforces authorization/evidence rules, and passes positive and negative acceptance tests. Page existence,
+generic lists, simulated callbacks, random identifiers, and shallow smoke checks are non-completion.
+
+**Rationale**: The repository can otherwise appear broad while failing the owner’s actual tasks. This
+decision converts FR-136 and SC-029 into an engineering gate shared by task metadata, reviews, CI, and
+release evidence.
+
+**Alternatives considered**:
+
+- File-based completion: rejected because it does not prove behavior.
+- Unit-test-only completion: rejected for cross-boundary workflows.
+- Manual demonstration without durable assertions: rejected as non-repeatable release evidence.
+
+## 25. Fail-Closed Release Validation
+
+**Decision**: Production promotion requires hosted database/RLS, complete browser/accessibility,
+adversarial security, AI evaluation, performance, and recovery evidence. Missing credentials, tools,
+browsers, fixtures, or reports fail the promotion gate. Development CI may explicitly skip unavailable
+external checks but cannot label that revision releasable.
+
+**Rationale**: Silent success when a mandatory environment is absent undermines the constitution and
+turns unexecuted checks into false assurance. Development convenience and release authority need
+separate statuses.
+
+**Alternatives considered**:
+
+- Exit successfully when release credentials are absent: rejected for production promotion.
+- Run release checks against production: rejected for privacy and operational risk.
+- Treat checked-in test files as validation evidence: rejected because SC outcomes require measured runs.
+
 ## Research Closure
 
-All Technical Context choices are resolved; no planning unknowns remain. Version pins are planning
-baselines and MUST be revalidated for security and compatibility during implementation without changing
-the architectural decisions silently.
+All Technical Context and reconciliation choices are resolved; no planning unknowns remain. Version pins
+are planning baselines and MUST be revalidated for security and compatibility during implementation
+without changing the architectural decisions silently. The amendment changes presentation grouping,
+owner authorization, completion evidence, and release gating but introduces no additional deployable
+service or constitutional exception.

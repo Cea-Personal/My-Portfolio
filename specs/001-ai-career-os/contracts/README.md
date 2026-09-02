@@ -8,13 +8,15 @@ These contracts define the boundaries that implementation tasks must preserve.
 | [Workflow events](events.md) | Versioned Inngest event envelope, catalog, and idempotency semantics |
 | [AI and evidence](ai-contracts.md) | Provider-neutral AI ports, retrieval, claims, citations, and generated artifact schemas |
 | [Job source adapter](job-source-adapter.md) | Pluggable job discovery, fetch, normalize, and health contract |
+| [Portfolio experience](portfolio-experience.md) | Reconciled one-page composition, career chapters, hero, project, Ask Basil, and responsive acceptance contract |
 
 ## Global Rules
 
 - Every contract is versioned independently and changed compatibly or with a new major version.
 - Public contracts contain only allowlisted published data. Private identifiers are never accepted as a
   shortcut to public access.
-- Authenticated contracts derive `owner_id` from the verified session, never from client input.
+- Authenticated contracts derive `owner_id` from a verified session with active configured-owner
+  authorization, never from client input. Authentication without owner authorization is forbidden.
 - Every write supports a correlation ID; retryable creates require an idempotency key.
 - All timestamps use RFC 3339 UTC strings; monetary values use decimal strings plus ISO currency.
 - Unknown fields are rejected for security-sensitive commands and ignored only for explicitly extensible

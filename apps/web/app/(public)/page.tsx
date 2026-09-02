@@ -19,6 +19,23 @@ export default async function PublicPortfolioPage() {
   const snapshot = await loadPublicPortfolio();
   const items = snapshot.items;
   const profile = snapshot.publication;
+  // if (!profile) {
+  //   return (
+  //     <>
+  //       <PageIntro name="Basil Ogbonna" />
+  //       <PortfolioNavigation />
+  //       <main id="main-content" className="portfolio-main portfolio-empty-state">
+  //         <p className="eyebrow">Basil Ogbonna · Portfolio</p>
+  //         <h1>Verified work is being prepared.</h1>
+  //         <p>
+  //           There is no active publication yet. Experience, projects, evidence, and writing will appear
+  //           here only after they have been reviewed and deliberately published.
+  //         </p>
+  //         <a href="/sign-in">Owner sign in</a>
+  //       </main>
+  //     </>
+  //   );
+  // }
   const configuredName =
     typeof profile?.display_name === "string" ? profile.display_name.trim() : "";
   const displayName =
@@ -30,11 +47,15 @@ export default async function PublicPortfolioPage() {
     configuredHeadline && !/senior data\s*(?:&|and)\s*ai engineer/i.test(configuredHeadline)
       ? configuredHeadline
       : "Senior Data Engineer";
-  const careerItems = items.filter((item) => item.source_entity_type === "experience");
-  const projectItems = items.filter((item) => item.source_entity_type === "project");
-  const impactItems = items.filter((item) => item.source_entity_type === "achievement");
-  const skillItems = items.filter((item) => item.source_entity_type === "skill");
-  const writingItems = items.filter((item) => item.source_entity_type === "post");
+  const careerItems = items.filter(
+    (item) => item.section === "experience" && item.title === "Experience"
+  );
+  const projectItems = items.filter((item) => item.section === "projects");
+  const impactItems = items.filter(
+    (item) => item.section === "experience" && item.title === "Achievement"
+  );
+  const skillItems = items.filter((item) => item.title === "Skill");
+  const writingItems = items.filter((item) => item.section === "blog");
   const text = (value: unknown, fallback = "") => (typeof value === "string" ? value : fallback);
   const list = (value: unknown) =>
     Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
@@ -45,35 +66,9 @@ export default async function PublicPortfolioPage() {
   const identities = (item: Record<string, unknown>) =>
     [text(item.career_stage), text(item.title)].filter(Boolean).map((value) => value.toLowerCase());
   const stageKey = (item: Record<string, unknown>) => identities(item)[0] ?? "career stage";
-  const fallbackStages: CareerTimelineStage[] = [
-    {
-      title: "Web Developer",
-      summary: "The beginning of a career built on shipping useful software."
-    },
-    {
-      title: "Software Engineer",
-      summary: "Expanding from web delivery into broader software systems and engineering practice."
-    },
-    {
-      title: "Lead Software Engineer",
-      summary: "Leading delivery, systems thinking, and teams through complex work."
-    },
-    {
-      title: "Data Engineer",
-      summary: "Building reliable pipelines and turning raw information into trusted data."
-    },
-    {
-      title: "Senior Data Engineer",
-      summary: "Designing scalable data platforms with measurable outcomes."
-    },
-    {
-      title: "AI Engineer (Software / Data)",
-      summary:
-        "A parallel capability combining software and data foundations for practical AI systems."
-    }
-  ];
-  const timelineStages: CareerTimelineStage[] = careerItems.length
-    ? Array.from(new Map(careerItems.map((item) => [stageKey(item), item])).values()).map(
+  const timelineStages: CareerTimelineStage[] = Array.from(
+    new Map(careerItems.map((item) => [stageKey(item), item])).values()
+  ).map(
         (item) => {
           const key = stageKey(item);
           const stageProjects = projectItems
@@ -116,8 +111,7 @@ export default async function PublicPortfolioPage() {
             ...(stageSkills.length ? { skills: [...new Set(stageSkills)] } : {})
           };
         }
-      )
-    : fallbackStages;
+      );
   const timelineProjectIds = new Set(
     timelineStages.flatMap((stage) => (stage.projects ?? []).map((project) => project.title))
   );

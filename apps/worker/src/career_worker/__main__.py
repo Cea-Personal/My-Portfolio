@@ -25,7 +25,12 @@ def main() -> None:
     elif args.command == "inngest":
         import os
 
-        serve_inngest(host=args.host, port=args.port, signing_key=os.getenv("INNGEST_SIGNING_KEY"))
+        serve_inngest(
+            host=args.host,
+            port=args.port,
+            signing_key=os.getenv("INNGEST_SIGNING_KEY"),
+            parser_secret=os.getenv("CAREER_WORKER_SHARED_SECRET"),
+        )
 
 
 if __name__ == "__main__":

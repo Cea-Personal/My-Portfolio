@@ -8,6 +8,8 @@ export interface RequirementScore {
   explanation?: string;
   category?: string;
   text?: string;
+  outcome?: "direct" | "transferable" | "unsupported" | "insufficient_evidence";
+  rationale?: string;
 }
 export interface JobScore {
   score: string;

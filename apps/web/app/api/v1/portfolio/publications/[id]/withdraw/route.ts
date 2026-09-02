@@ -6,20 +6,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const body = await request.json().catch(() => ({}));
     if (body.confirmation !== true)
       return apiResponse({ code: "CONFIRMATION_REQUIRED" }, request, 400);
-    const { data, error } = await client
-      .schema("published")
-      .from("portfolio_publications")
-      .update({ status: "withdrawn", withdrawn_at: new Date().toISOString() })
-      .eq("id", id)
-      .eq("owner_id", ownerId)
-      .eq("status", "published")
-      .select("*")
-      .maybeSingle();
+    const { data: publicationId, error } = await client
+      .schema("app")
+      .rpc("withdraw_portfolio_publication", { target_id: id });
     if (error) throw error;
     return apiResponse(
-      data ? { status: data.status, publication: data } : null,
+      { status: "withdrawn", publicationId, ownerId },
       request,
-      data ? 200 : 409
+      publicationId ? 200 : 409
     );
   });
 }

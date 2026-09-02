@@ -3,18 +3,19 @@
 import { useEffect, useState } from "react";
 
 interface HeroRole {
+  label: string;
   core: string;
   leading?: string;
   middle?: string;
 }
 
 const roles: readonly HeroRole[] = [
-  { core: "Data" },
-  { core: "Data", middle: "Platform" },
-  { leading: "AI", core: "Data" },
-  { core: "AI" },
-  { leading: "AI", core: "Software" },
-  { core: "Software" }
+  { label: "Data Engineer", core: "Data" },
+  { label: "Data Platform Engineer", core: "Data", middle: "Platform" },
+  { label: "AI Data Engineer", leading: "AI", core: "Data" },
+  { label: "AI Engineer", core: "AI" },
+  { label: "AI Software Engineer", leading: "AI", core: "Software" },
+  { label: "Software Engineer", core: "Software" }
 ] as const;
 
 const career = [
@@ -29,9 +30,14 @@ const career = [
 export function Hero({ name = "Basil Ogbonna" }: { name?: string; headline?: string }) {
   const [roleIndex, setRoleIndex] = useState(0);
   const firstName = name.split(" ")[0] ?? name;
-  const role = roles[roleIndex] ?? { core: "Data" };
+  const role = roles[roleIndex] ?? roles[0];
 
   useEffect(() => {
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    if (reducedMotion.matches) {
+      setRoleIndex(0);
+      return;
+    }
     const timer = window.setInterval(() => {
       setRoleIndex((current) => (current + 1) % roles.length);
     }, 3800);
@@ -52,7 +58,10 @@ export function Hero({ name = "Basil Ogbonna" }: { name?: string; headline?: str
       <div className="cinematic-hero-content">
         <p className="hero-name">Basil Ogbonna</p>
         <h1 id="hero-title">
-          <span className="hero-evolving-role" aria-live="polite">
+          <span className="sr-only" aria-live="polite">
+            {role.label}
+          </span>
+          <span className="hero-evolving-role" aria-hidden="true">
             {role.leading ? (
               <strong className="hero-role-token" key={`leading-${role.leading}`}>
                 {role.leading}

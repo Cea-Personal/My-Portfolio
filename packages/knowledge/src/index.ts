@@ -4,3 +4,4 @@ export * from "./hybrid-retrieval";
 export * from "./lexical-retrieval";
 export * from "./vector-retrieval";
 export * from "./article-indexing";
+export * from "./semantic-retrieval";

@@ -90,34 +90,65 @@ pnpm test:performance
 Expected result: all commands exit successfully, no test connects to production, and generated reports
 identify the application revision, schema version, prompt/retrieval versions, and fixture dataset hash.
 
+For a release candidate, repeat database validation against an isolated hosted Supabase staging project:
+
+```bash
+supabase link --project-ref "$SUPABASE_STAGING_PROJECT_REF"
+supabase db push --dry-run
+supabase test db --linked
+supabase db lint --linked
+```
+
+The staging project must contain acceptance fixtures only. Missing staging configuration fails the
+release promotion gate; it is not reported as a passing database check.
+
 ## Scenario 1: Public Portfolio and Accessibility
 
-**Requirements**: FR-028–FR-038, NFR-001–NFR-003, SC-001, SC-016, SC-017.
+**Requirements**: FR-028–FR-038, FR-127–FR-133, NFR-001–NFR-003, SC-001, SC-016–SC-017,
+SC-023–SC-027.
 
-1. Seed an approved publication containing every required one-page section.
-2. Open `/` at desktop and representative mobile viewports.
-3. Use anchor navigation for About, Experience, Projects, Impact, Skills, Writing, Match, Ask, and
-   Contact.
-4. Navigate only by keyboard and repeat with a screen reader accessibility tree.
-5. Enable reduced motion and scroll through the career journey.
-6. Stop AI/workflow/worker processes and reload the portfolio.
+1. Seed an approved publication with all six ordered Experience stages, stage-linked professional work,
+   two personal projects including Portfolio as Proof, one article, profile-rail content, and public
+   evidence. Do not seed a formal AI Engineer employer title.
+2. Open `/` at representative mobile, tablet, smaller-desktop, and large-desktop widths in light and dark
+   modes, then repeat the layout checks at 200% zoom.
+3. Use navigation for About, Experience, Projects, Blog, and Let’s Talk; verify Owner Login is
+   discoverable and dedicated project/article routes do not fragment the primary page.
+4. Verify impact, metrics, professional projects, skills, and tools are absent as standalone sections and
+   appear under the correct Experience chapters.
+5. Expand and collapse every chapter using keyboard only; confirm the controlled detail appears directly
+   below its summary and other summaries remain discoverable.
+6. Observe the approved hero sequence and inspect each complete accessible role label. Enable reduced
+   motion and repeat without loss of role meaning.
+7. Verify the sticky profile rail on wide layouts and its normal-flow equivalent on smaller layouts,
+   including image, summary, centered approved links, and availability statement.
+8. Open each personal project destination and verify professional projects remain within Experience.
+9. Use both Ask Basil modes and distinguish a cited conversational answer from deterministic role-fit
+   results.
+10. Stop AI/workflow/worker processes and reload the portfolio; then withdraw the active publication and
+    reload again.
 
 Expected outcomes:
 
-- The primary experience stays on one page; project/article details may open dedicated routes.
-- The active desktop career stage corresponds to visible content; mobile/reduced-motion mode is a plain
-  readable vertical timeline with native scrolling.
-- Focus, landmarks, names, contrast, and controls meet WCAG AA checks.
+- The primary experience stays on one page and uses the reconciled composition.
+- Career content originates only from the active publication; the AI capability is not presented as an
+  employer title without evidence, and withdrawal produces an honest empty state with no fallback claims.
+- Hero, navigation, rail, chapters, projects, proof, and Ask Basil produce no clipped essential text or
+  horizontal page overflow across the viewport/zoom matrix.
+- Focus, landmarks, complete role names, accordion relationships, contrast, and controls meet WCAG AA.
 - Approved content remains available when AI and private workers are unavailable.
 - The performance report meets the 2.5-second usable-content target on the defined mobile profile.
 
 ## Scenario 2: Manual Career Fact, Evidence, and Publication
 
-**Requirements**: FR-007–FR-027, FR-003, ST-001, PSR-001–PSR-002, SC-002, SC-006, SC-008.
+**Requirements**: FR-007–FR-027, FR-003, FR-134–FR-136, ST-001, PSR-001–PSR-002,
+SC-002, SC-006, SC-008, SC-028–SC-029.
 
-1. Verify anonymous access to `/dashboard` is rejected, then sign in through the seeded callback and
-   verify an invalid/expired callback fails safely.
-2. Open `/dashboard`, verify its actionable summary links only to owner-authorized records, and create a
+1. Verify anonymous access to `/dashboard` is rejected. Sign in as a valid authenticated non-owner and
+   verify every sampled private page/API is forbidden and no owner profile is created. Then sign in as
+   the seeded configured owner and verify an invalid/expired callback fails safely.
+2. Open `/dashboard`, verify the private navigation/contextual paths expose all selected-release owner
+   capabilities and its actionable summary links only to owner-authorized records, then create a
    private manual achievement with evidence and a metric.
 3. Confirm it is owner-verified but absent from all anonymous portfolio/API responses.
 4. Change visibility to public and add a Portfolio Projection rule.
@@ -130,6 +161,8 @@ Expected outcomes:
 Expected outcomes:
 
 - Manual data has source, verification, version, visibility, and audit history.
+- Authentication and owner authorization remain separate; an authenticated non-owner receives no owner
+  data, profile, download, analytics, or workflow authority.
 - Public content changes only after explicit publish confirmation.
 - No private description, raw evidence, object key, embedding, note, or confidence leaks.
 - Old publication and fact versions remain privately traceable.
@@ -305,12 +338,40 @@ Expected outcomes:
 - Public portfolio and verified Career Brain remain available.
 - No automation purpose can publish, submit, send, or change verified evidence.
 
+## Scenario 12: Durable Workflow Completion Audit
+
+**Requirements**: FR-134–FR-136, SC-028–SC-029, Constitution XVIII.
+
+1. Enumerate every workflow task marked complete for the selected release and link it to a functional
+   requirement, acceptance scenario, implementation boundary, durable record where applicable, and
+   executable positive/negative test.
+2. For Career Brain entry/review, document ingestion, job entry/search, application package, interview,
+   blog, analytics, export, and automation, perform the declared user action rather than opening only its
+   page or list.
+3. Reload after each create/update/transition and verify the authoritative record, immutable history or
+   run steps, owner scope, and public/private projection behavior.
+4. Repeat private reads and mutations as an authenticated non-owner. Repeat public evidence reads with a
+   private/restricted fixture in the owner corpus.
+5. Interrupt provider-backed or asynchronous workflows and verify retry, cancellation, partial result,
+   sanitized failure, and idempotent resume behavior where the workflow contract requires it.
+6. Compare task completion markers with the recorded evidence and reopen any task supported only by a
+   file, schema, shallow unit helper, simulated callback, random identifier, generic list, page-visible
+   assertion, or unexecuted validation document.
+
+Expected outcomes:
+
+- Every completed workflow has repeatable durable evidence and both authorized and unauthorized checks.
+- UI, HTTP, database, worker, and workflow state agree after reload and retry.
+- No placeholder or smoke test is accepted as proof of the stated owner outcome.
+- Tasks without complete evidence remain open and cannot contribute to release approval.
+
 ## Release Gate
 
 A release candidate is acceptable only when:
 
 1. all baseline commands pass in CI and an isolated preview environment;
-2. database/RLS tests include explicit anonymous, owner, cross-owner, worker, and service-role denial paths;
+2. database/RLS tests include explicit anonymous, configured-owner, authenticated-non-owner, cross-owner,
+   worker, and service-role denial paths;
 3. AI evaluation gates meet SC-003, SC-004, SC-005, SC-013, and adversarial privacy targets;
 4. accessibility, MP-005 browser compatibility, MP-006 usability, MP-007 document-corpus, and
    MP-001–MP-004 performance reports meet NFR/SC thresholds;
@@ -320,3 +381,5 @@ A release candidate is acceptable only when:
 8. portable export contents and authenticated status/download behavior satisfy NFR-012;
 9. a human reviewer approves the specification/plan/tasks for implementation and separately approves
    production promotion—neither implementation authorization nor deployment is autonomous.
+10. no mandatory promotion job reports success by silently skipping for missing credentials, tools,
+    browsers, fixtures, staging services, or reports.

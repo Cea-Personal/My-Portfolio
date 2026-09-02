@@ -118,7 +118,14 @@ importers:
         specifier: 4.0.14
         version: 4.0.14(@opentelemetry/api@1.9.1)(@types/node@24.10.1)(jiti@2.7.0)(lightningcss@1.32.0)(yaml@2.9.0)
 
-  packages/ai: {}
+  packages/ai:
+    dependencies:
+      '@career-os/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@career-os/knowledge':
+        specifier: workspace:*
+        version: link:../knowledge
 
   packages/analytics: {}
 

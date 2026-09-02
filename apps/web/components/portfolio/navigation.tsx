@@ -12,9 +12,9 @@ export function PortfolioNavigation() {
       <a href="#projects">Projects</a>
       <a href="#blog">Blog</a>
       <a href="#contact">Let&apos;s talk</a>
-      {/* <a className="owner-login" href="/sign-in">
+      <a className="owner-login" href="/sign-in">
         <span aria-hidden="true">◇</span> Owner login
-      </a> */}
+      </a>
       <ThemeToggle />
     </nav>
   );

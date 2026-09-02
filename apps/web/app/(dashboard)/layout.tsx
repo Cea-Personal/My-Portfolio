@@ -19,14 +19,15 @@ const links = [
 
 export default async function DashboardLayout({ children }: Readonly<{ children: ReactNode }>) {
   const env = parsePublicEnv();
-  const session = await getOwnerSession(
-    createServerSupabaseClient(
-      env.NEXT_PUBLIC_SUPABASE_URL,
-      env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-      await cookies()
-    )
+  const client = createServerSupabaseClient(
+    env.NEXT_PUBLIC_SUPABASE_URL,
+    env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    await cookies()
   );
-  if (!session) redirect("/sign-in?next=/dashboard");
+  const { data: identity } = await client.auth.getUser();
+  if (!identity.user) redirect("/sign-in?next=/dashboard");
+  const session = await getOwnerSession(client);
+  if (!session) redirect("/sign-in?error=not_authorized&next=/dashboard");
   return (
     <PrivateWorkspaceGate>
       <nav aria-label="Private workspace">

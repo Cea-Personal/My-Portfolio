@@ -110,6 +110,11 @@ wrong offsets, unavailable source versions, or visibility mismatches fail determ
 Public generation has no write-capable tools and no access to private source rows. Exact prompt/model
 details remain private operational metadata.
 
+The public UI presents this contract as the portfolio-question mode of Ask Basil. The “How do I fit?”
+mode uses the Job Description Analysis and deterministic scoring contracts below. Sharing a section does
+not merge their schemas: conversational claims require citation validation, while the displayed role-fit
+score is copied from the immutable deterministic calculation and cannot be rewritten by the model.
+
 ## Job Description Analysis v1
 
 ```json
