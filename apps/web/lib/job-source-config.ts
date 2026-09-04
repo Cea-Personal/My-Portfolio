@@ -5,6 +5,12 @@ import {
   leverAdapter,
   linkedinAuthorizedAdapter,
   rssAdapter,
+  workableAdapter,
+  smartRecruitersAdapter,
+  teamtailorAdapter,
+  personioAdapter,
+  recruiteeAdapter,
+  structuredAdapter,
   type JobSourceAdapter,
   type JobSourceInput
 } from "@career-os/jobs";
@@ -15,7 +21,13 @@ const adapters: Readonly<Record<string, JobSourceAdapter>> = {
   greenhouse: greenhouseAdapter,
   lever: leverAdapter,
   "linkedin-authorized": linkedinAuthorizedAdapter,
-  rss: rssAdapter
+  rss: rssAdapter,
+  workable: workableAdapter,
+  smartrecruiters: smartRecruitersAdapter,
+  teamtailor: teamtailorAdapter,
+  personio: personioAdapter,
+  recruitee: recruiteeAdapter,
+  structured: structuredAdapter
 };
 
 export const supportedJobSourceTypes = Object.keys(adapters);

@@ -8,7 +8,7 @@
     "pnpm": "11.25.0"
   },
   "scripts": {
-    "dev": "turbo dev",
+    "dev": "node scripts/dev.mjs",
     "dev:web": "pnpm --filter @career-os/web dev",
     "dev:workflows": "pnpm --filter @career-os/web inngest:dev",
     "build": "turbo build",

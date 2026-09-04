@@ -45,22 +45,45 @@ export async function POST(request: Request) {
       .select("*")
       .single();
     if (error || !run) throw error ?? new Error("INGESTION_RUN_CREATE_FAILED");
-    await inngest.send({
-      name: "career/drive.sync.requested.v1",
-      id: `${ownerId}:${operationKey}`,
-      data: {
-        schemaVersion: 1,
-        ownerId,
-        correlationId,
-        resourceType: "ingestion_run",
-        resourceId: run.id,
-        operationKey,
-        requestedBy: "owner",
-        metadata: { trigger: typeof body.trigger === "string" ? body.trigger : "manual" },
-        runId: run.id,
-        cursor: typeof body.cursor === "string" ? body.cursor : null
-      }
-    });
-    return apiResponse(run, request, 202);
+    try {
+      await inngest.send({
+        name: "career/drive.sync.requested.v1",
+        id: `${ownerId}:${operationKey}`,
+        data: {
+          schemaVersion: 1,
+          ownerId,
+          correlationId,
+          resourceType: "ingestion_run",
+          resourceId: run.id,
+          operationKey,
+          requestedBy: "owner",
+          metadata: { trigger: typeof body.trigger === "string" ? body.trigger : "manual" },
+          runId: run.id,
+          cursor: typeof body.cursor === "string" ? body.cursor : null
+        }
+      });
+    } catch {
+      await client
+        .schema("app")
+        .from("ingestion_runs")
+        .update({
+          status: "failed",
+          error_summary: "WORKFLOW_DISPATCH_FAILED",
+          finished_at: new Date().toISOString()
+        })
+        .eq("id", run.id)
+        .eq("owner_id", ownerId);
+      return apiResponse(
+        {
+          code: "DRIVE_SYNC_DISPATCH_FAILED",
+          detail:
+            "The Drive folder is connected, but the workflow runner is unavailable. Restart the development stack with `pnpm dev`, then try again.",
+          runId: run.id
+        },
+        request,
+        503
+      );
+    }
+    return apiResponse({ run, dispatchStatus: "sent" }, request, 202);
   });
 }

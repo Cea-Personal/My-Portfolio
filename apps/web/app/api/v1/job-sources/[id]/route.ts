@@ -26,11 +26,28 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       body.secretRef === undefined ? undefined : validateSecretReference(body.secretRef);
     const rateLimit =
       body.rateLimitPerMinute === undefined ? undefined : Number(body.rateLimitPerMinute);
+    const discoveryFrequency =
+      body.discoveryFrequencyMinutes === undefined
+        ? undefined
+        : Number(body.discoveryFrequencyMinutes);
+    const extractionConfig =
+      body.extractionConfig === undefined
+        ? undefined
+        : body.extractionConfig &&
+            typeof body.extractionConfig === "object" &&
+            !Array.isArray(body.extractionConfig)
+          ? body.extractionConfig
+          : null;
     if (
       (body.endpoint !== undefined && !endpoint) ||
       (body.secretRef !== undefined && secretRef === undefined) ||
       (rateLimit !== undefined &&
-        (!Number.isInteger(rateLimit) || rateLimit < 1 || rateLimit > 300))
+        (!Number.isInteger(rateLimit) || rateLimit < 1 || rateLimit > 300)) ||
+      (discoveryFrequency !== undefined &&
+        (!Number.isInteger(discoveryFrequency) ||
+          discoveryFrequency < 15 ||
+          discoveryFrequency > 43200)) ||
+      extractionConfig === null
     )
       return apiResponse({ code: "INVALID_SOURCE_CONFIGURATION" }, request, 400);
     const { data: existingSource } = await client
@@ -78,11 +95,25 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       .maybeSingle();
     if (error) throw error;
     if (!data) return apiResponse(null, request, 404);
-    if (endpoint !== undefined || body.secretRef !== undefined || rateLimit !== undefined) {
+    if (
+      endpoint !== undefined ||
+      body.secretRef !== undefined ||
+      rateLimit !== undefined ||
+      discoveryFrequency !== undefined ||
+      extractionConfig !== undefined
+    ) {
       const config = await client
         .schema("app")
         .from("job_source_configs")
-        .update({ endpoint, secret_ref: secretRef, rate_limit_per_minute: rateLimit })
+        .update({
+          endpoint,
+          secret_ref: secretRef,
+          rate_limit_per_minute: rateLimit,
+          discovery_frequency_minutes: discoveryFrequency,
+          extraction_config: extractionConfig ?? undefined,
+          schedule_eligible:
+            typeof body.scheduleEligible === "boolean" ? body.scheduleEligible : undefined
+        })
         .eq("source_id", id);
       if (config.error) throw config.error;
     }

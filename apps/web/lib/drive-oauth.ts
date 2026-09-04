@@ -16,11 +16,35 @@ interface DriveOAuthConfig {
   appUrl: string;
 }
 
+export function getDriveOAuthConfigurationStatus(): {
+  configured: boolean;
+  missing: string[];
+  invalidEncryptionKey: boolean;
+} {
+  const required = [
+    "GOOGLE_DRIVE_CLIENT_ID",
+    "GOOGLE_DRIVE_CLIENT_SECRET",
+    "GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY",
+    "NEXT_PUBLIC_APP_URL"
+  ] as const;
+  const missing = required.filter((name) => !process.env[name]);
+  const encodedKey = process.env.GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY;
+  const invalidEncryptionKey = Boolean(
+    encodedKey && Buffer.from(encodedKey, "base64").length !== 32
+  );
+  return {
+    configured: missing.length === 0 && !invalidEncryptionKey,
+    missing,
+    invalidEncryptionKey
+  };
+}
+
 export function getDriveOAuthConfig(): DriveOAuthConfig | null {
   const clientId = process.env.GOOGLE_DRIVE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_DRIVE_CLIENT_SECRET;
   const encodedKey = process.env.GOOGLE_DRIVE_TOKEN_ENCRYPTION_KEY;
   const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+  if (!getDriveOAuthConfigurationStatus().configured) return null;
   if (!clientId || !clientSecret || !encodedKey || !appUrl) return null;
   const encryptionKey = Buffer.from(encodedKey, "base64");
   if (encryptionKey.length !== 32) return null;

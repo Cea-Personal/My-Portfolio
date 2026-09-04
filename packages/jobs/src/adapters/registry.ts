@@ -3,6 +3,27 @@ export interface JobSourceAdapter {
   version: string;
   capabilities: readonly string[];
   collect(input: JobSourceInput): Promise<readonly unknown[]>;
+  /** Contract-compatible hooks; collect remains for backwards-compatible adapters. */
+  testConnection?: (input: JobSourceInput) => Promise<{ status: string; recordCount?: number }>;
+  search?: (input: JobSourceInput) => Promise<readonly unknown[]>;
+  fetchJob?: (input: JobSourceInput) => Promise<unknown>;
+  normalize?: (record: unknown, input?: JobSourceInput) => unknown;
+  healthCheck?: (input: JobSourceInput) => Promise<{ status: string; recordCount?: number }>;
+}
+
+export function contractAdapter(adapter: JobSourceAdapter): JobSourceAdapter {
+  const test = async (input: JobSourceInput) => {
+    const records = await adapter.collect(input);
+    return { status: "success", recordCount: records.length };
+  };
+  return {
+    ...adapter,
+    testConnection: adapter.testConnection ?? test,
+    search: adapter.search ?? adapter.collect,
+    fetchJob: adapter.fetchJob ?? (async (input) => (await adapter.collect(input))[0] ?? null),
+    normalize: adapter.normalize ?? ((record) => record),
+    healthCheck: adapter.healthCheck ?? test
+  };
 }
 export interface JobSourceInput {
   cursor?: string;
@@ -29,6 +50,14 @@ export async function fetchSourceJson(input: JobSourceInput): Promise<unknown> {
   if (!input.endpoint) return [];
   const url = new URL(input.endpoint);
   if (url.protocol !== "https:") throw new Error("SOURCE_ENDPOINT_MUST_USE_HTTPS");
+  if (
+    url.username ||
+    url.password ||
+    url.hostname === "localhost" ||
+    url.hostname === "::1" ||
+    url.hostname.endsWith(".local")
+  )
+    throw new Error("SOURCE_ENDPOINT_BLOCKED");
   for (const [key, value] of Object.entries(input.query ?? {}))
     url.searchParams.set(key, String(value));
   const controller = new AbortController();
@@ -39,6 +68,7 @@ export async function fetchSourceJson(input: JobSourceInput): Promise<unknown> {
   try {
     const response = await (input.fetcher ?? fetch)(url, {
       ...(input.headers ? { headers: input.headers } : {}),
+      redirect: "error",
       signal
     });
     if (!response.ok) throw new Error(`SOURCE_HTTP_${response.status}`);
@@ -54,6 +84,14 @@ export async function fetchSourceText(input: JobSourceInput): Promise<string> {
   if (!input.endpoint) return "";
   const url = new URL(input.endpoint);
   if (url.protocol !== "https:") throw new Error("SOURCE_ENDPOINT_MUST_USE_HTTPS");
+  if (
+    url.username ||
+    url.password ||
+    url.hostname === "localhost" ||
+    url.hostname === "::1" ||
+    url.hostname.endsWith(".local")
+  )
+    throw new Error("SOURCE_ENDPOINT_BLOCKED");
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10_000);
   const signal = input.signal
@@ -62,6 +100,7 @@ export async function fetchSourceText(input: JobSourceInput): Promise<string> {
   try {
     const response = await (input.fetcher ?? fetch)(url, {
       ...(input.headers ? { headers: input.headers } : {}),
+      redirect: "error",
       signal
     });
     if (!response.ok) throw new Error(`SOURCE_HTTP_${response.status}`);

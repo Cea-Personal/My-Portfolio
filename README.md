@@ -71,16 +71,19 @@ service-role keys differ from `.env.example`.
 
 ## Run the application
 
-Use separate terminals from the repository root:
+Start the web app, Inngest development workflow runner, and document parser/indexer together from
+the repository root:
 
 ```bash
-pnpm dev:web
-pnpm dev:workflows
-uv run --project apps/worker career-worker inngest
+pnpm dev
 ```
 
+For troubleshooting, the web app and workflow runner can still be started separately with
+`pnpm dev:web` and `pnpm dev:workflows`. The worker can be started separately with
+`uv run --project apps/worker career-worker inngest`.
+
 - Web app: <http://localhost:3000>
-- Inngest development UI: the URL printed by `pnpm dev:workflows`
+- Inngest development UI: the URL printed by `pnpm dev` (or `pnpm dev:workflows`)
 - Inngest development server/UI: <http://127.0.0.1:8288>
 - Document parser/indexer: <http://127.0.0.1:8081>
 
@@ -133,6 +136,37 @@ The profile stickers immediately below the portrait read approved profile fields
 `NEXT_PUBLIC_LINKEDIN_URL`, `NEXT_PUBLIC_GITHUB_URL`, and `NEXT_PUBLIC_CONTACT_EMAIL` environment
 values. Unconfigured stickers remain visible as placeholders instead of inventing destinations.
 The public navigation includes an **Owner login** link to `/sign-in` for the private workspace.
+
+### Connect a Google Drive career folder
+
+1. In Google Cloud, enable the Drive API and create a service account with a JSON key. It does not
+   need a Google Workspace role or domain-wide delegation.
+2. Create a dedicated `Resumes` folder under **My Drive**. Share only that folder with the service
+   account's `client_email` as **Viewer**. Do not share the Drive root.
+3. Copy the folder ID from its Drive URL and configure the server values below.
+4. Sign in at `/sign-in`, open **Settings → Documents**, and select **Verify and activate shared
+   folder**, followed by **Sync selected folder**.
+5. Keep the Inngest workflow process and career worker running. Imported files appear in Documents;
+   select **Index knowledge** for any item waiting on parsing or embeddings.
+
+The active Drive integration does not use user OAuth and never requests access to your personal
+Drive. Its `drive.readonly` token belongs to the isolated service account, which can see only items
+shared with that account. The worker additionally lists files exclusively by the configured parent
+folder ID. Configure:
+
+```bash
+# macOS/Linux: encode the downloaded JSON without line wrapping
+GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON_BASE64="$(base64 < service-account.json | tr -d '\n')"
+GOOGLE_DRIVE_FOLDER_ID=your-folder-id
+GOOGLE_DRIVE_FOLDER_NAME=Resumes
+```
+
+Keep these values server-only. Never prefix them with `NEXT_PUBLIC_` and never commit the JSON key.
+Apply the Drive migrations before activating the folder:
+
+```bash
+supabase db push
+```
 
 ### Project enquiry form
 

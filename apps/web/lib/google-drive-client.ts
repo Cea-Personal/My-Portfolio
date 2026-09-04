@@ -24,6 +24,7 @@ export interface GoogleDriveChange {
         modifiedTime?: string | undefined;
         md5Checksum?: string | undefined;
         trashed: boolean;
+        parents?: string[];
       }
     | undefined;
 }
@@ -37,6 +38,34 @@ export interface GoogleDriveChangePage {
 export interface GoogleDriveFilePage {
   changes: GoogleDriveChange[];
   nextPageToken?: string | undefined;
+}
+
+export interface GoogleDriveFolder {
+  id: string;
+  name: string;
+  modifiedTime?: string;
+}
+
+export async function getDriveFolder(
+  accessToken: string,
+  folderId: string
+): Promise<GoogleDriveFolder> {
+  if (!/^[A-Za-z0-9_-]{10,200}$/.test(folderId)) throw new Error("DRIVE_FOLDER_INVALID");
+  const url = new URL(`${DRIVE_API}/files/${encodeURIComponent(folderId)}`);
+  url.searchParams.set("fields", "id,name,mimeType,modifiedTime,trashed");
+  url.searchParams.set("supportsAllDrives", "true");
+  const folder = await driveJson(url, accessToken);
+  if (
+    folder.id !== folderId ||
+    folder.mimeType !== "application/vnd.google-apps.folder" ||
+    folder.trashed === true
+  )
+    throw new Error("DRIVE_SHARED_FOLDER_UNAVAILABLE");
+  return {
+    id: folderId,
+    name: safeDriveName(folder.name, "Resumes"),
+    ...(typeof folder.modifiedTime === "string" ? { modifiedTime: folder.modifiedTime } : {})
+  };
 }
 
 function safeDriveName(value: unknown, fallback: string): string {
@@ -111,7 +140,7 @@ export async function listDriveChanges(
   url.searchParams.set("includeRemoved", "true");
   url.searchParams.set(
     "fields",
-    "nextPageToken,newStartPageToken,changes(fileId,removed,file(id,name,mimeType,version,modifiedTime,md5Checksum,trashed,capabilities(canDownload)))"
+    "nextPageToken,newStartPageToken,changes(fileId,removed,file(id,name,mimeType,version,modifiedTime,md5Checksum,trashed,parents,capabilities(canDownload)))"
   );
   const payload = await driveJson(url, accessToken);
   const rawChanges = Array.isArray(payload.changes) ? payload.changes : [];
@@ -136,7 +165,14 @@ export async function listDriveChanges(
           version: typeof fileRaw.version === "string" ? fileRaw.version : "unknown",
           modifiedTime: typeof fileRaw.modifiedTime === "string" ? fileRaw.modifiedTime : undefined,
           md5Checksum: typeof fileRaw.md5Checksum === "string" ? fileRaw.md5Checksum : undefined,
-          trashed: fileRaw.trashed === true
+          trashed: fileRaw.trashed === true,
+          ...(Array.isArray(fileRaw.parents)
+            ? {
+                parents: fileRaw.parents.filter(
+                  (value): value is string => typeof value === "string"
+                )
+              }
+            : {})
         }
       : undefined;
     return [{ fileId: raw.fileId, removed, permissionLost, file }];
@@ -151,15 +187,21 @@ export async function listDriveChanges(
 
 export async function listDriveFiles(
   accessToken: string,
-  pageToken?: string
+  pageToken?: string,
+  folderId?: string
 ): Promise<GoogleDriveFilePage> {
   const url = new URL(`${DRIVE_API}/files`);
   url.searchParams.set("pageSize", "100");
   url.searchParams.set("spaces", "drive");
-  url.searchParams.set("q", "trashed = false");
+  url.searchParams.set(
+    "q",
+    folderId
+      ? `'${folderId.replace(/[^a-zA-Z0-9_-]/g, "")}' in parents and trashed = false and mimeType != 'application/vnd.google-apps.folder'`
+      : "trashed = false"
+  );
   url.searchParams.set(
     "fields",
-    "nextPageToken,files(id,name,mimeType,version,modifiedTime,md5Checksum,trashed,capabilities(canDownload))"
+    "nextPageToken,files(id,name,mimeType,version,modifiedTime,md5Checksum,trashed,parents,capabilities(canDownload))"
   );
   if (pageToken) url.searchParams.set("pageToken", pageToken);
   const payload = await driveJson(url, accessToken);
@@ -184,7 +226,12 @@ export async function listDriveFiles(
           version: typeof file.version === "string" ? file.version : "unknown",
           modifiedTime: typeof file.modifiedTime === "string" ? file.modifiedTime : undefined,
           md5Checksum: typeof file.md5Checksum === "string" ? file.md5Checksum : undefined,
-          trashed: false
+          trashed: false,
+          ...(Array.isArray(file.parents)
+            ? {
+                parents: file.parents.filter((value): value is string => typeof value === "string")
+              }
+            : {})
         }
       }
     ];
@@ -193,6 +240,28 @@ export async function listDriveFiles(
     changes,
     nextPageToken: typeof payload.nextPageToken === "string" ? payload.nextPageToken : undefined
   };
+}
+
+export async function listDriveFolders(accessToken: string): Promise<GoogleDriveFolder[]> {
+  const url = new URL(`${DRIVE_API}/files`);
+  url.searchParams.set("pageSize", "100");
+  url.searchParams.set("spaces", "drive");
+  url.searchParams.set("q", "mimeType = 'application/vnd.google-apps.folder' and trashed = false");
+  url.searchParams.set("orderBy", "name");
+  url.searchParams.set("fields", "files(id,name,modifiedTime)");
+  const payload = await driveJson(url, accessToken);
+  return (Array.isArray(payload.files) ? payload.files : []).flatMap((entry) => {
+    if (!entry || typeof entry !== "object") return [];
+    const folder = entry as Record<string, unknown>;
+    if (typeof folder.id !== "string" || typeof folder.name !== "string") return [];
+    return [
+      {
+        id: folder.id,
+        name: folder.name,
+        ...(typeof folder.modifiedTime === "string" ? { modifiedTime: folder.modifiedTime } : {})
+      }
+    ];
+  });
 }
 
 const GOOGLE_EXPORTS: Record<string, { mimeType: string; extension: string }> = {

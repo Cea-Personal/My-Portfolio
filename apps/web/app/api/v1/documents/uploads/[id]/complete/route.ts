@@ -50,26 +50,80 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (statusError) throw statusError;
 
     const operationKey = request.headers.get("idempotency-key") ?? `document:${id}:${hash}`;
-    await inngest.send({
-      name: "career/document.changed.v1",
-      id: `${ownerId}:${id}:${hash}`,
-      data: {
-        schemaVersion: 1,
-        ownerId,
-        correlationId,
-        resourceType: "document",
-        resourceId: id,
-        operationKey,
-        requestedBy: "owner",
-        metadata: { documentVersionId: version.id }
-      }
+    const { data: run, error: runError } = await client
+      .schema("app")
+      .from("ingestion_runs")
+      .insert({
+        owner_id: ownerId,
+        trigger: "document_upload",
+        correlation_id: correlationId,
+        idempotency_key: `ingest:${version.id}`,
+        status: "pending"
+      })
+      .select("id")
+      .single();
+    if (runError || !run) throw runError ?? new Error("INGESTION_RUN_CREATE_FAILED");
+    const { error: itemError } = await client.schema("app").from("ingestion_items").insert({
+      run_id: run.id,
+      document_id: id,
+      document_version_id: version.id,
+      stage: "queued",
+      status: "pending",
+      attempts: 0
     });
+    if (itemError) throw itemError;
+    try {
+      await inngest.send({
+        name: "career/document.changed.v1",
+        id: `${ownerId}:${id}:${hash}`,
+        data: {
+          schemaVersion: 1,
+          ownerId,
+          correlationId,
+          resourceType: "document",
+          resourceId: id,
+          operationKey,
+          requestedBy: "owner",
+          metadata: { documentVersionId: version.id, ingestionRunId: run.id }
+        }
+      });
+    } catch {
+      await client
+        .schema("app")
+        .from("ingestion_runs")
+        .update({
+          status: "failed",
+          error_summary: "WORKFLOW_DISPATCH_FAILED",
+          finished_at: new Date().toISOString()
+        })
+        .eq("id", run.id)
+        .eq("owner_id", ownerId);
+      await client
+        .schema("app")
+        .from("ingestion_items")
+        .update({
+          status: "failed",
+          sanitized_error: "WORKFLOW_DISPATCH_FAILED",
+          finished_at: new Date().toISOString()
+        })
+        .eq("run_id", run.id)
+        .eq("document_id", id);
+      return apiResponse(
+        {
+          code: "INGESTION_DISPATCH_FAILED",
+          detail: "The file was uploaded, but automatic indexing could not be started."
+        },
+        request,
+        503
+      );
+    }
     return apiResponse(
       {
         documentId: id,
         documentVersionId: version.id,
         filename: document.name,
-        status: "uploaded"
+        status: "indexing",
+        ingestionRunId: run.id
       },
       request,
       201

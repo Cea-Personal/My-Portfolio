@@ -56,15 +56,55 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         return apiResponse({ code: "INVALID_TIMEZONE" }, request, 400);
       }
     }
+    const optionalNumber = (value: unknown) => {
+      if (value === undefined) return undefined;
+      if (value === null || value === "") return null;
+      const parsed = Number(value);
+      return Number.isFinite(parsed) && parsed >= 0 ? parsed : Number.NaN;
+    };
+    const minimumSalary = optionalNumber(body.minimumSalary);
+    const preferredSalary = optionalNumber(body.preferredSalary);
+    const maxJobAgeDays = body.maxJobAgeDays === undefined ? undefined : Number(body.maxJobAgeDays);
+    if (
+      Number.isNaN(minimumSalary) ||
+      Number.isNaN(preferredSalary) ||
+      (maxJobAgeDays !== undefined &&
+        (!Number.isInteger(maxJobAgeDays) || maxJobAgeDays < 1 || maxJobAgeDays > 365))
+    )
+      return apiResponse({ code: "INVALID_PROFILE_CRITERIA" }, request, 400);
     const update = {
       name: typeof body.name === "string" ? body.name.trim().slice(0, 160) : undefined,
       target_titles: array(body.targetTitles),
+      preferred_titles: array(body.preferredTitles),
+      excluded_titles: array(body.excludedTitles),
+      seniority_levels: array(body.seniorityLevels),
       locations: array(body.locations),
+      regions: array(body.regions),
+      remote_restrictions: array(body.remoteRestrictions),
       work_arrangements: array(body.workArrangements),
       employment_types: array(body.employmentTypes),
       required_technologies: array(body.requiredTechnologies),
       preferred_technologies: array(body.preferredTechnologies),
       excluded_technologies: array(body.excludedTechnologies),
+      nice_to_have_technologies: array(body.niceToHaveTechnologies),
+      industries: array(body.industries),
+      company_sizes: array(body.companySizes),
+      preferred_companies: array(body.preferredCompanies),
+      excluded_companies: array(body.excludedCompanies),
+      visa_sponsorship:
+        typeof body.visaSponsorship === "string" ? body.visaSponsorship.slice(0, 80) : undefined,
+      relocation_support:
+        typeof body.relocationSupport === "string"
+          ? body.relocationSupport.slice(0, 80)
+          : undefined,
+      language_requirements: array(body.languageRequirements),
+      minimum_salary: minimumSalary,
+      preferred_salary: preferredSalary,
+      salary_currency:
+        typeof body.salaryCurrency === "string"
+          ? body.salaryCurrency.trim().toUpperCase().slice(0, 3) || null
+          : undefined,
+      max_job_age_days: maxJobAgeDays,
       scoring_weights: scoringWeights,
       timezone,
       enabled: typeof body.enabled === "boolean" ? body.enabled : undefined

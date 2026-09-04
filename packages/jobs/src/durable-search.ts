@@ -6,8 +6,17 @@ import { greenhouseAdapter } from "./adapters/greenhouse";
 import { leverAdapter } from "./adapters/lever";
 import { linkedinAuthorizedAdapter } from "./adapters/linkedin-authorized";
 import { rssAdapter } from "./adapters/rss";
+import {
+  personioAdapter,
+  recruiteeAdapter,
+  smartRecruitersAdapter,
+  teamtailorAdapter,
+  workableAdapter
+} from "./adapters/ats";
+import { structuredAdapter } from "./adapters/structured";
 import { calculateCareerMatch } from "./career-match";
 import { calculateOpportunityScore } from "./opportunity-score";
+import { evaluateJobEligibility, type EligibilityProfile } from "./eligibility-filter";
 import { runSearch, type SearchSourceResult } from "./search-run";
 import type { JobSourceAdapter, JobSourceInput } from "./adapters/registry";
 
@@ -17,7 +26,13 @@ const adapters: Record<string, JobSourceAdapter> = {
   greenhouse: greenhouseAdapter,
   lever: leverAdapter,
   "linkedin-authorized": linkedinAuthorizedAdapter,
-  rss: rssAdapter
+  rss: rssAdapter,
+  workable: workableAdapter,
+  smartrecruiters: smartRecruitersAdapter,
+  teamtailor: teamtailorAdapter,
+  personio: personioAdapter,
+  recruitee: recruiteeAdapter,
+  structured: structuredAdapter
 };
 
 function failedAdapter(type: string, version: string, reason: string): JobSourceAdapter {
@@ -46,8 +61,14 @@ interface JobRecord {
 
 interface SearchProfile {
   target_titles?: unknown;
+  preferred_titles?: unknown;
+  excluded_titles?: unknown;
   locations?: unknown;
+  regions?: unknown;
   required_technologies?: unknown;
+  excluded_technologies?: unknown;
+  preferred_companies?: unknown;
+  excluded_companies?: unknown;
   scoring_weights?: unknown;
 }
 
@@ -106,6 +127,7 @@ async function persistJob(
   },
   sourceProvider: string,
   scoringWeights: Record<string, number>,
+  requiredTechnologies: readonly string[],
   searchRunId: string
 ): Promise<JobRecord> {
   const existingResult = await client
@@ -217,15 +239,28 @@ async function persistJob(
     compensation: asNumber(scoringWeights.compensation, 0),
     logistics: asNumber(scoringWeights.logistics, 0)
   });
+  const searchableText = `${job.title} ${job.description}`.toLowerCase();
+  const requiredTerms = requiredTechnologies;
+  const requirements = requiredTerms.map((term, index) => ({
+    id: `profile-term-${index}`,
+    priority: "required" as const,
+    match: searchableText.includes(term.toLowerCase()) ? 1 : 0,
+    evidence: [],
+    explanation: searchableText.includes(term.toLowerCase())
+      ? "Term found in the published job content."
+      : "No matching term found in the published job content.",
+    outcome: "insufficient_evidence" as const
+  }));
+  const careerMatch = calculateCareerMatch(requirements);
   const scoreRows = [
     {
       job_id: id,
       score_type: "career_match",
-      numeric_score: calculateCareerMatch([]).score,
-      factor_values: { evidence: 0 },
+      numeric_score: careerMatch.score,
+      factor_values: { profileTerms: requirements.length },
       weights: {},
       calculation_version: "career-match.v1",
-      evidence_snapshot: { evidenceIds: [], searchRunId },
+      evidence_snapshot: { evidenceIds: careerMatch.evidenceIds, requirements, searchRunId },
       search_run_id: searchRunId
     },
     {
@@ -375,29 +410,95 @@ export async function executePersistedSearch(input: DurableSearchInput): Promise
   const profileResult = await input.client
     .schema("app")
     .from("job_search_profiles")
-    .select("scoring_weights")
+    .select(
+      "scoring_weights,target_titles,preferred_titles,excluded_titles,locations,regions,required_technologies,excluded_technologies,preferred_companies,excluded_companies"
+    )
     .eq("id", input.profileId)
     .eq("owner_id", input.ownerId)
     .maybeSingle();
   if (profileResult.error) throw profileResult.error;
   const scoringWeights = asNumberRecord(profileResult.data?.scoring_weights);
+  const requiredTechnologies = asStringArray(profileResult.data?.required_technologies);
+  const eligibilityProfile: EligibilityProfile = {
+    targetTitles: asStringArray(profileResult.data?.target_titles),
+    preferredTitles: asStringArray(profileResult.data?.preferred_titles),
+    excludedTitles: asStringArray(profileResult.data?.excluded_titles),
+    locations: asStringArray(profileResult.data?.locations),
+    regions: asStringArray(profileResult.data?.regions),
+    requiredTechnologies,
+    excludedTechnologies: asStringArray(profileResult.data?.excluded_technologies),
+    preferredCompanies: asStringArray(profileResult.data?.preferred_companies),
+    excludedCompanies: asStringArray(profileResult.data?.excluded_companies)
+  };
   const persistedJobIds = new Set<string>();
+  let filteredJobsCount = 0;
+  let reviewJobsCount = 0;
   for (const sourceResult of result.sources) {
+    const evaluatedJobs = sourceResult.jobs.map((job) => ({
+      job,
+      eligibility: evaluateJobEligibility(job, eligibilityProfile)
+    }));
+    const eligibleJobs = evaluatedJobs.filter(({ eligibility }) => eligibility.outcome !== "FAIL");
+    if (evaluatedJobs.length) {
+      const rawResult = await input.client
+        .schema("app")
+        .from("raw_jobs")
+        .upsert(
+          evaluatedJobs.map(({ job, eligibility }) => ({
+            owner_id: input.ownerId,
+            source_id: sourceResult.sourceId,
+            external_job_id: job.externalId ?? null,
+            source_url: job.canonicalUrl ?? null,
+            content_hash: hash(JSON.stringify(job)),
+            payload: job,
+            processing_status: eligibility.outcome === "FAIL" ? "rejected" : "normalized",
+            filter_outcome: eligibility.outcome,
+            filter_reasons: eligibility.reasons,
+            processed_at: new Date().toISOString()
+          })),
+          { onConflict: "owner_id,source_id,content_hash" }
+        );
+      if (rawResult.error) throw rawResult.error;
+    }
+    const failedCount = evaluatedJobs.length - eligibleJobs.length;
+    const reviewCount = evaluatedJobs.filter(
+      ({ eligibility }) => eligibility.outcome === "REVIEW"
+    ).length;
+    filteredJobsCount += failedCount;
+    reviewJobsCount += reviewCount;
+    const completedAt = new Date().toISOString();
     const sourceUpdate = await input.client
       .schema("app")
       .from("job_search_run_sources")
       .update({
         status: sourceResult.status,
         attempts: sourceResult.attempts,
-        accepted_count: sourceResult.jobs.length,
+        accepted_count: eligibleJobs.length,
         fetched_count: sourceResult.fetchedCount,
-        rejected_count: sourceResult.rejectedCount,
-        sanitized_error: sourceResult.error ?? null
+        rejected_count: sourceResult.rejectedCount + failedCount,
+        review_count: reviewCount,
+        sanitized_error: sourceResult.error ?? null,
+        completed_at: completedAt
       })
       .eq("run_id", input.runId)
       .eq("source_id", sourceResult.sourceId);
     if (sourceUpdate.error) throw sourceUpdate.error;
-    for (const job of sourceResult.jobs) {
+    const healthUpdate = await input.client
+      .schema("app")
+      .from("job_sources")
+      .update({
+        health_status: sourceResult.status === "failed" ? "unhealthy" : "healthy",
+        last_run_at: completedAt,
+        last_success_at: sourceResult.status === "failed" ? undefined : completedAt,
+        last_failure_at: sourceResult.status === "failed" ? completedAt : undefined,
+        consecutive_failures: sourceResult.status === "failed" ? 1 : 0,
+        last_discovered_count: sourceResult.fetchedCount,
+        last_accepted_count: eligibleJobs.length
+      })
+      .eq("id", sourceResult.sourceId)
+      .eq("owner_id", input.ownerId);
+    if (healthUpdate.error) throw healthUpdate.error;
+    for (const { job } of eligibleJobs) {
       const persisted = await persistJob(
         input.client,
         input.ownerId,
@@ -406,6 +507,7 @@ export async function executePersistedSearch(input: DurableSearchInput): Promise
         sourceInputs.find((source) => source.id === sourceResult.sourceId)?.adapter.type ??
           "source_feed",
         scoringWeights,
+        requiredTechnologies,
         input.runId
       );
       persistedJobIds.add(persisted.id);
@@ -419,6 +521,8 @@ export async function executePersistedSearch(input: DurableSearchInput): Promise
       result_counts: {
         discovered: result.jobs.length,
         persisted: persistedJobIds.size,
+        filtered: filteredJobsCount,
+        review: reviewJobsCount,
         failedSources: result.sources.filter((source) => source.status === "failed").length
       },
       finished_at: new Date().toISOString(),

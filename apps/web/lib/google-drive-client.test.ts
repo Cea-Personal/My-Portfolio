@@ -3,6 +3,8 @@ import {
   downloadDriveFile,
   driveTokenNeedsRefresh,
   listDriveChanges,
+  listDriveFiles,
+  listDriveFolders,
   refreshDriveToken
 } from "./google-drive-client";
 
@@ -83,5 +85,20 @@ describe("Google Drive ingestion boundary", () => {
     });
     expect(result).toMatchObject({ mimeType: "text/plain", filename: "Career notes.txt" });
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain("/export?mimeType=text%2Fplain");
+  });
+
+  it("scopes initial listing to the selected folder and exposes folder names only", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ files: [{ id: "folder-1", name: "Career" }] }), {
+          status: 200
+        })
+      )
+      .mockResolvedValueOnce(new Response(JSON.stringify({ files: [] }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(listDriveFolders("token")).resolves.toEqual([{ id: "folder-1", name: "Career" }]);
+    await listDriveFiles("token", undefined, "folder-1");
+    expect(String(fetchMock.mock.calls[1]?.[0])).toContain("in+parents");
   });
 });

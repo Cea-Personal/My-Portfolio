@@ -82,6 +82,16 @@ interface SearchRun {
   result_counts: Record<string, unknown>;
   error_summary?: string | null;
 }
+interface JobSourceSummary {
+  id: string;
+  name: string;
+  adapter_type: string;
+  enabled: boolean;
+  health_status: string;
+  last_run_at?: string | null;
+  last_discovered_count?: number;
+  last_accepted_count?: number;
+}
 
 const transitions: Record<JobStatus, JobStatus[]> = {
   discovered: ["shortlisted", "interested", "withdrawn", "expired"],
@@ -146,6 +156,7 @@ export function JobsWorkspace() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [profiles, setProfiles] = useState<SearchProfile[]>([]);
   const [runs, setRuns] = useState<SearchRun[]>([]);
+  const [sources, setSources] = useState<JobSourceSummary[]>([]);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [message, setMessage] = useState("");
   const [filter, setFilter] = useState<"all" | JobStatus>("all");
@@ -153,20 +164,26 @@ export function JobsWorkspace() {
   const [detail, setDetail] = useState<Job | null>(null);
   const load = useCallback(async () => {
     try {
-      const [jobsResponse, profilesResponse, runsResponse] = await Promise.all([
+      const [jobsResponse, profilesResponse, runsResponse, sourcesResponse] = await Promise.all([
         fetch("/api/v1/jobs", { cache: "no-store" }),
         fetch("/api/v1/search-profiles", { cache: "no-store" }),
-        fetch("/api/v1/job-search-runs", { cache: "no-store" })
+        fetch("/api/v1/job-search-runs", { cache: "no-store" }),
+        fetch("/api/v1/job-sources", { cache: "no-store" })
       ]);
-      if (!jobsResponse.ok || !profilesResponse.ok || !runsResponse.ok) throw new Error();
+      if (!jobsResponse.ok || !profilesResponse.ok || !runsResponse.ok || !sourcesResponse.ok)
+        throw new Error();
       const jobsPayload = (await jobsResponse.json()) as { data?: { jobs?: Job[] } };
       const profilesPayload = (await profilesResponse.json()) as {
         data?: { profiles?: SearchProfile[] };
       };
       const runsPayload = (await runsResponse.json()) as { data?: { runs?: SearchRun[] } };
+      const sourcesPayload = (await sourcesResponse.json()) as {
+        data?: { sources?: JobSourceSummary[] };
+      };
       setJobs(jobsPayload.data?.jobs ?? []);
       setProfiles(profilesPayload.data?.profiles ?? []);
       setRuns(runsPayload.data?.runs ?? []);
+      setSources(sourcesPayload.data?.sources ?? []);
       setState("ready");
     } catch {
       setState("error");
@@ -269,6 +286,37 @@ export function JobsWorkspace() {
           lifecycle.
         </p>
       </header>
+      <section aria-labelledby="discovery-health-title">
+        <h2 id="discovery-health-title">Discovery sources</h2>
+        <p>
+          {String(sources.filter((source) => source.enabled).length)} enabled ·{" "}
+          {String(sources.filter((source) => source.health_status === "healthy").length)} healthy ·{" "}
+          {String(sources.reduce((total, source) => total + (source.last_accepted_count ?? 0), 0))}{" "}
+          accepted on latest source checks
+        </p>
+        {sources.length ? (
+          <ul className="workspace-list">
+            {sources.map((source) => (
+              <li key={source.id}>
+                <strong>{source.name}</strong> · {source.adapter_type} ·{" "}
+                {source.enabled ? "enabled" : "disabled"} · {source.health_status}
+                <small>
+                  {source.last_run_at
+                    ? ` Last checked ${new Date(source.last_run_at).toLocaleString()}.`
+                    : " Not tested yet."}
+                </small>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p>No sources have been configured.</p>
+        )}
+        <p>
+          <a href="/settings/job-sources">
+            Configure sources, selectors, cadence, and diagnostics →
+          </a>
+        </p>
+      </section>
       <section aria-labelledby="search-jobs-title">
         <h2 id="search-jobs-title">Run a search</h2>
         <form className="workspace-actions" onSubmit={(event) => void startSearch(event)}>

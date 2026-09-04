@@ -20,6 +20,12 @@ function weights(value: unknown): Record<string, number> | null {
   return entries.length === Object.keys(value).length ? Object.fromEntries(entries) : null;
 }
 
+function optionalNumber(value: unknown): number | null {
+  if (value === undefined || value === null || value === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : Number.NaN;
+}
+
 export function GET(request: Request) {
   return withPrivateApi(request, async ({ client, ownerId }) => {
     const { data, error } = await client
@@ -40,12 +46,23 @@ export async function POST(request: Request) {
     const scoringWeights = weights(body.scoringWeights);
     const timezone =
       typeof body.timezone === "string" ? body.timezone.trim().slice(0, 80) : "Africa/Kigali";
+    const minimumSalary = optionalNumber(body.minimumSalary);
+    const preferredSalary = optionalNumber(body.preferredSalary);
+    const maxJobAgeDays = Number(body.maxJobAgeDays ?? 30);
     try {
       new Intl.DateTimeFormat("en", { timeZone: timezone }).format();
     } catch {
       return apiResponse({ code: "INVALID_TIMEZONE" }, request, 400);
     }
-    if (!name || scoringWeights === null)
+    if (
+      !name ||
+      scoringWeights === null ||
+      Number.isNaN(minimumSalary) ||
+      Number.isNaN(preferredSalary) ||
+      !Number.isInteger(maxJobAgeDays) ||
+      maxJobAgeDays < 1 ||
+      maxJobAgeDays > 365
+    )
       return apiResponse({ code: "INVALID_PROFILE" }, request, 400);
     const { data, error } = await client
       .schema("app")
@@ -54,12 +71,34 @@ export async function POST(request: Request) {
         owner_id: ownerId,
         name,
         target_titles: strings(body.targetTitles),
+        preferred_titles: strings(body.preferredTitles),
+        excluded_titles: strings(body.excludedTitles),
+        seniority_levels: strings(body.seniorityLevels),
         locations: strings(body.locations),
+        regions: strings(body.regions),
+        remote_restrictions: strings(body.remoteRestrictions),
         work_arrangements: strings(body.workArrangements),
         employment_types: strings(body.employmentTypes),
         required_technologies: strings(body.requiredTechnologies),
         preferred_technologies: strings(body.preferredTechnologies),
         excluded_technologies: strings(body.excludedTechnologies),
+        nice_to_have_technologies: strings(body.niceToHaveTechnologies),
+        industries: strings(body.industries),
+        company_sizes: strings(body.companySizes),
+        preferred_companies: strings(body.preferredCompanies),
+        excluded_companies: strings(body.excludedCompanies),
+        visa_sponsorship:
+          typeof body.visaSponsorship === "string" ? body.visaSponsorship.slice(0, 80) : null,
+        relocation_support:
+          typeof body.relocationSupport === "string" ? body.relocationSupport.slice(0, 80) : null,
+        language_requirements: strings(body.languageRequirements),
+        minimum_salary: minimumSalary,
+        preferred_salary: preferredSalary,
+        salary_currency:
+          typeof body.salaryCurrency === "string"
+            ? body.salaryCurrency.trim().toUpperCase().slice(0, 3) || null
+            : null,
+        max_job_age_days: maxJobAgeDays,
         scoring_weights: scoringWeights,
         timezone,
         enabled: body.enabled === true

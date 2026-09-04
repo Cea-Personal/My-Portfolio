@@ -8,6 +8,9 @@ interface SourceConfig {
   secret_ref?: string | null;
   rate_limit_per_minute?: number;
   last_test_outcome?: string | null;
+  discovery_frequency_minutes?: number;
+  schedule_eligible?: boolean;
+  extraction_config?: Record<string, string>;
 }
 
 interface JobSource {
@@ -17,6 +20,12 @@ interface JobSource {
   adapter_version: string;
   enabled: boolean;
   health_status: string;
+  last_run_at?: string | null;
+  last_success_at?: string | null;
+  last_failure_at?: string | null;
+  consecutive_failures?: number;
+  last_discovered_count?: number;
+  last_accepted_count?: number;
   job_source_configs?: SourceConfig[] | SourceConfig;
 }
 
@@ -25,12 +34,29 @@ interface SearchProfile {
   name: string;
   enabled: boolean;
   target_titles: string[];
+  preferred_titles: string[];
+  excluded_titles: string[];
+  seniority_levels: string[];
   locations: string[];
+  regions: string[];
+  remote_restrictions: string[];
   work_arrangements: string[];
   employment_types: string[];
   required_technologies: string[];
   preferred_technologies: string[];
   excluded_technologies: string[];
+  nice_to_have_technologies: string[];
+  industries: string[];
+  company_sizes: string[];
+  preferred_companies: string[];
+  excluded_companies: string[];
+  visa_sponsorship?: string | null;
+  relocation_support?: string | null;
+  language_requirements: string[];
+  minimum_salary?: number | null;
+  preferred_salary?: number | null;
+  salary_currency?: string | null;
+  max_job_age_days: number;
   scoring_weights: Record<string, number>;
   timezone: string;
 }
@@ -42,6 +68,53 @@ function list(value: FormDataEntryValue | null): string[] {
         .map((item) => item.trim())
         .filter(Boolean)
     : [];
+}
+
+function extractionConfig(form: FormData): Record<string, string> {
+  return Object.fromEntries(
+    [
+      "jobSelector",
+      "titleSelector",
+      "companySelector",
+      "locationSelector",
+      "urlSelector",
+      "nextPageSelector"
+    ]
+      .map((name) => {
+        const value = form.get(name);
+        return [name, typeof value === "string" ? value.trim() : ""] as const;
+      })
+      .filter(([, value]) => value)
+  );
+}
+
+function profileCriteria(form: FormData) {
+  return {
+    targetTitles: list(form.get("targetTitles")),
+    preferredTitles: list(form.get("preferredTitles")),
+    excludedTitles: list(form.get("excludedTitles")),
+    seniorityLevels: list(form.get("seniorityLevels")),
+    locations: list(form.get("locations")),
+    regions: list(form.get("regions")),
+    remoteRestrictions: list(form.get("remoteRestrictions")),
+    workArrangements: list(form.get("workArrangements")),
+    employmentTypes: list(form.get("employmentTypes")),
+    requiredTechnologies: list(form.get("requiredTechnologies")),
+    preferredTechnologies: list(form.get("preferredTechnologies")),
+    niceToHaveTechnologies: list(form.get("niceToHaveTechnologies")),
+    excludedTechnologies: list(form.get("excludedTechnologies")),
+    industries: list(form.get("industries")),
+    companySizes: list(form.get("companySizes")),
+    preferredCompanies: list(form.get("preferredCompanies")),
+    excludedCompanies: list(form.get("excludedCompanies")),
+    visaSponsorship: form.get("visaSponsorship"),
+    relocationSupport: form.get("relocationSupport"),
+    languageRequirements: list(form.get("languageRequirements")),
+    minimumSalary: form.get("minimumSalary"),
+    preferredSalary: form.get("preferredSalary"),
+    salaryCurrency: form.get("salaryCurrency"),
+    maxJobAgeDays: Number(form.get("maxJobAgeDays"))
+  };
 }
 
 async function request(endpoint: string, method: "POST" | "PATCH" | "DELETE", body?: unknown) {
@@ -100,6 +173,9 @@ export function JobSourcesWorkspace() {
         endpoint: form.get("endpoint"),
         secretRef: form.get("secretRef"),
         rateLimitPerMinute: Number(form.get("rateLimit")),
+        discoveryFrequencyMinutes: Number(form.get("frequency")),
+        scheduleEligible: form.get("scheduleEligible") === "on",
+        extractionConfig: extractionConfig(form),
         termsNote: form.get("termsNote"),
         enabled: form.get("enabled") === "on"
       });
@@ -132,6 +208,9 @@ export function JobSourcesWorkspace() {
         endpoint: form.get("endpoint"),
         secretRef: form.get("secretRef"),
         rateLimitPerMinute: Number(form.get("rateLimit")),
+        discoveryFrequencyMinutes: Number(form.get("frequency")),
+        scheduleEligible: form.get("scheduleEligible") === "on",
+        extractionConfig: extractionConfig(form),
         termsNote: form.get("termsNote")
       });
       setMessage(`${source.name} was updated. Run a new connection test.`);
@@ -158,14 +237,29 @@ export function JobSourcesWorkspace() {
     }
   }
 
+  async function remove(source: JobSource) {
+    if (!window.confirm(`Disable and remove “${source.name}” from future searches?`)) return;
+    setMessage(`Removing ${source.name}…`);
+    try {
+      await request(`/api/v1/job-sources/${source.id}`, "DELETE");
+      setMessage(`${source.name} was removed from future searches.`);
+      await load();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not remove source.");
+    }
+  }
+
   return (
     <main className="workspace-page">
       <header className="workspace-heading">
         <p className="eyebrow">Opportunity intake</p>
         <h1>Job sources</h1>
         <p>
-          Connect approved HTTPS feeds. Credentials remain server-side and only their
-          environment-variable name is stored.
+          Configure, test, schedule, and monitor approved sources. Credentials remain server-side;
+          only their environment-variable name is stored.
+        </p>
+        <p>
+          <a href="/jobs">Run enabled sources from the Jobs workspace →</a>
         </p>
       </header>
       <section aria-labelledby="new-source-title">
@@ -181,6 +275,12 @@ export function JobSourcesWorkspace() {
               <option value="greenhouse">Greenhouse</option>
               <option value="lever">Lever</option>
               <option value="ashby">Ashby</option>
+              <option value="workable">Workable</option>
+              <option value="smartrecruiters">SmartRecruiters</option>
+              <option value="teamtailor">Teamtailor</option>
+              <option value="personio">Personio</option>
+              <option value="recruitee">Recruitee</option>
+              <option value="structured">Structured data (JSON-LD)</option>
               <option value="linkedin-authorized">LinkedIn (authorized feed)</option>
               <option value="rss">RSS</option>
               <option value="custom-rest">Custom REST</option>
@@ -214,11 +314,53 @@ export function JobSourcesWorkspace() {
             <input name="rateLimit" type="number" min="1" max="300" defaultValue="30" required />
           </label>
           <label>
+            Discovery frequency (minutes)
+            <input
+              name="frequency"
+              type="number"
+              min="15"
+              max="43200"
+              defaultValue="1440"
+              required
+            />
+          </label>
+          <details>
+            <summary>HTML / structured extraction selectors</summary>
+            <p>Optional, reviewed CSS selectors for sources without a supported ATS feed.</p>
+            <label>
+              Job item selector
+              <input name="jobSelector" placeholder="article.job" />
+            </label>
+            <label>
+              Title selector
+              <input name="titleSelector" placeholder="h2" />
+            </label>
+            <label>
+              Company selector
+              <input name="companySelector" placeholder=".company" />
+            </label>
+            <label>
+              Location selector
+              <input name="locationSelector" placeholder=".location" />
+            </label>
+            <label>
+              Job URL selector
+              <input name="urlSelector" placeholder="a.apply" />
+            </label>
+            <label>
+              Next-page selector
+              <input name="nextPageSelector" placeholder="a.next" />
+            </label>
+          </details>
+          <label>
             Terms / lawful-use note
             <textarea name="termsNote" rows={3} maxLength={1000} />
           </label>
           <label>
             <input name="enabled" type="checkbox" /> Enable after saving
+          </label>
+          <label>
+            <input name="scheduleEligible" type="checkbox" /> Include in scheduled discovery
           </label>
           <button type="submit">Save source</button>
         </form>
@@ -238,6 +380,18 @@ export function JobSourcesWorkspace() {
                   {source.adapter_type}@{source.adapter_version} ·{" "}
                   {source.enabled ? "enabled" : "disabled"} · health: {source.health_status}
                 </p>
+                <p>
+                  Every {String(config.discovery_frequency_minutes ?? 1440)} minutes · last run:{" "}
+                  {source.last_run_at ? new Date(source.last_run_at).toLocaleString() : "never"} ·
+                  last yield: {String(source.last_accepted_count ?? 0)}/
+                  {String(source.last_discovered_count ?? 0)} accepted
+                </p>
+                {source.last_failure_at ? (
+                  <p>
+                    Last failure: {new Date(source.last_failure_at).toLocaleString()} · consecutive
+                    failures: {String(source.consecutive_failures ?? 0)}
+                  </p>
+                ) : null}
                 <p>{config.endpoint}</p>
                 {config.last_test_outcome ? (
                   <details>
@@ -278,6 +432,69 @@ export function JobSourcesWorkspace() {
                       />
                     </label>
                     <label>
+                      Discovery frequency (minutes)
+                      <input
+                        name="frequency"
+                        type="number"
+                        min="15"
+                        max="43200"
+                        defaultValue={config.discovery_frequency_minutes ?? 1440}
+                      />
+                    </label>
+                    <details>
+                      <summary>Edit extraction selectors</summary>
+                      <label>
+                        Job item selector
+                        <input
+                          name="jobSelector"
+                          defaultValue={config.extraction_config?.jobSelector ?? ""}
+                        />
+                      </label>
+                      <label>
+                        Title selector
+                        <input
+                          name="titleSelector"
+                          defaultValue={config.extraction_config?.titleSelector ?? ""}
+                        />
+                      </label>
+                      <label>
+                        Company selector
+                        <input
+                          name="companySelector"
+                          defaultValue={config.extraction_config?.companySelector ?? ""}
+                        />
+                      </label>
+                      <label>
+                        Location selector
+                        <input
+                          name="locationSelector"
+                          defaultValue={config.extraction_config?.locationSelector ?? ""}
+                        />
+                      </label>
+                      <label>
+                        Job URL selector
+                        <input
+                          name="urlSelector"
+                          defaultValue={config.extraction_config?.urlSelector ?? ""}
+                        />
+                      </label>
+                      <label>
+                        Next-page selector
+                        <input
+                          name="nextPageSelector"
+                          defaultValue={config.extraction_config?.nextPageSelector ?? ""}
+                        />
+                      </label>
+                    </details>
+                    <label>
+                      <input
+                        name="scheduleEligible"
+                        type="checkbox"
+                        defaultChecked={config.schedule_eligible}
+                      />{" "}
+                      Include in scheduled discovery
+                    </label>
+                    <label>
                       Terms / lawful-use note
                       <textarea name="termsNote" rows={2} maxLength={1000} />
                     </label>
@@ -290,6 +507,9 @@ export function JobSourcesWorkspace() {
                   </button>
                   <button type="button" onClick={() => void toggle(source)}>
                     {source.enabled ? "Disable" : "Enable"}
+                  </button>
+                  <button type="button" onClick={() => void remove(source)}>
+                    Remove
                   </button>
                 </div>
               </li>
@@ -326,13 +546,7 @@ export function SearchProfilesWorkspace() {
     try {
       await request("/api/v1/search-profiles", "POST", {
         name: form.get("name"),
-        targetTitles: list(form.get("targetTitles")),
-        locations: list(form.get("locations")),
-        workArrangements: list(form.get("workArrangements")),
-        employmentTypes: list(form.get("employmentTypes")),
-        requiredTechnologies: list(form.get("requiredTechnologies")),
-        preferredTechnologies: list(form.get("preferredTechnologies")),
-        excludedTechnologies: list(form.get("excludedTechnologies")),
+        ...profileCriteria(form),
         timezone: form.get("timezone"),
         enabled: form.get("enabled") === "on",
         scoringWeights: {
@@ -368,13 +582,7 @@ export function SearchProfilesWorkspace() {
     try {
       await request(`/api/v1/search-profiles/${profile.id}`, "PATCH", {
         name: form.get("name"),
-        targetTitles: list(form.get("targetTitles")),
-        locations: list(form.get("locations")),
-        workArrangements: list(form.get("workArrangements")),
-        employmentTypes: list(form.get("employmentTypes")),
-        requiredTechnologies: list(form.get("requiredTechnologies")),
-        preferredTechnologies: list(form.get("preferredTechnologies")),
-        excludedTechnologies: list(form.get("excludedTechnologies")),
+        ...profileCriteria(form),
         timezone: form.get("timezone"),
         scoringWeights: {
           alignment: Number(form.get("alignment")),
@@ -427,8 +635,31 @@ export function SearchProfilesWorkspace() {
             />
           </label>
           <label>
+            Preferred / related titles
+            <input
+              name="preferredTitles"
+              placeholder="Analytics Engineer, Data Infrastructure Engineer"
+            />
+          </label>
+          <label>
+            Excluded titles
+            <input name="excludedTitles" placeholder="Intern, Junior" />
+          </label>
+          <label>
+            Seniority levels
+            <input name="seniorityLevels" placeholder="senior, staff, lead" />
+          </label>
+          <label>
             Locations
             <input name="locations" placeholder="Remote, Kigali, London" />
+          </label>
+          <label>
+            Regions
+            <input name="regions" placeholder="EMEA, UK, EU" />
+          </label>
+          <label>
+            Remote restrictions
+            <input name="remoteRestrictions" placeholder="EMEA only, UTC ±3" />
           </label>
           <label>
             Work arrangements
@@ -447,9 +678,67 @@ export function SearchProfilesWorkspace() {
             <input name="preferredTechnologies" placeholder="dbt, Airflow" />
           </label>
           <label>
+            Nice-to-have technologies
+            <input name="niceToHaveTechnologies" placeholder="Kafka, Snowflake" />
+          </label>
+          <label>
             Excluded technologies
             <input name="excludedTechnologies" />
           </label>
+          <label>
+            Industries
+            <input name="industries" placeholder="fintech, healthtech" />
+          </label>
+          <label>
+            Company sizes
+            <input name="companySizes" placeholder="startup, scale-up, enterprise" />
+          </label>
+          <label>
+            Preferred companies
+            <input name="preferredCompanies" />
+          </label>
+          <label>
+            Excluded companies
+            <input name="excludedCompanies" />
+          </label>
+          <label>
+            Visa sponsorship requirement
+            <input name="visaSponsorship" placeholder="required, preferred, not needed" />
+          </label>
+          <label>
+            Relocation support
+            <input name="relocationSupport" placeholder="required, optional" />
+          </label>
+          <label>
+            Language requirements
+            <input name="languageRequirements" placeholder="English" />
+          </label>
+          <fieldset>
+            <legend>Compensation and freshness</legend>
+            <label>
+              Minimum salary
+              <input name="minimumSalary" type="number" min="0" />
+            </label>
+            <label>
+              Preferred salary
+              <input name="preferredSalary" type="number" min="0" />
+            </label>
+            <label>
+              Currency
+              <input name="salaryCurrency" maxLength={3} placeholder="USD" />
+            </label>
+            <label>
+              Maximum job age (days)
+              <input
+                name="maxJobAgeDays"
+                type="number"
+                min="1"
+                max="365"
+                defaultValue="30"
+                required
+              />
+            </label>
+          </fieldset>
           <label>
             Timezone
             <input name="timezone" defaultValue="Africa/Kigali" required />
@@ -525,8 +814,40 @@ export function SearchProfilesWorkspace() {
                     <input name="targetTitles" defaultValue={profile.target_titles.join(", ")} />
                   </label>
                   <label>
+                    Preferred / related titles
+                    <input
+                      name="preferredTitles"
+                      defaultValue={profile.preferred_titles.join(", ")}
+                    />
+                  </label>
+                  <label>
+                    Excluded titles
+                    <input
+                      name="excludedTitles"
+                      defaultValue={profile.excluded_titles.join(", ")}
+                    />
+                  </label>
+                  <label>
+                    Seniority levels
+                    <input
+                      name="seniorityLevels"
+                      defaultValue={profile.seniority_levels.join(", ")}
+                    />
+                  </label>
+                  <label>
                     Locations
                     <input name="locations" defaultValue={profile.locations.join(", ")} />
+                  </label>
+                  <label>
+                    Regions
+                    <input name="regions" defaultValue={profile.regions.join(", ")} />
+                  </label>
+                  <label>
+                    Remote restrictions
+                    <input
+                      name="remoteRestrictions"
+                      defaultValue={profile.remote_restrictions.join(", ")}
+                    />
                   </label>
                   <label>
                     Work arrangements
@@ -557,12 +878,99 @@ export function SearchProfilesWorkspace() {
                     />
                   </label>
                   <label>
+                    Nice-to-have technologies
+                    <input
+                      name="niceToHaveTechnologies"
+                      defaultValue={profile.nice_to_have_technologies.join(", ")}
+                    />
+                  </label>
+                  <label>
                     Excluded technologies
                     <input
                       name="excludedTechnologies"
                       defaultValue={profile.excluded_technologies.join(", ")}
                     />
                   </label>
+                  <label>
+                    Industries
+                    <input name="industries" defaultValue={profile.industries.join(", ")} />
+                  </label>
+                  <label>
+                    Company sizes
+                    <input name="companySizes" defaultValue={profile.company_sizes.join(", ")} />
+                  </label>
+                  <label>
+                    Preferred companies
+                    <input
+                      name="preferredCompanies"
+                      defaultValue={profile.preferred_companies.join(", ")}
+                    />
+                  </label>
+                  <label>
+                    Excluded companies
+                    <input
+                      name="excludedCompanies"
+                      defaultValue={profile.excluded_companies.join(", ")}
+                    />
+                  </label>
+                  <label>
+                    Visa sponsorship requirement
+                    <input name="visaSponsorship" defaultValue={profile.visa_sponsorship ?? ""} />
+                  </label>
+                  <label>
+                    Relocation support
+                    <input
+                      name="relocationSupport"
+                      defaultValue={profile.relocation_support ?? ""}
+                    />
+                  </label>
+                  <label>
+                    Language requirements
+                    <input
+                      name="languageRequirements"
+                      defaultValue={profile.language_requirements.join(", ")}
+                    />
+                  </label>
+                  <fieldset>
+                    <legend>Compensation and freshness</legend>
+                    <label>
+                      Minimum salary
+                      <input
+                        name="minimumSalary"
+                        type="number"
+                        min="0"
+                        defaultValue={profile.minimum_salary ?? ""}
+                      />
+                    </label>
+                    <label>
+                      Preferred salary
+                      <input
+                        name="preferredSalary"
+                        type="number"
+                        min="0"
+                        defaultValue={profile.preferred_salary ?? ""}
+                      />
+                    </label>
+                    <label>
+                      Currency
+                      <input
+                        name="salaryCurrency"
+                        maxLength={3}
+                        defaultValue={profile.salary_currency ?? ""}
+                      />
+                    </label>
+                    <label>
+                      Maximum job age (days)
+                      <input
+                        name="maxJobAgeDays"
+                        type="number"
+                        min="1"
+                        max="365"
+                        defaultValue={profile.max_job_age_days}
+                        required
+                      />
+                    </label>
+                  </fieldset>
                   <label>
                     Timezone
                     <input name="timezone" defaultValue={profile.timezone} required />

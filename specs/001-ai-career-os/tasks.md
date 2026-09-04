@@ -754,3 +754,37 @@ path and independent fixture path both pass.
   task.
 - T324 remains open until those external gates are run and a final convergence review can truthfully
   close the release checklist.
+
+### Implementation update — 2026-09-04
+
+- Drive owner flow is now implemented in the Documents workspace: OAuth initiation, connection status,
+  folder listing/selection, selected-folder synchronization, and encrypted server-side credentials.
+  Migration `0119_drive_folder_selection.sql` adds the selected folder fields.
+- Job source intake now exposes Workable, SmartRecruiters, Teamtailor, Personio, and Recruitee adapter
+  types, with contract-compatible test/search/fetch/normalize/health hooks and redirect-blocked HTTPS
+  fetching. Existing sources retain the legacy collect hook for compatibility.
+- Job search run reads no longer order by the nonexistent `created_at` column; they use `logical_date`.
+- Job source settings now expose removal in addition to edit, test, and enable/disable.
+- External release gates T284 and T318–T324 remain open until their required hosted, browser, AI,
+  performance, recovery, and evidence environments are available.
+
+### Phase 16 — Multi-source discovery amendment and Drive runtime repair
+
+- [X] T330 Fix authenticated document loading by selecting the real ingestion timestamps, preserve
+  non-auth API diagnostics in the Documents workspace, and require optimistic mutation headers for
+  Drive folder selection.
+- [X] T331 Add source cadence, structured extraction selectors, source health/yield telemetry, an
+  in-context Jobs discovery panel, and expanded search-profile criteria for title, geography,
+  technology, company, visa, compensation, language, and freshness filtering.
+- [X] T332 Persist raw source jobs and deterministic PASS/FAIL/REVIEW reasons before semantic/AI
+  scoring; expose per-source review/rejection counts and grant the durable worker only the required
+  Supabase tables.
+- [ ] T333 Complete an authenticated Playwright shared-folder activation/sync and source-search smoke
+  test.
+  Repository CLI and application now both target `jnbop…`; migrations through `0123` are applied,
+  Drive/job-discovery service-role access is verified, the Google OAuth variables are present and
+  structurally valid, and the dev server was started after the environment file was updated.
+- [X] T334 Replace personal Google Drive OAuth with an isolated service-account/shared-folder
+  integration: validate a fixed folder ID, verify Viewer sharing before activation, list only direct
+  children of that folder, reconcile removed files, disable user OAuth endpoints, revoke stored
+  personal-OAuth connections/credentials, and document the server-only configuration contract.

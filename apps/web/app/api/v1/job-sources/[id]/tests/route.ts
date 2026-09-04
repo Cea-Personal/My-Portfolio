@@ -47,7 +47,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const sourceUpdate = await client
       .schema("app")
       .from("job_sources")
-      .update({ health_status: healthy ? "healthy" : "unhealthy" })
+      .update({
+        health_status: healthy ? "healthy" : "unhealthy",
+        last_run_at: testedAt,
+        last_success_at: healthy ? testedAt : undefined,
+        last_failure_at: healthy ? undefined : testedAt,
+        consecutive_failures: healthy ? 0 : 1,
+        last_discovered_count: recordCount,
+        last_accepted_count: recordCount
+      })
       .eq("id", id)
       .eq("owner_id", ownerId);
     if (sourceUpdate.error) throw sourceUpdate.error;

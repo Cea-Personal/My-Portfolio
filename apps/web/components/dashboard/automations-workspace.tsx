@@ -5,6 +5,7 @@ interface Schedule {
   id: string;
   purpose: string;
   recurrence: string;
+  cron_expression: string;
   timezone: string;
   enabled: boolean;
   next_run_at: string | null;
@@ -36,8 +37,10 @@ async function mutate(endpoint: string, body: unknown, method: "POST" | "PATCH" 
     body: JSON.stringify(body)
   });
   if (!response.ok) {
-    const payload = (await response.json().catch(() => ({}))) as { data?: { code?: string } };
-    throw new Error(payload.data?.code ?? "Request failed");
+    const payload = (await response.json().catch(() => ({}))) as {
+      data?: { code?: string; detail?: string };
+    };
+    throw new Error(payload.data?.detail ?? payload.data?.code ?? "Request failed");
   }
 }
 export function AutomationsWorkspace() {
@@ -66,7 +69,7 @@ export function AutomationsWorkspace() {
     try {
       await mutate("/api/v1/automations", {
         purpose: form.get("purpose"),
-        recurrence: form.get("recurrence"),
+        cronExpression: form.get("cronExpression"),
         timezone: form.get("timezone")
       });
       event.currentTarget.reset();
@@ -130,13 +133,19 @@ export function AutomationsWorkspace() {
           </select>
         </label>
         <label>
-          Recurrence
-          <select name="recurrence">
-            <option>hourly</option>
-            <option>daily</option>
-            <option>weekly</option>
-          </select>
+          Cron schedule
+          <input
+            aria-describedby="cron-help"
+            name="cronExpression"
+            required
+            defaultValue="0 9 * * *"
+            placeholder="0 9 * * *"
+          />
         </label>
+        <p id="cron-help">
+          Five fields: minute, hour, day, month, weekday. For example, <code>30 8 * * 1-5</code>
+          runs at 08:30 every weekday in your selected timezone.
+        </p>
         <label>
           IANA timezone
           <input name="timezone" required defaultValue="Africa/Kigali" />
@@ -149,8 +158,11 @@ export function AutomationsWorkspace() {
           <ul className="workspace-list">
             {schedules.map((schedule) => (
               <li key={schedule.id}>
-                <strong>{schedule.purpose}</strong> · {schedule.recurrence} · {schedule.timezone} ·{" "}
-                {schedule.enabled ? "enabled" : "disabled"}
+                <strong>{schedule.purpose}</strong> · <code>{schedule.cron_expression}</code> ·{" "}
+                {schedule.timezone} · {schedule.enabled ? "enabled" : "disabled"}
+                {schedule.next_run_at
+                  ? ` · next ${new Date(schedule.next_run_at).toLocaleString()}`
+                  : " · next run not calculated"}
                 <button type="button" onClick={() => void toggle(schedule)}>
                   {schedule.enabled ? "Disable" : "Enable"}
                 </button>

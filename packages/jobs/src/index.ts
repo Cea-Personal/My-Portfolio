@@ -1,4 +1,6 @@
 export * from "./adapters/ashby";
+export * from "./adapters/ats";
+export * from "./adapters/structured";
 export * from "./adapters/custom-rest";
 export * from "./adapters/greenhouse";
 export * from "./adapters/lever";
@@ -6,6 +8,7 @@ export * from "./adapters/linkedin-authorized";
 export * from "./adapters/registry";
 export * from "./adapters/rss";
 export * from "./deduplication";
+export * from "./eligibility-filter";
 export * from "./jd-analysis";
 export * from "./jd-score";
 export * from "./job-state";

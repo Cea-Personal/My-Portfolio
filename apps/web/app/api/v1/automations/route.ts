@@ -1,5 +1,6 @@
 import { apiResponse } from "@/lib/api/response";
 import { withPrivateApi } from "@/lib/api/private";
+import { isValidTimeZone, nextCronOccurrence, parseCronExpression } from "@/lib/automation-cron";
 export function GET(request: Request) {
   return withPrivateApi(request, async ({ client, ownerId }) => {
     const [schedules, runs, deadLetters] = await Promise.all([
@@ -40,19 +41,32 @@ export async function POST(request: Request) {
     if (
       typeof body.purpose !== "string" ||
       !["drive_sync", "job_search", "analytics_aggregate"].includes(body.purpose) ||
-      typeof body.recurrence !== "string" ||
-      !["hourly", "daily", "weekly"].includes(body.recurrence)
+      typeof body.cronExpression !== "string" ||
+      !parseCronExpression(body.cronExpression)
     )
-      return apiResponse({ code: "INVALID_AUTOMATION" }, request, 400);
+      return apiResponse(
+        {
+          code: "INVALID_AUTOMATION",
+          detail: "Choose a purpose and provide a valid five-field cron expression."
+        },
+        request,
+        400
+      );
+    const timezone = typeof body.timezone === "string" ? body.timezone : "Africa/Kigali";
+    if (!isValidTimeZone(timezone)) return apiResponse({ code: "INVALID_TIMEZONE" }, request, 400);
+    const nextRunAt = nextCronOccurrence(body.cronExpression, timezone);
+    if (!nextRunAt) return apiResponse({ code: "INVALID_CRON_SCHEDULE" }, request, 400);
     const { data, error } = await client
       .schema("app")
       .from("automation_schedules")
       .insert({
         owner_id: ownerId,
         purpose: body.purpose.slice(0, 120),
-        recurrence: body.recurrence.slice(0, 120),
-        timezone: typeof body.timezone === "string" ? body.timezone : "Africa/Kigali",
-        enabled: false
+        recurrence: "cron",
+        cron_expression: body.cronExpression.trim().slice(0, 120),
+        timezone,
+        enabled: false,
+        next_run_at: nextRunAt.toISOString()
       })
       .select("*")
       .single();

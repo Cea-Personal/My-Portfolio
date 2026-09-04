@@ -1,16 +1,14 @@
 import { contentHash } from "@career-os/documents";
 import { createServiceSupabaseClient } from "@career-os/database/service";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { decryptSecret, encryptSecret, getDriveOAuthConfig } from "@/lib/drive-oauth";
+import {
+  getDriveServiceAccountAccessToken,
+  getDriveServiceAccountConfig
+} from "@/lib/drive-service-account";
 import {
   downloadDriveFile,
-  driveTokenNeedsRefresh,
-  getDriveStartPageToken,
-  listDriveChanges,
   listDriveFiles,
-  refreshDriveToken,
-  type GoogleDriveChange,
-  type StoredDriveToken
+  type GoogleDriveChange
 } from "@/lib/google-drive-client";
 import { inngest } from "./client";
 
@@ -20,19 +18,6 @@ function configuredClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   return url && serviceRoleKey ? createServiceSupabaseClient(url, serviceRoleKey) : null;
-}
-
-function parseStoredToken(value: string): StoredDriveToken {
-  const parsed = JSON.parse(value) as Partial<StoredDriveToken>;
-  if (typeof parsed.access_token !== "string" || typeof parsed.obtained_at !== "string")
-    throw new Error("DRIVE_CREDENTIAL_INVALID");
-  return {
-    access_token: parsed.access_token,
-    refresh_token: typeof parsed.refresh_token === "string" ? parsed.refresh_token : null,
-    expires_in: typeof parsed.expires_in === "number" ? parsed.expires_in : null,
-    token_type: typeof parsed.token_type === "string" ? parsed.token_type : "Bearer",
-    obtained_at: parsed.obtained_at
-  };
 }
 
 function safeObjectName(name: string): string {
@@ -227,14 +212,14 @@ export const driveSync = inngest.createFunction(
     if (!ownerId || !runId) return { status: "failed" as const, reason: "INVALID_SYNC_EVENT" };
     if (!client)
       return { status: "deferred" as const, reason: "SERVICE_CONFIGURATION_MISSING", runId };
-    const oauth = getDriveOAuthConfig();
-    if (!oauth)
+    const driveConfig = getDriveServiceAccountConfig();
+    if (!driveConfig)
       return { status: "deferred" as const, reason: "DRIVE_CONFIGURATION_MISSING", runId };
 
     const { data: run, error: runError } = await client
       .schema("app")
       .from("ingestion_runs")
-      .select("connection_id,status")
+      .select("connection_id,status,workflow_run_id")
       .eq("id", runId)
       .eq("owner_id", ownerId)
       .maybeSingle();
@@ -251,13 +236,21 @@ export const driveSync = inngest.createFunction(
       .eq("id", runId)
       .eq("owner_id", ownerId);
     if (startError) throw startError;
+    if (run.workflow_run_id) {
+      await client
+        .schema("app")
+        .from("automation_runs")
+        .update({ status: "running", started_at: new Date().toISOString(), error_code: null })
+        .eq("id", run.workflow_run_id)
+        .eq("owner_id", ownerId);
+    }
 
     try {
       const result = await step.run("reconcile-drive", async () => {
         const { data: connection, error: connectionError } = await client
           .schema("app")
           .from("integration_connections")
-          .select("id,status,cursor")
+          .select("id,status,connection_type,selected_folder_id")
           .eq("id", connectionId)
           .eq("owner_id", ownerId)
           .eq("provider", "drive")
@@ -265,56 +258,23 @@ export const driveSync = inngest.createFunction(
         if (connectionError) throw connectionError;
         if (!connection || connection.status !== "active")
           throw new Error("DRIVE_RECONNECT_REQUIRED");
-        const { data: credential, error: credentialError } = await client
-          .schema("app")
-          .from("integration_oauth_credentials")
-          .select("ciphertext")
-          .eq("connection_id", connectionId)
-          .maybeSingle();
-        if (credentialError || !credential)
-          throw credentialError ?? new Error("DRIVE_RECONNECT_REQUIRED");
-        let token = parseStoredToken(decryptSecret(credential.ciphertext, oauth.encryptionKey));
-        if (driveTokenNeedsRefresh(token)) {
-          token = await refreshDriveToken(token, oauth.clientId, oauth.clientSecret);
-          const { error } = await client
-            .schema("app")
-            .from("integration_oauth_credentials")
-            .update({
-              ciphertext: encryptSecret(JSON.stringify(token), oauth.encryptionKey),
-              rotated_at: new Date().toISOString()
-            })
-            .eq("connection_id", connectionId);
-          if (error) throw error;
-        }
+        if (
+          connection.connection_type !== "service_account" ||
+          connection.selected_folder_id !== driveConfig.folderId
+        )
+          throw new Error("DRIVE_SHARED_FOLDER_MISMATCH");
+        const accessToken = await getDriveServiceAccountAccessToken(driveConfig);
 
         const changes: GoogleDriveChange[] = [];
-        let nextCursor = typeof connection.cursor === "string" ? connection.cursor : "";
-        if (connection.cursor) {
-          let pageToken = connection.cursor as string;
-          for (let page = 0; page < MAX_SYNC_PAGES; page += 1) {
-            if (await isCancelled(client, runId, ownerId))
-              return { status: "cancelled" as const, changed: 0, unavailable: 0, unchanged: 0 };
-            const pageResult = await listDriveChanges(token.access_token, pageToken);
-            changes.push(...pageResult.changes);
-            if (!pageResult.nextPageToken) {
-              nextCursor = pageResult.newStartPageToken ?? pageToken;
-              break;
-            }
-            pageToken = pageResult.nextPageToken;
-            if (page === MAX_SYNC_PAGES - 1) throw new Error("DRIVE_PAGE_LIMIT_EXCEEDED");
-          }
-        } else {
-          nextCursor = await getDriveStartPageToken(token.access_token);
-          let pageToken: string | undefined;
-          for (let page = 0; page < MAX_SYNC_PAGES; page += 1) {
-            if (await isCancelled(client, runId, ownerId))
-              return { status: "cancelled" as const, changed: 0, unavailable: 0, unchanged: 0 };
-            const pageResult = await listDriveFiles(token.access_token, pageToken);
-            changes.push(...pageResult.changes);
-            pageToken = pageResult.nextPageToken;
-            if (!pageToken) break;
-            if (page === MAX_SYNC_PAGES - 1) throw new Error("DRIVE_PAGE_LIMIT_EXCEEDED");
-          }
+        let pageToken: string | undefined;
+        for (let page = 0; page < MAX_SYNC_PAGES; page += 1) {
+          if (await isCancelled(client, runId, ownerId))
+            return { status: "cancelled" as const, changed: 0, unavailable: 0, unchanged: 0 };
+          const pageResult = await listDriveFiles(accessToken, pageToken, driveConfig.folderId);
+          changes.push(...pageResult.changes);
+          pageToken = pageResult.nextPageToken;
+          if (!pageToken) break;
+          if (page === MAX_SYNC_PAGES - 1) throw new Error("DRIVE_PAGE_LIMIT_EXCEEDED");
         }
 
         const counts = { changed: 0, unavailable: 0, unchanged: 0 };
@@ -322,13 +282,19 @@ export const driveSync = inngest.createFunction(
         for (const change of changes) {
           if (await isCancelled(client, runId, ownerId))
             return { status: "cancelled" as const, ...counts };
+          if (
+            change.file &&
+            change.file.parents?.length &&
+            !change.file.parents.includes(driveConfig.folderId)
+          )
+            continue;
           try {
             const outcome = await persistDriveFile(
               client,
               ownerId,
               connectionId,
               runId,
-              token.access_token,
+              accessToken,
               change
             );
             counts[outcome] += 1;
@@ -338,12 +304,40 @@ export const driveSync = inngest.createFunction(
             permanentErrors.push(`${change.fileId}:${code}`.slice(0, 180));
           }
         }
+        const visibleFileIds = changes.flatMap((change) =>
+          change.file && !change.removed ? [change.file.id] : []
+        );
+        const { data: priorDocuments, error: priorDocumentsError } = await client
+          .schema("app")
+          .from("documents")
+          .select("id,external_file_id")
+          .eq("owner_id", ownerId)
+          .eq("integration_connection_id", connectionId)
+          .eq("availability", "available");
+        if (priorDocumentsError) throw priorDocumentsError;
+        const missingIds = (priorDocuments ?? []).flatMap((document) =>
+          typeof document.id === "string" &&
+          typeof document.external_file_id === "string" &&
+          !visibleFileIds.includes(document.external_file_id)
+            ? [document.id]
+            : []
+        );
+        if (missingIds.length) {
+          const { error: missingError } = await client
+            .schema("app")
+            .from("documents")
+            .update({ availability: "unavailable", removed_at: new Date().toISOString() })
+            .eq("owner_id", ownerId)
+            .in("id", missingIds);
+          if (missingError) throw missingError;
+          counts.unavailable += missingIds.length;
+        }
         const { error: cursorError } = await client
           .schema("app")
           .from("integration_connections")
           .update({
-            cursor: nextCursor,
-            cursor_version: "drive-v3",
+            cursor: null,
+            cursor_version: "shared-folder-v1",
             last_success_at: new Date().toISOString(),
             last_error_code: permanentErrors.length ? "PARTIAL_FILE_FAILURE" : null
           })
@@ -372,6 +366,18 @@ export const driveSync = inngest.createFunction(
         .eq("id", runId)
         .eq("owner_id", ownerId);
       if (finishError) throw finishError;
+      if (run.workflow_run_id) {
+        await client
+          .schema("app")
+          .from("automation_runs")
+          .update({
+            status: result.status,
+            finished_at: new Date().toISOString(),
+            error_code: null
+          })
+          .eq("id", run.workflow_run_id)
+          .eq("owner_id", ownerId);
+      }
       return { ...result, runId, resumable: true };
     } catch (error) {
       const code = error instanceof Error ? error.message.slice(0, 120) : "DRIVE_SYNC_FAILED";
@@ -391,6 +397,14 @@ export const driveSync = inngest.createFunction(
         })
         .eq("id", connectionId)
         .eq("owner_id", ownerId);
+      if (run.workflow_run_id) {
+        await client
+          .schema("app")
+          .from("automation_runs")
+          .update({ status: "failed", finished_at: new Date().toISOString(), error_code: code })
+          .eq("id", run.workflow_run_id)
+          .eq("owner_id", ownerId);
+      }
       throw error;
     }
   }

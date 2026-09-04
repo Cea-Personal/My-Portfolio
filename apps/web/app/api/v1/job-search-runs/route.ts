@@ -9,7 +9,8 @@ export function GET(request: Request) {
       .from("job_search_runs")
       .select("*")
       .eq("owner_id", ownerId)
-      .order("created_at", { ascending: false })
+      // job_search_runs is keyed by logical_date/started_at; it intentionally has no created_at.
+      .order("logical_date", { ascending: false })
       .limit(50);
     if (error) throw error;
     return apiResponse({ runs: data ?? [] }, request);
