@@ -9,5 +9,6 @@
   or required evidence are missing.
 - [x] Inngest trigger registration is split within the ten-trigger platform limit.
 - [ ] Human production approval (required at deployment time).
-- [ ] Hosted pgTAP/RLS suite (`pnpm test:db:hosted`) and cross-engine browser matrix.
+- [x] Hosted pgTAP/RLS suite (`pnpm test:db:hosted`) passed transactionally against the linked project;
+  isolated seeded/object-storage fixture and cross-engine browser matrix remain open.
 - [ ] k6 performance budget and isolated backup/restore drill.

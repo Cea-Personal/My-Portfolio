@@ -746,7 +746,8 @@ path and independent fixture path both pass.
 - T323 is reconciled against executable evidence. T317 now has a guarded hosted runner (`pnpm
   test:db:hosted`) and the Cloud schema is aligned through 0118; the linked project now exposes the
   `api` and `published` PostgREST schemas, and a read-only smoke check confirms the public projections
-  are reachable. Its isolated fixture execution remains open. T318, T319, T320, and T321 remain open because this workstation lacks usable
+  are reachable. The 12-file hosted pgTAP suite also passed transactionally against the linked project;
+  isolated seeded/object-storage fixture execution remains open. T318, T319, T320, and T321 remain open because this workstation lacks usable
   Firefox/WebKit binaries, k6, and an isolated backup/restore environment. T284 remains the umbrella
   release-validation task.
 - T324 remains open until those external gates are run and a final convergence review can truthfully
