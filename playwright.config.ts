@@ -2,6 +2,7 @@ import { defineConfig, devices } from "@playwright/test";
 
 const port = process.env.PLAYWRIGHT_PORT ?? "3000";
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? `http://127.0.0.1:${port}`;
+const startsLocalServer = /^(https?:\/\/)?(localhost|127\.0\.0\.1)(:\d+)?\/?$/.test(baseURL);
 
 export default defineConfig({
   testDir: "./tests",
@@ -21,9 +22,13 @@ export default defineConfig({
     { name: "mobile-chrome", use: { ...devices["Pixel 7"] } },
     { name: "mobile-safari", use: { ...devices["iPhone 15"] } }
   ],
-  webServer: {
-    command: `pnpm --filter @career-os/web exec next dev --hostname 127.0.0.1 --port ${port}`,
-    url: baseURL,
-    reuseExistingServer: !process.env.CI
-  }
+  ...(startsLocalServer
+    ? {
+        webServer: {
+          command: `pnpm --filter @career-os/web exec next dev --hostname 127.0.0.1 --port ${port}`,
+          url: baseURL,
+          reuseExistingServer: !process.env.CI
+        }
+      }
+    : {})
 });

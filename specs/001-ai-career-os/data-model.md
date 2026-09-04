@@ -81,7 +81,8 @@ One row per authenticated owner.
 Reusable private deterministic application data. PK/FK `owner_id`; fields include email, telephone,
 location, country, professional links, notice period, relocation, work authorization, sponsorship,
 languages, education summary, and certification summary. Sensitive voluntary demographic fields are
-intentionally absent.
+intentionally absent. `revision` and `application_profile_versions` preserve changes; `archived_at`
+removes a profile from active selectors without deleting audit or historical application context.
 
 ### `app.integration_connections`
 
@@ -255,7 +256,7 @@ raw URLs not approved for display, and surrounding source text.
 |-------|------------------------|
 | `app.job_sources` | Owner, name, adapter type/version, provider, enabled state, terms/access note, capabilities, and health status. |
 | `app.job_source_configs` | Source, endpoint/connection reference, secret reference, validated headers/parameters/field mappings, rate limits, schedule eligibility, and last test outcome. No plaintext secrets. |
-| `app.job_search_profiles` | Owner, name, target titles/synonyms, seniority, locations, work arrangements, contract/employment types, required/preferred/excluded technologies, industries, authorization, compensation, company preferences, scoring weights, timezone, enabled. |
+| `app.job_search_profiles` | Owner, name, target titles/synonyms, seniority, locations, work arrangements, contract/employment types, required/preferred/excluded technologies, industries, authorization, compensation, company preferences, scoring weights, timezone, enabled, and optional `archived_at` for safe removal from future searches. |
 | `app.automation_schedules` | Owner, purpose, profile/source target, recurrence expression, timezone, jitter, enabled, next run, last run. Consequential actions are not valid purposes. |
 | `app.job_search_runs` | Owner, profile, schedule/manual trigger, logical date, status, result counts, start/end, Inngest run/correlation ID, error summary. Unique profile + logical date + trigger type. |
 | `app.job_search_run_sources` | Run + source, status, attempts, fetched/accepted/rejected counts, rate-limit metadata, sanitized error. |
@@ -264,7 +265,7 @@ raw URLs not approved for display, and surrounding source text.
 
 | Table | Purpose and key fields |
 |-------|------------------------|
-| `app.jobs` | Owner, canonical company/title/location/country, remote/employment/contract types, salary range/currency/period, posted/expiry/discovery dates, status, normalized fingerprint, and current description. |
+| `app.jobs` | Owner, canonical company/title/location/country, remote/employment/contract types, salary range/currency/period, posted/expiry/discovery dates, status, normalized fingerprint, current description, and optional owner-supplied source URL/provider. |
 | `app.job_descriptions` | Job, sequential version, original text hash, normalized text, source, fetched/provided time, language, and active flag. Immutable. |
 | `app.job_source_references` | Job, source, external ID, canonical URL, source payload object/hash, first/last seen, source status. Unique source + external ID or canonical URL. |
 | `app.job_requirements` | Description version, normalized requirement text, category, priority, skills, sequence, extraction model/prompt version, and confidence. |
@@ -279,7 +280,7 @@ automatic merges retain all source references and can be reversed through an aud
 
 | Table | Purpose and key fields |
 |-------|------------------------|
-| `app.applications` | Owner, job, status, started/applied/closed dates, current package, notes, and revision. One active application per owner/job unless explicitly cloned. |
+| `app.applications` | Owner, job, optional selected approved application profile, status, started/applied/closed dates, current package, notes, and revision. One active application per owner/job unless explicitly cloned. |
 | `app.application_status_history` | Application, from/to state, actor, reason, time. Append-only. |
 | `app.application_forms` | Application, source URL, captured time, access method, schema version, status, and source hash. |
 | `app.application_fields` | Form, sequence, label, field type, required, choices, char/word limits, category, conditional rule, sensitive flag. Demographic fields default to manual-only. |

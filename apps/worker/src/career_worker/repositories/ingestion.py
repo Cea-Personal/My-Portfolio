@@ -62,6 +62,8 @@ class SupabaseIngestionStore:
             headers={
                 "apikey": self.service_role_key,
                 "authorization": f"Bearer {self.service_role_key}",
+                "accept-profile": "app",
+                "content-profile": "app",
                 "content-type": "application/json",
                 "prefer": "return=representation",
             },

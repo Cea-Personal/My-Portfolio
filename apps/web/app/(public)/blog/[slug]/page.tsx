@@ -1,13 +1,12 @@
-import { loadPublicPortfolio } from "@/lib/api/public-data";
+import { ArticleBody } from "@/components/portfolio/article-body";
+import { loadPublicBlogPost } from "@/lib/api/public-data";
+import { PublicEvents } from "@/components/analytics/public-events";
 
 export const dynamic = "force-dynamic";
 
 export default async function BlogPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const snapshot = await loadPublicPortfolio();
-  const post = snapshot.items.find(
-    (item) => item.source_entity_type === "post" && item.detail_slug === slug
-  );
+  const post = await loadPublicBlogPost(slug);
   if (!post) {
     return (
       <main>
@@ -18,9 +17,15 @@ export default async function BlogPage({ params }: { params: Promise<{ slug: str
   }
   return (
     <main>
-      <h1>{typeof post.title === "string" ? post.title : "Blog"}</h1>
-      {typeof post.subtitle === "string" ? <p>{post.subtitle}</p> : null}
-      <p>{typeof post.public_summary === "string" ? post.public_summary : ""}</p>
+      <PublicEvents name="article_view" properties={{ article: post.slug }} />
+      <a href="/blog">← All articles</a>
+      <h1>{post.title}</h1>
+      <p>{post.excerpt}</p>
+      <p>
+        {new Date(post.visible_at).toLocaleDateString()} · {post.tags.join(" · ")}
+      </p>
+      <ArticleBody markdown={post.markdown} />
+      <small>Technical knowledge; not independent proof of professional employment.</small>
     </main>
   );
 }

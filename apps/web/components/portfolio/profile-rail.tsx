@@ -6,11 +6,13 @@ interface ProfileLink {
 export function ProfileRail({
   name,
   photoSrc,
-  links = []
+  links = [],
+  statement
 }: {
   name: string;
   photoSrc?: string;
   links?: readonly ProfileLink[];
+  statement?: string;
 }) {
   return (
     <aside className="profile-rail" aria-label={`${name} profile`}>
@@ -37,10 +39,7 @@ export function ProfileRail({
           )
         )}
       </nav>
-      <p className="profile-statement">
-        I engineer software, data platforms, and AI systems that move difficult ideas into reliable
-        production.
-      </p>
+      {statement ? <p className="profile-statement">{statement}</p> : null}
       <div className="profile-availability-wrap">
         <p className="profile-availability">
           <span aria-hidden="true" /> Open to meaningful work

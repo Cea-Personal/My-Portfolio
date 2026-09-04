@@ -8,3 +8,4 @@ export * from "./questions";
 export * from "./schemas";
 export * from "./stages";
 export * from "./star-stories";
+export * from "./auto-preparation";

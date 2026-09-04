@@ -6,7 +6,7 @@ export function GET(request: Request) {
       .schema("app")
       .from("documents")
       .select(
-        "id,name,source_mime,availability,created_at,document_versions(download_status,created_at)"
+        "id,name,source_mime,availability,created_at,document_versions(download_status,evidence_version_id,created_at),ingestion_items(status,stage,sanitized_error,created_at)"
       )
       .eq("owner_id", ownerId)
       .order("created_at", { ascending: false });

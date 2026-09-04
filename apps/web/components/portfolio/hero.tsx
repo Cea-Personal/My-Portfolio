@@ -30,7 +30,7 @@ const career = [
 export function Hero({ name = "Basil Ogbonna" }: { name?: string; headline?: string }) {
   const [roleIndex, setRoleIndex] = useState(0);
   const firstName = name.split(" ")[0] ?? name;
-  const role = roles[roleIndex] ?? roles[0];
+  const role = roles[roleIndex] ?? { label: "Data Engineer", core: "Data" };
 
   useEffect(() => {
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");

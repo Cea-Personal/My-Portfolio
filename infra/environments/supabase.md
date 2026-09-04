@@ -35,10 +35,14 @@ project; no self-hosted Supabase or local Docker runtime is required:
 supabase link --project-ref <staging-project-ref>
 supabase db push --dry-run
 supabase db push
-supabase test db --linked
+SUPABASE_DB_URL='postgresql://...?...sslmode=require' pnpm test:db:hosted
 ```
 
 Use a disposable owner account and fixture-only data. Confirm `published` is readable only for active
 publications, every `app` table denies anonymous and cross-owner access, append-only triggers reject
 updates/deletes, and storage URLs are short-lived. Record the project ref, migration version, fixture
 hash, and test output in the release evidence; never paste credentials into the repository or CI logs.
+
+`pnpm test:db:hosted` reads the PostgreSQL URI from `SUPABASE_DB_URL`, runs every committed
+`supabase/tests/*.test.sql` file with SSL required, and fails closed when the URL or `psql` is missing.
+The URI belongs in CI secrets and must point to the isolated staging project, never production.

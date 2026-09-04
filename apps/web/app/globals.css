@@ -63,6 +63,118 @@ body {
   border: 0;
 }
 
+.assistant-window[hidden] {
+  display: none;
+}
+
+.assistant-modes {
+  display: flex;
+  gap: 0.5rem;
+  padding: 1rem 0;
+  border-block: 1px solid #303743;
+}
+
+.assistant-modes button[aria-selected="false"] {
+  border-color: #536071;
+  background: transparent;
+  color: inherit;
+}
+
+.role-fit-table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.role-fit-results table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.role-fit-results caption {
+  padding-block: 1rem;
+  text-align: left;
+  font-weight: 700;
+}
+
+.role-fit-results th,
+.role-fit-results td {
+  padding: 0.8rem;
+  border-block: 1px solid currentcolor;
+  text-align: left;
+  vertical-align: top;
+}
+
+.role-fit-results td small {
+  display: block;
+  margin-top: 0.35rem;
+}
+
+.workspace-page {
+  width: min(100% - 2rem, 76rem);
+  margin-inline: auto;
+  padding: clamp(2rem, 5vw, 5rem) 0;
+}
+
+.workspace-heading {
+  max-width: 52rem;
+  margin-bottom: 2rem;
+}
+
+.knowledge-entry-form,
+.career-brain-columns > section,
+.workspace-page > section {
+  margin-block: 1.5rem;
+  padding: clamp(1.25rem, 3vw, 2rem);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.knowledge-entry-form {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.career-brain-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.5rem;
+}
+
+.workspace-list {
+  display: grid;
+  gap: 1rem;
+  padding: 0;
+  list-style: none;
+}
+
+.workspace-list > li {
+  padding-block: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.workspace-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.portfolio-empty-state {
+  width: min(100% - 2rem, 56rem);
+  min-height: calc(100vh - 5rem);
+  margin-inline: auto;
+  padding-block: clamp(5rem, 14vw, 10rem);
+}
+
+@media (max-width: 50rem) {
+  .career-brain-columns {
+    grid-template-columns: 1fr;
+  }
+}
+
 a {
   color: var(--accent-dark);
   text-underline-offset: 0.2em;

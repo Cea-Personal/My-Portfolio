@@ -8,13 +8,14 @@ import { PrivateWorkspaceGate } from "../../components/auth/private-workspace-ga
 import { OwnerSignOutButton } from "../../components/auth/owner-sign-out-button";
 
 const links = [
-  ["Overview", "/dashboard"],
   ["Career Brain", "/career-brain"],
   ["Jobs", "/jobs"],
-  ["Documents", "/documents"],
-  ["Blog", "/blog"],
-  ["Analytics", "/analytics"],
-  ["Settings", "/settings/data"]
+  ["Application Kit", "/applications"],
+  ["Interview Kit", "/interviews"],
+  ["Journals", "/journal"],
+  ["Blog", "/blogs"],
+  ["Settings", "/settings"],
+  ["Portfolio", "/"]
 ] as const;
 
 export default async function DashboardLayout({ children }: Readonly<{ children: ReactNode }>) {
@@ -32,12 +33,11 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     <PrivateWorkspaceGate>
       <nav aria-label="Private workspace">
         <a href="/dashboard">Basil Ogbonna · Workspace</a>
-        {links.slice(1).map(([label, href]) => (
+        {links.map(([label, href]) => (
           <a key={href} href={href}>
             {label}
           </a>
         ))}
-        <a href="/">Public portfolio</a>
         <OwnerSignOutButton />
       </nav>
       {children}

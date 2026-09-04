@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 
 from career_worker.health import serve_health
 from career_worker.workflows.serve import serve_inngest
@@ -14,7 +15,7 @@ def build_parser() -> argparse.ArgumentParser:
     serve.add_argument("--port", type=int, default=8080)
     inngest = subparsers.add_parser("inngest", help="Serve the signed workflow endpoint")
     inngest.add_argument("--host", default="127.0.0.1")
-    inngest.add_argument("--port", type=int, default=8288)
+    inngest.add_argument("--port", type=int, default=8081)
     return parser
 
 
@@ -25,11 +26,14 @@ def main() -> None:
     elif args.command == "inngest":
         import os
 
+        parser_secret = os.getenv("CAREER_WORKER_SHARED_SECRET")
+        if not parser_secret and os.getenv("CAREER_WORKER_ENV", "development") != "production":
+            parser_secret = hashlib.sha256(b"career-worker-local-development").hexdigest()
         serve_inngest(
             host=args.host,
             port=args.port,
             signing_key=os.getenv("INNGEST_SIGNING_KEY"),
-            parser_secret=os.getenv("CAREER_WORKER_SHARED_SECRET"),
+            parser_secret=parser_secret,
         )
 
 

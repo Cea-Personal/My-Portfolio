@@ -4,6 +4,7 @@ import { ashbyAdapter } from "./adapters/ashby";
 import { customRestAdapter } from "./adapters/custom-rest";
 import { greenhouseAdapter } from "./adapters/greenhouse";
 import { leverAdapter } from "./adapters/lever";
+import { linkedinAuthorizedAdapter } from "./adapters/linkedin-authorized";
 import { rssAdapter } from "./adapters/rss";
 import { calculateCareerMatch } from "./career-match";
 import { calculateOpportunityScore } from "./opportunity-score";
@@ -15,6 +16,7 @@ const adapters: Record<string, JobSourceAdapter> = {
   "custom-rest": customRestAdapter,
   greenhouse: greenhouseAdapter,
   lever: leverAdapter,
+  "linkedin-authorized": linkedinAuthorizedAdapter,
   rss: rssAdapter
 };
 
@@ -102,7 +104,9 @@ async function persistJob(
     description?: string;
     fingerprint: string;
   },
-  scoringWeights: Record<string, number>
+  sourceProvider: string,
+  scoringWeights: Record<string, number>,
+  searchRunId: string
 ): Promise<JobRecord> {
   const existingResult = await client
     .schema("app")
@@ -125,6 +129,8 @@ async function persistJob(
         canonical_title: job.title,
         location: job.location ?? null,
         current_description: job.description ?? null,
+        ...(job.canonicalUrl ? { source_url: job.canonicalUrl } : {}),
+        source_provider: sourceProvider,
         discovered_at: new Date().toISOString()
       })
       .eq("id", id)
@@ -140,6 +146,8 @@ async function persistJob(
         canonical_title: job.title,
         location: job.location ?? null,
         current_description: job.description ?? null,
+        source_url: job.canonicalUrl ?? null,
+        source_provider: sourceProvider,
         normalized_fingerprint: job.fingerprint,
         status: "discovered"
       })
@@ -217,7 +225,8 @@ async function persistJob(
       factor_values: { evidence: 0 },
       weights: {},
       calculation_version: "career-match.v1",
-      evidence_snapshot: { evidenceIds: [] }
+      evidence_snapshot: { evidenceIds: [], searchRunId },
+      search_run_id: searchRunId
     },
     {
       job_id: id,
@@ -226,10 +235,12 @@ async function persistJob(
       factor_values: opportunity.weights,
       weights: opportunity.weights,
       calculation_version: opportunity.calculationVersion,
-      evidence_snapshot: { sourceId, inputs: opportunity.weights }
+      evidence_snapshot: { sourceId, inputs: opportunity.weights, searchRunId },
+      search_run_id: searchRunId
     }
   ];
   for (const score of scoreRows) {
+    // Each run is an immutable score snapshot; a later run must not overwrite history.
     const existingScore = await client
       .schema("app")
       .from("job_scores")
@@ -237,12 +248,10 @@ async function persistJob(
       .eq("job_id", id)
       .eq("score_type", score.score_type)
       .eq("calculation_version", score.calculation_version)
-      .limit(1)
+      .eq("search_run_id", searchRunId)
       .maybeSingle();
     if (existingScore.error) throw existingScore.error;
     if (!existingScore.data) {
-      // The shared client is intentionally schema-agnostic here; the database migration is
-      // the source of truth for the JSON factor/evidence columns.
       const insertedScore = await client
         .schema("app")
         .from("job_scores")
@@ -263,9 +272,12 @@ function adapterInput(config: Record<string, unknown>, profile: SearchProfile): 
   if (technologies.length) query.technology = technologies.join(",");
   const endpoint = asString(config.endpoint);
   const fieldMapping = asStringRecord(config.field_mapping);
+  const secretRef = asString(config.secret_ref);
+  const secret = secretRef ? process.env[secretRef] : undefined;
   return {
     ...(endpoint ? { endpoint } : {}),
     ...(Object.keys(fieldMapping).length ? { fieldMapping } : {}),
+    ...(secret ? { headers: { authorization: `Bearer ${secret}` } } : {}),
     ...(Object.keys(query).length ? { query } : {})
   };
 }
@@ -314,7 +326,7 @@ async function loadSources(
     const configResult = await client
       .schema("app")
       .from("job_source_configs")
-      .select("endpoint,field_mapping")
+      .select("endpoint,field_mapping,secret_ref")
       .eq("source_id", id)
       .maybeSingle();
     if (configResult.error) {
@@ -369,24 +381,34 @@ export async function executePersistedSearch(input: DurableSearchInput): Promise
     .maybeSingle();
   if (profileResult.error) throw profileResult.error;
   const scoringWeights = asNumberRecord(profileResult.data?.scoring_weights);
-  let persistedJobs = 0;
+  const persistedJobIds = new Set<string>();
   for (const sourceResult of result.sources) {
     const sourceUpdate = await input.client
       .schema("app")
       .from("job_search_run_sources")
       .update({
         status: sourceResult.status,
-        attempts: 1,
+        attempts: sourceResult.attempts,
         accepted_count: sourceResult.jobs.length,
-        fetched_count: sourceResult.jobs.length,
+        fetched_count: sourceResult.fetchedCount,
+        rejected_count: sourceResult.rejectedCount,
         sanitized_error: sourceResult.error ?? null
       })
       .eq("run_id", input.runId)
       .eq("source_id", sourceResult.sourceId);
     if (sourceUpdate.error) throw sourceUpdate.error;
     for (const job of sourceResult.jobs) {
-      await persistJob(input.client, input.ownerId, sourceResult.sourceId, job, scoringWeights);
-      persistedJobs += 1;
+      const persisted = await persistJob(
+        input.client,
+        input.ownerId,
+        sourceResult.sourceId,
+        job,
+        sourceInputs.find((source) => source.id === sourceResult.sourceId)?.adapter.type ??
+          "source_feed",
+        scoringWeights,
+        input.runId
+      );
+      persistedJobIds.add(persisted.id);
     }
   }
   const runUpdate = await input.client
@@ -396,7 +418,7 @@ export async function executePersistedSearch(input: DurableSearchInput): Promise
       status: result.status,
       result_counts: {
         discovered: result.jobs.length,
-        persisted: persistedJobs,
+        persisted: persistedJobIds.size,
         failedSources: result.sources.filter((source) => source.status === "failed").length
       },
       finished_at: new Date().toISOString(),
@@ -410,5 +432,5 @@ export async function executePersistedSearch(input: DurableSearchInput): Promise
     .eq("id", input.runId)
     .eq("owner_id", input.ownerId);
   if (runUpdate.error) throw runUpdate.error;
-  return { status: result.status, jobs: persistedJobs, sources: result.sources };
+  return { status: result.status, jobs: persistedJobIds.size, sources: result.sources };
 }

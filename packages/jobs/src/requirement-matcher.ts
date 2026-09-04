@@ -3,7 +3,23 @@ import type { RetrievalCandidate } from "@career-os/knowledge";
 import { lexicalSearch } from "@career-os/knowledge";
 import type { RequirementScore } from "./jd-score";
 
-const STOP_WORDS = new Set(["and", "the", "with", "for", "from", "that", "this", "you", "your", "are", "will", "have", "must", "required", "preferred"]);
+const STOP_WORDS = new Set([
+  "and",
+  "the",
+  "with",
+  "for",
+  "from",
+  "that",
+  "this",
+  "you",
+  "your",
+  "are",
+  "will",
+  "have",
+  "must",
+  "required",
+  "preferred"
+]);
 
 function terms(value: string): Set<string> {
   return new Set(

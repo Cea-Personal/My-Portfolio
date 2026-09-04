@@ -1,8 +1,8 @@
-# AI Career OS
+# Basil Ogbonna · Portfolio and Career Workspace
 
-AI Career OS is a Next.js portfolio and private career workspace backed by Supabase, Inngest, and an
-isolated Python worker. The public portfolio only reads the active, approved publication; career data,
-documents, applications, and workflow state remain owner-scoped.
+This is Basil Ogbonna's Next.js portfolio and private career workspace backed by Supabase, Inngest,
+and an isolated Python worker. The public portfolio only reads the active, approved publication;
+career data, documents, applications, and workflow state remain owner-scoped.
 
 ## Prerequisites
 
@@ -11,6 +11,7 @@ documents, applications, and workflow state remain owner-scoped.
 - Supabase CLI
 - Docker-compatible runtime for local Supabase (optional when using Supabase Cloud)
 - k6 for the performance command
+- PostgreSQL client (`psql`) for the hosted pgTAP command
 
 ## Install and configure
 
@@ -34,7 +35,7 @@ supabase login
 supabase link --project-ref <project-ref>
 supabase db push --dry-run
 supabase db push
-supabase test db --linked
+SUPABASE_DB_URL='postgresql://...?...sslmode=require' pnpm test:db:hosted
 ```
 
 Set the linked project's URL and anonymous key in `.env.local`, and its service-role key only in the
@@ -75,20 +76,54 @@ Use separate terminals from the repository root:
 ```bash
 pnpm dev:web
 pnpm dev:workflows
-uv run --project apps/worker career-worker serve
+uv run --project apps/worker career-worker inngest
 ```
 
 - Web app: <http://localhost:3000>
 - Inngest development UI: the URL printed by `pnpm dev:workflows`
-- Worker health/workflow server: <http://127.0.0.1:8080>
+- Inngest development server/UI: <http://127.0.0.1:8288>
+- Document parser/indexer: <http://127.0.0.1:8081>
+
+Document vectors are stored in the `app.chunk_embeddings.embedding` column, not in the `public`
+schema. In Supabase Studio, select the `app` schema and open `chunk_embeddings`; source text chunks
+are in `app.evidence_chunks`. The `vector` extension may appear under `public` in Studio—this is the
+type provider and does not require vector-bearing tables to live in `public`. Uploading alone creates
+a private binary; keep both the Inngest development server and parser/indexer above running, then use
+**Index knowledge** on `/documents`. The status changes to `indexed` only after a durable ingestion
+run creates the evidence version, chunks, and embeddings.
+
+Local development uses a parser-only default secret when none is configured. Deployed environments
+must set the same strong `CAREER_WORKER_SHARED_SECRET` on the Web/Inngest runtime and worker runtime;
+production has no default and fails closed when either the worker URL or secret is absent.
 
 Supabase Cloud is the database, authentication, and API layer; it does not host the Next.js user
 interface. Open the Web app URL above (or deploy `apps/web` to a Next.js host and set
 `NEXT_PUBLIC_APP_URL` to that deployed URL).
 
-The public page is `/`. Private workspaces include `/dashboard`, `/career-brain`, `/documents`,
-`/jobs`, `/applications/<id>`, and `/interviews/<id>`. Sign-in uses the Supabase Auth callback at
+The public page is `/`. Private tabs are Career Brain, Jobs, Application Kit, Interview Kit, Journals,
+Blog, Settings, and Portfolio. Settings contains documents, analytics, agents, automations, search
+profiles, job sources, providers, and exports. Sign-in uses the Supabase Auth callback at
 `/auth/callback`.
+
+Application Kit keeps CVs and cover letters attached to the job application that produced them. Use
+the material composer in an application to create versioned drafts, then review or download them
+from Application Kit (or the CV/Cover Letters history pages). Application profiles can be edited in
+place; deleting one archives it, clears any application selections, and removes it from future
+dropdowns without destroying the audit history. Search profiles support the same edit/archive flow
+under **Settings → Search profiles**.
+
+### LinkedIn job intake and interview packages
+
+In **Jobs**, paste a LinkedIn listing URL while entering its title, company, and description. The
+owner-supplied URL is retained as a reference; the app does not scrape LinkedIn. For automated
+discovery, configure **LinkedIn (authorized feed)** under **Settings → Job sources** with an
+authorized or licensed provider endpoint and a terms/access note.
+
+In **Interview Kit**, create a process from an application and choose **Generate / refresh interview
+package**. The planner reads the selected job description, infers stages when evidence is present (or
+labels the process unknown), compares indexed private CV excerpts, and maps only approved Career Brain
+evidence to confidence-labelled questions, preparation guidance, and evidence gaps. No live interview
+joining, transcription, or hidden assistance is provided.
 
 To add Basil's hero portrait, place the image in `apps/web/public/images/` and set, for example,
 `NEXT_PUBLIC_PROFILE_IMAGE_URL=/images/basil-ogbonna.jpg` in `.env.local`. The hero displays a styled
@@ -147,6 +182,16 @@ pnpm test:e2e
 pnpm test:a11y
 pnpm test:performance
 ```
+
+For the release gate, provide an isolated Cloud database connection URL (never a production URL) and run
+the hosted SQL suite directly with `psql`:
+
+```bash
+SUPABASE_DB_URL='postgresql://...?...sslmode=require' pnpm test:db:hosted
+```
+
+The release workflow requires this value as the `SUPABASE_DB_URL` secret, installs the PostgreSQL client,
+and fails closed if the URL or any other hosted fixture credential is missing.
 
 Keep release evidence in `docs/validation/release-evidence.md`. Hosted migration, backup/restore, and
 production promotion checks require a dedicated staging project and human approval; never use personal

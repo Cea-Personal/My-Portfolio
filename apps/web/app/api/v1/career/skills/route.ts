@@ -24,6 +24,9 @@ export async function POST(request: Request) {
         name: body.name.slice(0, 160),
         category: typeof body.category === "string" ? body.category.slice(0, 120) : null,
         description: typeof body.description === "string" ? body.description.slice(0, 2000) : null,
+        self_assessment: ["possessed", "learning", "not_possessed"].includes(body.selfAssessment)
+          ? body.selfAssessment
+          : "possessed",
         visibility: "private"
       })
       .select("*")

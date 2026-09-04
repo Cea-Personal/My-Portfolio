@@ -11,6 +11,7 @@ const suggestions = [
 ] as const;
 
 export function AskShell() {
+  const [mode, setMode] = useState<"question" | "fit">("question");
   const [question, setQuestion] = useState("");
   const [submittedQuestion, setSubmittedQuestion] = useState<string | null>(null);
   const [answer, setAnswer] = useState<string | null>(null);
@@ -55,14 +56,44 @@ export function AskShell() {
       <header className="assistant-header">
         <div>
           <p className="eyebrow">Interactive proof</p>
-          <h2 id="ask-title">Ask AI</h2>
+          <h2 id="ask-title">Ask Basil</h2>
         </div>
         <span className="assistant-ready">
           <i aria-hidden="true" /> evidence tool ready
         </span>
       </header>
 
-      <div className="assistant-window">
+      <div className="assistant-modes" role="tablist" aria-label="Ask Basil modes">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mode === "question"}
+          aria-controls="portfolio-question-panel"
+          onClick={() => {
+            setMode("question");
+          }}
+        >
+          Ask the portfolio
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mode === "fit"}
+          aria-controls="role-fit-panel"
+          onClick={() => {
+            setMode("fit");
+          }}
+        >
+          How do I fit?
+        </button>
+      </div>
+
+      <div
+        className="assistant-window"
+        id="portfolio-question-panel"
+        role="tabpanel"
+        hidden={mode !== "question"}
+      >
         <div className="assistant-intro">
           <span aria-hidden="true">BO</span>
           <p>
@@ -161,6 +192,8 @@ export function AskShell() {
             {status === "loading" ? "…" : "↑"}
           </button>
         </form>
+      </div>
+      <div className="assistant-window" id="role-fit-panel" role="tabpanel" hidden={mode !== "fit"}>
         <RoleFit />
       </div>
     </section>

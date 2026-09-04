@@ -14,19 +14,16 @@ export function GET(request: Request) {
   });
 }
 export async function POST(request: Request) {
-  return withPrivateApi(request, async ({ client, ownerId }) => {
-    const body = await request.json().catch(() => ({}));
-    const { data, error } = await client
+  return withPrivateApi(request, async ({ client }) => {
+    const requestedKey = request.headers.get("idempotency-key") ?? `export:${crypto.randomUUID()}`;
+    const { data: exportId, error } = await client
       .schema("app")
-      .from("export_requests")
-      .insert({
-        owner_id: ownerId,
-        format: body.format === "zip" ? "zip" : "json",
-        status: "queued"
-      })
-      .select("*")
-      .single();
-    if (error || !data) throw error ?? new Error("EXPORT_CREATE_FAILED");
-    return apiResponse({ export: data, status: data.status }, request, 202);
+      .rpc("request_data_export", { requested_key: requestedKey });
+    if (error || !exportId) throw error ?? new Error("EXPORT_CREATE_FAILED");
+    return apiResponse(
+      { export: { id: exportId, format: "json" }, status: "queued" },
+      request,
+      202
+    );
   });
 }

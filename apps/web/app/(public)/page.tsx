@@ -11,12 +11,16 @@ import { PageIntro } from "../../components/portfolio/page-intro";
 import { ProfileRail } from "../../components/portfolio/profile-rail";
 import { EngineeringProcesses } from "../../components/portfolio/engineering-processes";
 import type { CareerTimelineStage } from "../../components/portfolio/career-timeline";
-import { loadPublicPortfolio } from "@/lib/api/public-data";
+import { loadPublicBlogPosts, loadPublicPortfolio } from "@/lib/api/public-data";
+import { PublicEvents } from "@/components/analytics/public-events";
 
 export const dynamic = "force-dynamic";
 
 export default async function PublicPortfolioPage() {
-  const snapshot = await loadPublicPortfolio();
+  const [snapshot, publishedPosts] = await Promise.all([
+    loadPublicPortfolio(),
+    loadPublicBlogPosts()
+  ]);
   const items = snapshot.items;
   const profile = snapshot.publication;
   // if (!profile) {
@@ -48,14 +52,28 @@ export default async function PublicPortfolioPage() {
       ? configuredHeadline
       : "Senior Data Engineer";
   const careerItems = items.filter(
-    (item) => item.section === "experience" && item.title === "Experience"
+    (item) =>
+      item.source_entity_type === "experience" ||
+      item.source_entity_type === "career_experience" ||
+      (item.section === "experience" && String(item.title).toLowerCase() === "experience")
   );
-  const projectItems = items.filter((item) => item.section === "projects");
+  const projectItems = items.filter(
+    (item) => item.section === "projects" || item.source_entity_type === "project"
+  );
   const impactItems = items.filter(
-    (item) => item.section === "experience" && item.title === "Achievement"
+    (item) =>
+      item.source_entity_type === "achievement" ||
+      (item.section === "experience" && String(item.title).toLowerCase() === "achievement")
   );
-  const skillItems = items.filter((item) => item.title === "Skill");
-  const writingItems = items.filter((item) => item.section === "blog");
+  const skillItems = items.filter(
+    (item) => item.source_entity_type === "skill" || String(item.title).toLowerCase() === "skill"
+  );
+  const writingItems = items.filter(
+    (item) => item.section === "blog" || item.source_entity_type === "post"
+  );
+  const aboutItems = items.filter(
+    (item) => item.section === "about" || item.source_entity_type === "profile"
+  );
   const text = (value: unknown, fallback = "") => (typeof value === "string" ? value : fallback);
   const list = (value: unknown) =>
     Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
@@ -68,50 +86,45 @@ export default async function PublicPortfolioPage() {
   const stageKey = (item: Record<string, unknown>) => identities(item)[0] ?? "career stage";
   const timelineStages: CareerTimelineStage[] = Array.from(
     new Map(careerItems.map((item) => [stageKey(item), item])).values()
-  ).map(
-        (item) => {
-          const key = stageKey(item);
-          const stageProjects = projectItems
-            .filter((project) => identities(project).includes(key))
-            .map((project) => {
-              const href = slugHref(project);
-              return {
-                title: text(project.title, "Project"),
-                summary: text(project.public_summary),
-                ...(href ? { href } : {})
-              };
-            });
-          const stageImpacts = impactItems
-            .filter((impact) => identities(impact).includes(key))
-            .flatMap((impact) => [text(impact.display_metric, text(impact.public_summary))])
-            .filter(Boolean);
-          const directImpact = text(item.display_metric);
-          if (directImpact) stageImpacts.unshift(directImpact);
-          const stageSkills = [
-            ...skillItems
-              .filter((skill) => identities(skill).includes(key))
-              .map((skill) => text(skill.title)),
-            ...list(item.display_technologies)
-          ].filter(Boolean);
-          const company = text(
-            item.company_name,
-            text(item.organization_name, text(item.subtitle))
-          );
-          const period = text(
-            item.period,
-            [text(item.start_date), text(item.end_date)].filter(Boolean).join(" — ")
-          );
-          return {
-            title: text(item.title, "Career stage"),
-            summary: text(item.public_summary),
-            ...(company ? { company } : {}),
-            ...(period ? { period } : {}),
-            ...(stageProjects.length ? { projects: stageProjects } : {}),
-            ...(stageImpacts.length ? { impacts: stageImpacts } : {}),
-            ...(stageSkills.length ? { skills: [...new Set(stageSkills)] } : {})
-          };
-        }
-      );
+  ).map((item) => {
+    const key = stageKey(item);
+    const stageProjects = projectItems
+      .filter((project) => identities(project).includes(key))
+      .map((project) => {
+        const href = slugHref(project);
+        return {
+          title: text(project.title, "Project"),
+          summary: text(project.public_summary),
+          ...(href ? { href } : {})
+        };
+      });
+    const stageImpacts = impactItems
+      .filter((impact) => identities(impact).includes(key))
+      .flatMap((impact) => [text(impact.display_metric, text(impact.public_summary))])
+      .filter(Boolean);
+    const directImpact = text(item.display_metric);
+    if (directImpact) stageImpacts.unshift(directImpact);
+    const stageSkills = [
+      ...skillItems
+        .filter((skill) => identities(skill).includes(key))
+        .map((skill) => text(skill.title)),
+      ...list(item.display_technologies)
+    ].filter(Boolean);
+    const company = text(item.company_name, text(item.organization_name, text(item.subtitle)));
+    const period = text(
+      item.period,
+      [text(item.start_date), text(item.end_date)].filter(Boolean).join(" — ")
+    );
+    return {
+      title: text(item.title, "Career stage"),
+      summary: text(item.public_summary),
+      ...(company ? { company } : {}),
+      ...(period ? { period } : {}),
+      ...(stageProjects.length ? { projects: stageProjects } : {}),
+      ...(stageImpacts.length ? { impacts: stageImpacts } : {}),
+      ...(stageSkills.length ? { skills: [...new Set(stageSkills)] } : {})
+    };
+  });
   const timelineProjectIds = new Set(
     timelineStages.flatMap((stage) => (stage.projects ?? []).map((project) => project.title))
   );
@@ -121,10 +134,7 @@ export default async function PublicPortfolioPage() {
   // Use the included local portrait when a deployment does not supply an external image URL.
   const profileImage =
     process.env.NEXT_PUBLIC_PROFILE_IMAGE_URL?.trim() || "/images/basil-ogbonna.jpg";
-  const bio =
-    typeof profile?.bio === "string"
-      ? profile.bio
-      : "I build software, data, and AI systems with a focus on clarity, reliability, and useful outcomes.";
+  const bio = text(aboutItems[0]?.public_summary);
   const safeHref = (value: unknown) => {
     const href = text(value).trim();
     return /^(?:https?:\/\/|mailto:)/i.test(href) ? href : "";
@@ -181,36 +191,52 @@ export default async function PublicPortfolioPage() {
       ...(image ? { image } : {})
     };
   });
+  const portfolioSourceUrl = safeHref(process.env.NEXT_PUBLIC_PORTFOLIO_SOURCE_URL);
   return (
     <>
+      <PublicEvents
+        sections={["about", "experience", "projects", "ask-basil", "blog", "contact"]}
+      />
       <PageIntro name={displayName} />
       <PortfolioNavigation />
-      <main id="main-content" className="portfolio-main">
+      <main id="main-content" className="portfolio-main" tabIndex={-1}>
         <PortfolioMotion />
         <div className="portfolio-layout">
           <ProfileRail
             name={displayName}
             {...(profileImage ? { photoSrc: profileImage } : {})}
             links={profileLinks}
+            {...(bio ? { statement: bio } : {})}
           />
           <div className="portfolio-stream">
             <Hero name={displayName} headline={headline} />
-            <About bio={bio} />
+            <About {...(bio ? { bio } : {})} />
             <EngineeringProcesses />
             <CareerTimeline stages={timelineStages} />
-            <Projects items={renderedProjects} />
+            <Projects
+              items={renderedProjects}
+              {...(portfolioSourceUrl ? { portfolioSourceUrl } : {})}
+            />
             <div className="intelligence-grid">
               <AskShell />
             </div>
             <Writing
-              items={writingItems.map((item) => ({
-                title: text(item.title),
-                summary: text(item.public_summary),
-                ...(text(item.detail_slug)
-                  ? { href: `/blog/${encodeURIComponent(text(item.detail_slug))}` }
-                  : {}),
-                ...(text(item.subtitle) ? { meta: text(item.subtitle) } : {})
-              }))}
+              items={[
+                ...publishedPosts.map((post) => ({
+                  title: post.title,
+                  summary: post.excerpt,
+                  href: `/blog/${encodeURIComponent(post.slug)}`,
+                  meta: new Date(post.visible_at).toLocaleDateString()
+                })),
+                ...writingItems.map((item) => ({
+                  title: text(item.title),
+                  summary: text(item.public_summary),
+                  ...(text(item.detail_slug)
+                    ? { href: `/blog/${encodeURIComponent(text(item.detail_slug))}` }
+                    : {}),
+                  ...(text(item.subtitle) ? { meta: text(item.subtitle) } : {})
+                }))
+              ]}
             />
             <Contact {...(email ? { email } : {})} />
           </div>

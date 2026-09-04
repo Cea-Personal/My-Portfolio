@@ -1,7 +1,8 @@
 import { PortfolioProof } from "./portfolio-proof";
 
 export function Projects({
-  items = []
+  items = [],
+  portfolioSourceUrl
 }: {
   items?: readonly {
     title: string;
@@ -11,6 +12,7 @@ export function Projects({
     meta?: string;
     image?: string;
   }[];
+  portfolioSourceUrl?: string;
 }) {
   return (
     <section id="projects" className="projects-section" aria-labelledby="projects-title">
@@ -21,7 +23,7 @@ export function Projects({
           Working systems and technical experiments, each with a public path to inspect or try it.
         </span>
       </header>
-      <PortfolioProof />
+      <PortfolioProof {...(portfolioSourceUrl ? { sourceUrl: portfolioSourceUrl } : {})} />
       {items.length ? (
         <ol className="project-chapters">
           {items.map((item, index) => (

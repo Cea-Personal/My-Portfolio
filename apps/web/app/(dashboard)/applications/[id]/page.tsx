@@ -1,6 +1,6 @@
-import { ApplicationDetail } from "@/components/dashboard/application-detail";
+import { ApplicationDetailWorkspace } from "@/components/dashboard/applications/detail-workspace";
 
 export default async function ApplicationPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  return <ApplicationDetail id={id} />;
+  return <ApplicationDetailWorkspace id={id} />;
 }

@@ -6,5 +6,5 @@ it("calculates reproducible opportunity scores and valid transitions", () => {
   expect(
     calculateOpportunityScore({ alignment: 1, growth: 1, compensation: 1, logistics: 1 }).score
   ).toBe("1.0000");
-  expect(transitionJob("discovered", "reviewing")).toBe("reviewing");
+  expect(transitionJob("discovered", "shortlisted")).toBe("shortlisted");
 });

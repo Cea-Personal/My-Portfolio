@@ -2,6 +2,7 @@ export * from "./adapters/ashby";
 export * from "./adapters/custom-rest";
 export * from "./adapters/greenhouse";
 export * from "./adapters/lever";
+export * from "./adapters/linkedin-authorized";
 export * from "./adapters/registry";
 export * from "./adapters/rss";
 export * from "./deduplication";

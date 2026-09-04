@@ -9,6 +9,7 @@ export interface JobSourceInput {
   endpoint?: string;
   fieldMapping?: Record<string, string>;
   query?: Record<string, string | number | boolean>;
+  headers?: Readonly<Record<string, string>>;
   fetcher?: typeof fetch;
   signal?: AbortSignal;
 }
@@ -37,6 +38,7 @@ export async function fetchSourceJson(input: JobSourceInput): Promise<unknown> {
     : controller.signal;
   try {
     const response = await (input.fetcher ?? fetch)(url, {
+      ...(input.headers ? { headers: input.headers } : {}),
       signal
     });
     if (!response.ok) throw new Error(`SOURCE_HTTP_${response.status}`);
@@ -59,6 +61,7 @@ export async function fetchSourceText(input: JobSourceInput): Promise<string> {
     : controller.signal;
   try {
     const response = await (input.fetcher ?? fetch)(url, {
+      ...(input.headers ? { headers: input.headers } : {}),
       signal
     });
     if (!response.ok) throw new Error(`SOURCE_HTTP_${response.status}`);

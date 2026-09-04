@@ -5,11 +5,12 @@ import { createBrowserSupabaseClient } from "@career-os/database/browser";
 
 export default function DocumentsPage() {
   const [documents, setDocuments] = useState<
-    readonly { id: string; name: string; status: string }[]
+    readonly { id: string; name: string; status: string; error?: string }[]
   >([]);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [file, setFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
+  const [reprocessingId, setReprocessingId] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   useEffect(() => {
     let active = true;
@@ -21,7 +22,17 @@ export default function DocumentsPage() {
             id?: string;
             name?: string;
             availability?: string;
-            document_versions?: readonly { download_status?: string }[];
+            document_versions?: readonly {
+              download_status?: string;
+              evidence_version_id?: string | null;
+              created_at?: string;
+            }[];
+            ingestion_items?: readonly {
+              status?: string;
+              stage?: string;
+              sanitized_error?: string | null;
+              created_at?: string;
+            }[];
           }[];
         };
         if (active) {
@@ -29,14 +40,26 @@ export default function DocumentsPage() {
             (payload.data ?? []).flatMap((document) =>
               typeof document.id === "string"
                 ? [
-                    {
-                      id: document.id,
-                      name: document.name ?? "Untitled document",
-                      status:
-                        document.document_versions?.[0]?.download_status ??
-                        document.availability ??
-                        "pending"
-                    }
+                    (() => {
+                      const version = [...(document.document_versions ?? [])].sort((left, right) =>
+                        String(right.created_at).localeCompare(String(left.created_at))
+                      )[0];
+                      const ingestion = [...(document.ingestion_items ?? [])].sort((left, right) =>
+                        String(right.created_at).localeCompare(String(left.created_at))
+                      )[0];
+                      return {
+                        id: document.id,
+                        name: document.name ?? "Untitled document",
+                        status: version?.evidence_version_id
+                          ? "indexed"
+                          : ingestion?.status === "failed"
+                            ? "indexing failed"
+                            : ingestion?.status === "pending" || ingestion?.status === "running"
+                              ? `${ingestion.stage ?? "indexing"} · ${ingestion.status}`
+                              : (version?.download_status ?? document.availability ?? "pending"),
+                        ...(ingestion?.sanitized_error ? { error: ingestion.sanitized_error } : {})
+                      };
+                    })()
                   ]
                 : []
             )
@@ -102,6 +125,37 @@ export default function DocumentsPage() {
     }
   }
 
+  async function reprocessDocument(documentId: string) {
+    setReprocessingId(documentId);
+    setSaveError(null);
+    try {
+      const response = await fetch(`/api/v1/documents/${documentId}/reprocess`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "idempotency-key": `document-reprocess-${documentId}-${crypto.randomUUID()}`
+        },
+        body: "{}"
+      });
+      const payload = (await response.json().catch(() => null)) as {
+        data?: { detail?: string };
+      } | null;
+      if (!response.ok)
+        throw new Error(payload?.data?.detail ?? "Document indexing could not be started.");
+      setDocuments((current) =>
+        current.map((document) =>
+          document.id === documentId ? { ...document, status: "indexing · pending" } : document
+        )
+      );
+    } catch (error) {
+      setSaveError(
+        error instanceof Error ? error.message : "Document indexing could not be started."
+      );
+    } finally {
+      setReprocessingId(null);
+    }
+  }
+
   return (
     <main>
       <h1>Documents</h1>
@@ -131,7 +185,17 @@ export default function DocumentsPage() {
         <ul>
           {documents.map((document) => (
             <li key={document.id}>
-              {document.name} <span>— {document.status}</span>
+              <strong>{document.name}</strong> <span>— {document.status}</span>
+              {document.error ? <small>{document.error}</small> : null}
+              {document.status !== "indexed" ? (
+                <button
+                  disabled={reprocessingId === document.id}
+                  onClick={() => void reprocessDocument(document.id)}
+                  type="button"
+                >
+                  {reprocessingId === document.id ? "Starting indexing…" : "Index knowledge"}
+                </button>
+              ) : null}
             </li>
           ))}
         </ul>

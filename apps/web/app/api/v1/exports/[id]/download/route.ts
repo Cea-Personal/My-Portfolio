@@ -14,10 +14,18 @@ export function GET(request: Request, { params }: { params: Promise<{ id: string
     if (error) throw error;
     if (!data) return apiResponse(null, request, 404);
     const expired = data.expires_at ? new Date(data.expires_at).getTime() <= Date.now() : true;
-    return apiResponse(
-      { downloadUrl: null, status: expired ? "expired" : data.status },
-      request,
-      expired ? 410 : 200
-    );
+    if (expired) return apiResponse({ code: "EXPORT_EXPIRED" }, request, 410);
+    if (data.status !== "completed" || !data.object_key)
+      return apiResponse({ status: data.status, code: "EXPORT_NOT_READY" }, request, 409);
+    const object = await client.storage.from("private-artifact").download(data.object_key);
+    if (object.error || !object.data)
+      return apiResponse({ code: "EXPORT_OBJECT_UNAVAILABLE" }, request, 404);
+    return new Response(await object.data.arrayBuffer(), {
+      headers: {
+        "content-type": "application/json",
+        "content-disposition": `attachment; filename="career-os-export-${id}.json"`,
+        "cache-control": "private, no-store"
+      }
+    });
   });
 }

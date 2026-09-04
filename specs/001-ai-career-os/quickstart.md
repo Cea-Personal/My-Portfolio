@@ -41,6 +41,7 @@ Populate only test values. Required classes of configuration:
 
 - public Supabase URL and anonymous key;
 - server-only database/service credentials;
+- an isolated hosted PostgreSQL connection URL for the release pgTAP gate;
 - Inngest signing/event keys for the local environment;
 - selected AI provider test credentials and approved model aliases;
 - Google OAuth client for the test folder;
@@ -95,8 +96,8 @@ For a release candidate, repeat database validation against an isolated hosted S
 ```bash
 supabase link --project-ref "$SUPABASE_STAGING_PROJECT_REF"
 supabase db push --dry-run
-supabase test db --linked
 supabase db lint --linked
+SUPABASE_DB_URL="$SUPABASE_DB_URL" pnpm test:db:hosted
 ```
 
 The staging project must contain acceptance fixtures only. Missing staging configuration fails the

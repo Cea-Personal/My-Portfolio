@@ -18,8 +18,23 @@ jobs:
         with: { node-version: 24, cache: pnpm }
       - uses: astral-sh/setup-uv@v6
         with: { version: 0.7.19, python-version: 3.13.5 }
+      - uses: grafana/setup-k6-action@v1
       - run: pnpm install --frozen-lockfile
       - run: uv sync --project apps/worker --locked
+      - run: pnpm exec playwright install --with-deps chromium firefox webkit
+      - name: Fail-closed release preflight
+        env:
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PLAYWRIGHT_BASE_URL: ${{ vars.PLAYWRIGHT_BASE_URL }}
+          E2E_ALLOW_MUTATIONS: "true"
+          E2E_OWNER_EMAIL: ${{ secrets.E2E_OWNER_EMAIL }}
+          E2E_OWNER_PASSWORD: ${{ secrets.E2E_OWNER_PASSWORD }}
+          E2E_NON_OWNER_EMAIL: ${{ secrets.E2E_NON_OWNER_EMAIL }}
+          E2E_NON_OWNER_PASSWORD: ${{ secrets.E2E_NON_OWNER_PASSWORD }}
+          GOOGLE_DRIVE_CLIENT_SECRET: ${{ secrets.GOOGLE_DRIVE_CLIENT_SECRET }}
+        run: pnpm release:preflight
       - run: pnpm format:check
       - run: pnpm lint
       - run: pnpm typecheck
@@ -34,19 +49,43 @@ jobs:
           SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
-          if [ -z "$SUPABASE_PROJECT_REF" ]; then echo "Hosted Supabase staging is not configured; dry run deferred."; exit 0; fi
           supabase link --project-ref "$SUPABASE_PROJECT_REF"
           supabase db push --dry-run
       - name: Hosted Supabase acceptance checks
         env:
-          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
-          if [ -z "$SUPABASE_PROJECT_REF" ]; then echo "Hosted Supabase staging is not configured; acceptance checks deferred."; exit 0; fi
-          supabase test db --linked
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+          pnpm test:db:hosted
       - name: Worker canary
         run: uv run --project apps/worker pytest -c apps/worker/pytest.ini --rootdir=apps/worker apps/worker/tests/test_health.py apps/worker/tests/test_ingestion_pipeline.py
       - run: pnpm test:ai-evals
       - run: pnpm build
+      - name: Browser and accessibility matrix
+        env:
+          PLAYWRIGHT_BASE_URL: ${{ vars.PLAYWRIGHT_BASE_URL }}
+          E2E_ALLOW_MUTATIONS: "true"
+          E2E_OWNER_EMAIL: ${{ secrets.E2E_OWNER_EMAIL }}
+          E2E_OWNER_PASSWORD: ${{ secrets.E2E_OWNER_PASSWORD }}
+          E2E_NON_OWNER_EMAIL: ${{ secrets.E2E_NON_OWNER_EMAIL }}
+          E2E_NON_OWNER_PASSWORD: ${{ secrets.E2E_NON_OWNER_PASSWORD }}
+          GOOGLE_DRIVE_CLIENT_SECRET: ${{ secrets.GOOGLE_DRIVE_CLIENT_SECRET }}
+        run: pnpm test:e2e && pnpm test:a11y
+      - name: Performance budgets
+        env:
+          BASE_URL: ${{ vars.PLAYWRIGHT_BASE_URL }}
+        run: pnpm test:performance
+      - name: Attach release evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-evidence-${{ github.run_id }}
+          path: |
+            playwright-report/
+            test-results/
+            specs/001-ai-career-os/validation/
+          if-no-files-found: error
+          retention-days: 30
       - name: Human production approval
         run: echo "Promotion is gated by the protected production environment."

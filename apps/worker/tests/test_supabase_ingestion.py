@@ -22,6 +22,8 @@ def test_supabase_store_scopes_source_version_lookup_to_owner() -> None:
         store.close()
 
     assert len(requests) == 2
+    assert requests[0].headers["accept-profile"] == "app"
+    assert requests[0].headers["content-profile"] == "app"
     assert "owner_id=eq.owner" in str(requests[0].url)
     assert "normalized_text_sha256=eq.hash" in str(requests[1].url)
 

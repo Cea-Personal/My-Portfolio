@@ -1,9 +1,16 @@
 import { verifyPublicClaim } from "../claim-verifier";
 import { hybridPublicRetrieval } from "@career-os/knowledge";
+import { hostilePublicInput } from "../input-safety";
 export function answerPublicQuestion(
   question: string,
   evidence: readonly { handle: string; text: string; source?: string }[]
 ): { answer: string; citations: string[]; abstained: boolean } {
+  if (hostilePublicInput(question))
+    return {
+      answer: "I don't have enough approved public evidence to answer that.",
+      citations: [],
+      abstained: true
+    };
   const byHandle = new Map(evidence.map((item) => [item.handle, item]));
   const selected = hybridPublicRetrieval(
     question,

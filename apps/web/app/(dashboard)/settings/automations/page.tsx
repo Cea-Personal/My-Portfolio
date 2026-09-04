@@ -1,12 +1,5 @@
-import { ResourceList } from "@/components/dashboard/resource-list";
+import { AutomationsWorkspace } from "@/components/dashboard/automations-workspace";
 
 export default function AutomationsSettingsPage() {
-  return (
-    <ResourceList
-      endpoint="/api/v1/automations"
-      title="Automations"
-      description="Enable bounded, informational workflows and inspect their next run."
-      emptyText="No automation schedules yet."
-    />
-  );
+  return <AutomationsWorkspace />;
 }

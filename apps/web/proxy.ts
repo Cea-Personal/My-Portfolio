@@ -6,11 +6,18 @@ export function proxy(request: NextRequest) {
   const privatePage = [
     "/dashboard",
     "/analytics",
-    "/blog",
+    "/blogs",
     "/career-brain",
     "/documents",
     "/jobs",
-    "/settings"
+    "/settings",
+    "/applications",
+    "/interviews",
+    "/journal",
+    "/agents",
+    "/automations",
+    "/cvs",
+    "/cover-letters"
   ].some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
   const providerCallback =
     path.includes("/integrations/drive/callback") || path.includes("/integrations/drive/webhook");

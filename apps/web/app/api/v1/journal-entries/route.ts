@@ -1,5 +1,6 @@
 import { apiResponse } from "@/lib/api/response";
 import { withPrivateApi } from "@/lib/api/private";
+import { createHash } from "node:crypto";
 export function GET(request: Request) {
   return withPrivateApi(request, async ({ client, ownerId }) => {
     const { data, error } = await client
@@ -9,7 +10,7 @@ export function GET(request: Request) {
       .eq("owner_id", ownerId)
       .order("created_at", { ascending: false });
     if (error) throw error;
-    return apiResponse(data ?? [], request);
+    return apiResponse({ entries: data ?? [] }, request);
   });
 }
 export async function POST(request: Request) {
@@ -20,14 +21,22 @@ export async function POST(request: Request) {
     const { data: entry, error } = await client
       .schema("app")
       .from("journal_entries")
-      .insert({ owner_id: ownerId })
+      .insert({
+        owner_id: ownerId,
+        title: typeof body.title === "string" ? body.title.trim().slice(0, 240) : "Journal entry",
+        entry_date:
+          typeof body.entryDate === "string"
+            ? body.entryDate
+            : new Date().toISOString().slice(0, 10),
+        related_type:
+          typeof body.relatedType === "string" ? body.relatedType.slice(0, 80) : "general",
+        related_id: typeof body.relatedId === "string" && body.relatedId ? body.relatedId : null,
+        attachment_keys: Array.isArray(body.attachmentKeys) ? body.attachmentKeys.slice(0, 20) : []
+      })
       .select("*")
       .single();
     if (error || !entry) throw error ?? new Error("JOURNAL_CREATE_FAILED");
-    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(body.text));
-    const contentHash = Array.from(new Uint8Array(digest))
-      .map((byte) => byte.toString(16).padStart(2, "0"))
-      .join("");
+    const contentHash = createHash("sha256").update(body.text).digest("hex");
     const { data: version, error: versionError } = await client
       .schema("app")
       .from("journal_versions")
@@ -40,6 +49,20 @@ export async function POST(request: Request) {
       .select("*")
       .single();
     if (versionError || !version) throw versionError ?? new Error("JOURNAL_VERSION_CREATE_FAILED");
+    const tags = Array.isArray(body.tags)
+      ? body.tags
+          .filter((tag: unknown): tag is string => typeof tag === "string")
+          .map((tag: string) => tag.trim().slice(0, 80))
+          .filter(Boolean)
+          .slice(0, 30)
+      : [];
+    if (tags.length) {
+      const insertedTags = await client
+        .schema("app")
+        .from("journal_tags")
+        .insert(tags.map((tag: string) => ({ entry_id: entry.id, tag })));
+      if (insertedTags.error) throw insertedTags.error;
+    }
     return apiResponse({ ...entry, currentVersion: version }, request, 201);
   });
 }

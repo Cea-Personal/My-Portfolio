@@ -27,6 +27,7 @@ export async function POST(request: Request) {
       .select("id")
       .eq("id", body.profileId)
       .eq("owner_id", ownerId)
+      .is("archived_at", null)
       .maybeSingle();
     if (profile.error) throw profile.error;
     if (!profile.data) return apiResponse({ code: "PROFILE_NOT_FOUND" }, request, 404);
@@ -46,6 +47,7 @@ export async function POST(request: Request) {
     const sourceIds = (sourceResult.data ?? [])
       .map((source) => source.id)
       .filter((value): value is string => typeof value === "string");
+    if (!sourceIds.length) return apiResponse({ code: "NO_ENABLED_JOB_SOURCES" }, request, 409);
     const { data, error } = await client
       .schema("app")
       .from("job_search_runs")

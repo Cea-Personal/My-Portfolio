@@ -233,10 +233,10 @@ fields. It never changes Career Brain trust or visibility automatically.
 | `PATCH|DELETE /job-sources/{id}` | Update/disable/safely remove | Historical references retained |
 | `POST /job-sources/{id}/tests` | Test connection and mapping | No enablement on failure |
 | `GET|POST /search-profiles` | List/create profile | Includes criteria, weights, and schedule |
-| `PATCH /search-profiles/{id}` | Version profile | Requires `If-Match` |
+| `PATCH|DELETE /search-profiles/{id}` | Version or archive profile | Requires `If-Match` for PATCH; archived profiles cannot start new searches |
 | `POST /job-search-runs` | Start one manual search | Returns observable run |
 | `GET /job-search-runs/{id}` | Run/source outcomes | Partial success represented explicitly |
-| `GET|POST /jobs` | Search jobs/create manual job | Pasted JD is sufficient for manual create |
+| `GET|POST /jobs` | Search jobs/create manual job | Pasted JD or an owner-supplied LinkedIn listing URL is retained as a private source reference; no LinkedIn scraping |
 | `GET|PATCH /jobs/{id}` | Job workspace metadata | Canonical record + sources + versions |
 | `POST /jobs/{id}/transitions` | Apply validated lifecycle transition | Append-only history |
 | `GET /jobs/{id}/analysis` | Requirements, matches, scores | Calculation version and factors included |
@@ -246,6 +246,8 @@ fields. It never changes Career Brain trust or visibility automatically.
 | Method and path | Purpose | Notes |
 |-----------------|---------|-------|
 | `POST /jobs/{id}/applications` | Create application workspace | One active application/job by default |
+| `GET|POST /application-profiles` | List/create reusable deterministic application profile | Only active owner profiles are returned; approved values are never rewritten by AI |
+| `PATCH|DELETE /application-profiles/{id}` | Version or archive an application profile | Delete is an owner-scoped archive; selected application references are cleared |
 | `GET /applications/{id}` | Complete workspace summary | Links to paged subresources |
 | `POST /applications/{id}/transitions` | Update status | Does not imply external submission |
 | `POST /applications/{id}/forms` | Save pasted/manual form | Remote analysis only through safe fetch policy |
@@ -270,6 +272,7 @@ fields. It never changes Career Brain trust or visibility automatically.
 | `POST /interview-processes/{id}/stages` | Add arbitrary stage |
 | `POST /interview-stages/{id}/transitions` | Schedule/complete/cancel/skip with history |
 | `POST /interview-stages/{id}/preparation-kits` | Generate stage-specific versioned kit |
+| `POST /interview-processes/{id}/auto-prepare` | Generate or refresh every stage's private interview package from the selected job, JD, approved evidence, CV context, and prior stories | Confidence labels and evidence gaps are explicit; no live assistance |
 | `GET|POST /star-stories` | Manage evidence-backed reusable stories |
 | `POST /interview-stages/{id}/mock-interviews` | Start private practice session only |
 | `POST /mock-interviews/{id}/complete` | Store qualitative feedback and derived insights |

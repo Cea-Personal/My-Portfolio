@@ -5,17 +5,26 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   return withPrivateApi(request, async ({ client, ownerId }) => {
     const { id } = await params;
     const body = await request.json().catch(() => ({}));
+    if (body.confirmation !== true)
+      return apiResponse({ code: "CONFIRMATION_REQUIRED" }, request, 400);
     const scheduledAt =
       typeof body.scheduledAt === "string" ? body.scheduledAt : new Date().toISOString();
-    const { data, error } = await client
+    if (!Number.isFinite(Date.parse(scheduledAt)) || Date.parse(scheduledAt) <= Date.now())
+      return apiResponse({ code: "FUTURE_SCHEDULE_REQUIRED" }, request, 400);
+    const owned = await client
       .schema("app")
       .from("posts")
-      .update({ status: "scheduled", scheduled_at: scheduledAt })
+      .select("id")
       .eq("id", id)
       .eq("owner_id", ownerId)
-      .select("*")
       .maybeSingle();
+    if (owned.error) throw owned.error;
+    if (!owned.data) return apiResponse(null, request, 404);
+    const { data, error } = await client.schema("app").rpc("publish_post", {
+      target_id: id,
+      requested_visible_at: scheduledAt
+    });
     if (error) throw error;
-    return apiResponse(data, request, data ? 200 : 404);
+    return apiResponse({ status: "scheduled", publicId: data, scheduledAt }, request);
   });
 }

@@ -4,7 +4,18 @@ import { useState } from "react";
 
 export function RoleFit() {
   const [description, setDescription] = useState("");
-  const [result, setResult] = useState<{ score: string; abstained?: boolean } | null>(null);
+  const [result, setResult] = useState<{
+    score: string;
+    abstained?: boolean;
+    requirements: readonly {
+      id: string;
+      text?: string;
+      priority: string;
+      outcome?: string;
+      rationale?: string;
+      evidence?: string[];
+    }[];
+  } | null>(null);
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -18,10 +29,24 @@ export function RoleFit() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ description })
       });
-      const payload = (await response.json()) as { data?: { score?: string; abstained?: boolean } };
+      const payload = (await response.json()) as {
+        data?: {
+          score?: string;
+          abstained?: boolean;
+          requirements?: readonly {
+            id: string;
+            text?: string;
+            priority: string;
+            outcome?: string;
+            rationale?: string;
+            evidence?: string[];
+          }[];
+        };
+      };
       if (!response.ok) throw new Error("request failed");
       setResult({
         score: payload.data?.score ?? "0.0000",
+        requirements: payload.data?.requirements ?? [],
         ...(typeof payload.data?.abstained === "boolean"
           ? { abstained: payload.data.abstained }
           : {})
@@ -66,10 +91,49 @@ export function RoleFit() {
         </form>
         {error ? <p role="alert">Matching is unavailable. Try again.</p> : null}
         {result ? (
-          <p>
-            Match score: {result.score}
-            {result.abstained ? " (no approved evidence matched)" : ""}
-          </p>
+          <div className="role-fit-results">
+            <p>
+              Match score: {result.score}
+              {result.abstained ? " (no approved evidence matched)" : ""}
+            </p>
+            {result.requirements.length ? (
+              <div className="role-fit-table-wrap">
+                <table>
+                  <caption>Requirement-by-requirement evidence comparison</caption>
+                  <thead>
+                    <tr>
+                      <th>Requirement</th>
+                      <th>Priority</th>
+                      <th>Outcome</th>
+                      <th>Evidence</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {result.requirements.map((requirement) => (
+                      <tr key={requirement.id}>
+                        <th scope="row">{requirement.text ?? "Requirement"}</th>
+                        <td>{requirement.priority}</td>
+                        <td>
+                          {requirement.outcome?.replace("_", " ") ?? "not assessed"}
+                          <small>{requirement.rationale}</small>
+                        </td>
+                        <td>
+                          {requirement.evidence?.length
+                            ? requirement.evidence.join(", ")
+                            : "No citation"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p>There were no distinct requirements to compare.</p>
+            )}
+            <small>
+              Scores summarize approved public evidence only; they are not a hiring prediction.
+            </small>
+          </div>
         ) : null}
       </div>
     </details>

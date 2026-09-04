@@ -20,6 +20,7 @@
     "test:worker": "apps/worker/.venv/bin/pytest -c apps/worker/pytest.ini --rootdir=apps/worker -o cache_dir=apps/worker/.pytest_cache apps/worker/tests",
     "lint:worker": "apps/worker/.venv/bin/ruff check apps/worker/src apps/worker/tests && apps/worker/.venv/bin/mypy apps/worker/src apps/worker/tests",
     "test:db": "supabase test db",
+    "test:db:hosted": "node scripts/hosted-pgtap.mjs",
     "test:contracts": "vitest run tests/contract",
     "test:integration": "vitest run tests/integration",
     "test:e2e": "playwright test tests/e2e",
@@ -27,6 +28,7 @@
     "test:ai-evals": "vitest run tests/evals",
     "test:security": "vitest run tests/security",
     "test:performance": "k6 run tests/performance/release.js",
+    "release:preflight": "node scripts/release-preflight.mjs",
     "db:reset": "supabase db reset",
     "seed:acceptance": "supabase db reset"
   },

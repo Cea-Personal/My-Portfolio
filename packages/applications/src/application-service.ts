@@ -1,10 +1,12 @@
 export type ApplicationStatus =
   | "draft"
   | "in_progress"
+  | "ready"
   | "submitted"
   | "interviewing"
   | "offer"
-  | "closed";
+  | "closed"
+  | "withdrawn";
 export interface Application {
   id: string;
   ownerId: string;
@@ -21,9 +23,27 @@ export function transitionApplication(
   expectedRevision: number
 ): Application {
   if (application.revision !== expectedRevision) throw new Error("REVISION_CONFLICT");
-  if (status === "submitted" && application.status === "draft")
-    return { ...application, status, revision: application.revision + 1 };
-  if (status === "in_progress" && application.status === "draft")
-    return { ...application, status, revision: application.revision + 1 };
-  throw new Error("INVALID_APPLICATION_TRANSITION");
+  const transitions: Record<ApplicationStatus, readonly ApplicationStatus[]> = {
+    draft: ["in_progress", "withdrawn"],
+    in_progress: ["ready", "submitted", "withdrawn"],
+    ready: ["in_progress", "submitted", "withdrawn"],
+    submitted: ["interviewing", "offer", "closed", "withdrawn"],
+    interviewing: ["offer", "closed", "withdrawn"],
+    offer: ["closed", "withdrawn"],
+    closed: [],
+    withdrawn: ["in_progress"]
+  };
+  if (!transitions[application.status].includes(status))
+    throw new Error("INVALID_APPLICATION_TRANSITION");
+  return { ...application, status, revision: application.revision + 1 };
 }
+export const applicationStatuses: readonly ApplicationStatus[] = [
+  "draft",
+  "in_progress",
+  "ready",
+  "submitted",
+  "interviewing",
+  "offer",
+  "closed",
+  "withdrawn"
+];

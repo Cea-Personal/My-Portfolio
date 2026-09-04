@@ -1,4 +1,4 @@
-import { createHmac } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
 import { createServiceSupabaseClient } from "@career-os/database/service";
 import { inngest } from "./client";
 
@@ -38,8 +38,15 @@ function configuredClient() {
 }
 
 function parserConfiguration() {
-  const url = process.env.CAREER_WORKER_URL?.replace(/\/$/, "");
-  const secret = process.env.CAREER_WORKER_SHARED_SECRET;
+  const development = process.env.NODE_ENV !== "production";
+  const url = (
+    process.env.CAREER_WORKER_URL ?? (development ? "http://127.0.0.1:8081" : "")
+  ).replace(/\/$/, "");
+  const secret =
+    process.env.CAREER_WORKER_SHARED_SECRET ??
+    (development
+      ? createHash("sha256").update("career-worker-local-development").digest("hex")
+      : "");
   return url && secret ? { url, secret } : null;
 }
 

@@ -34,7 +34,10 @@ export function hybridPublicRetrieval(
       score: cosineSimilarity(queryVector, tokenHashEmbedding(candidate.content))
     }))
     .filter((result) => result.score > 0.02)
-    .sort((left, right) => right.score - left.score || left.candidate.id.localeCompare(right.candidate.id))
+    .sort(
+      (left, right) =>
+        right.score - left.score || left.candidate.id.localeCompare(right.candidate.id)
+    )
     .slice(0, 50)
     .map(({ candidate }) => candidate);
   const fused = reciprocalRankFusion(query, safe, semantic, 25);

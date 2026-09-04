@@ -7,7 +7,9 @@ export function GET(request: Request, { params }: { params: Promise<{ id: string
     const { data, error } = await client
       .schema("app")
       .from("interview_processes")
-      .select("*, interview_stages(*)")
+      .select(
+        "*, applications(status,job_id,jobs(canonical_title,canonical_company,current_description)), interview_stages(*, interview_stage_history(*), preparation_kits(*), mock_interviews(*), interview_debriefs(*))"
+      )
       .eq("id", id)
       .eq("owner_id", ownerId)
       .maybeSingle();

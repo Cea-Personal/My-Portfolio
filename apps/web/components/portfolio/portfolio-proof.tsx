@@ -45,7 +45,7 @@ const privateCapabilities = [
   "Automations, analytics, and owner-only settings"
 ];
 
-export function PortfolioProof() {
+export function PortfolioProof({ sourceUrl }: { sourceUrl?: string }) {
   return (
     <div id="proof" className="proof-section" aria-labelledby="proof-title">
       <header className="section-heading section-heading-inverse">
@@ -111,6 +111,11 @@ export function PortfolioProof() {
         </p>
         <a href="#ask">Test role fit</a>
         <a href="#ask">Ask the portfolio</a>
+        {sourceUrl ? (
+          <a href={sourceUrl}>Inspect the source ↗</a>
+        ) : (
+          <span role="status">Source link is not currently published.</span>
+        )}
       </div>
     </div>
   );
