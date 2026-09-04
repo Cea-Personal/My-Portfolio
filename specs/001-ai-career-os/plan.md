@@ -845,9 +845,11 @@ gates pass.
   are present. T294 is marked complete in `tasks.md`.
 - **Verified locally**: fallback validator, web lint, web typecheck, production build, and targeted public
   contract tests.
-- **Hosted verification update**: migration `0118_expose_public_schemas.sql` is applied to the linked
-  Supabase project; anonymous PostgREST reads of `api` and `published` now succeed. The project currently
-  has no active publication, so the explicit unpublished outcome remains expected. Hosted pgTAP/isolated
-  fixtures and restore drills, the full Chromium/Firefox/WebKit matrix, k6 performance, production-like AI
-  evaluation, and final release evidence remain gated externally (T284, T317–T321, T324). R-010 and R-012
-  remain open until those workflows and hosted gates are run with owner fixtures.
+- **Hosted verification update**: the production `Portfolio` Supabase Cloud project was previously
+  checked read-only after applying `0118_expose_public_schemas.sql`; its empty publication state remains
+  unchanged. For convergence, the repository root is linked to the isolated `Portfolio_Test` project,
+  which has deterministic acceptance fixtures. All 13 hosted pgTAP/RLS files pass
+  transactionally, including Storage/publication boundaries. Chromium responsive/accessibility and
+  deterministic AI evaluations pass; Firefox/WebKit binaries, k6 performance, production-like AI
+  evaluation, backup/restore, and final release evidence remain gated externally (T318–T321, T324).
+  R-010 and R-012 remain open until those workflows and hosted gates are run with owner fixtures.

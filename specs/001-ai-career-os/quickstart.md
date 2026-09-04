@@ -411,10 +411,12 @@ A release candidate is acceptable only when:
 
 ## Convergence verification — 2026-09-04
 
-The linked Supabase Cloud project was checked read-only after applying
-`0118_expose_public_schemas.sql`. The anonymous PostgREST role can reach the `api` and `published`
-schemas used by the public reader. The project currently has no active publication or public blog rows,
-so the application returns the explicit unpublished state; it does not substitute the E-001 fallback.
-The ingestion corpus contains two evidence versions, six chunks, and six non-null `vector(1536)`
-embeddings. Full hosted pgTAP fixtures, cross-engine browser runs, k6 profiles, production-like AI
-evaluation, and backup/restore remain open release gates until an isolated staging environment is provided.
+The production `Portfolio` Supabase Cloud project was previously checked read-only after applying
+`0118_expose_public_schemas.sql`; its empty publication state remains unchanged. For convergence, the
+repository root is linked to the isolated `Portfolio_Test` project. Migrations through 0118 were applied,
+and `supabase/seed/acceptance.sql` loaded deterministic synthetic owner, career, evidence, and published
+portfolio fixtures. The isolated project has non-null `vector(1536)` embeddings and the
+13-file hosted pgTAP/RLS suite passes transactionally, including Storage/publication boundaries. The
+Chromium responsive/accessibility matrix and deterministic AI evaluations also pass. Firefox/WebKit
+browser binaries, k6 profiles, production-like AI provider evaluation, and backup/restore remain open
+release gates.

@@ -716,7 +716,7 @@ path and independent fixture path both pass.
 - [X] T314 Register every required durable Inngest/outbox handler in the serving route and implement bounded retries, cancellation, dead-letter, resume, and owner-visible run/step histories per FR-013/FR-056/FR-057/FR-117–FR-126 and plan: durable workflows (partial)
 - [X] T315 Replace placeholder/read-only private workspace views with authenticated mutation controls, explicit outcome feedback, histories, and reload verification for every primary owner workflow per FR-136, SC-029, and plan: workflow completion evidence (partial)
 - [X] T316 Expand HTTP contract, integration, and browser tests to exercise actual public projection, configured-owner/non-owner, document, Drive, Career Brain, publication, jobs, applications, interviews, blog, analytics, automation, and export journeys rather than shallow visibility checks per SC-001–SC-022 and SC-029 (partial)
-- [ ] T317 Execute and record the full hosted Supabase migration/pgTAP/RLS/negative-authorization suite against isolated seeded fixtures, including all object-storage and publication boundaries per Constitution XI/XIII/XVI and SC-028 (partial)
+- [X] T317 Execute and record the full hosted Supabase migration/pgTAP/RLS/negative-authorization suite against isolated seeded fixtures, including all object-storage and publication boundaries per Constitution XI/XIII/XVI and SC-028
 - [ ] T318 Execute and record Chromium, Firefox, and WebKit accessibility/compatibility checks at desktop, narrow-desktop, mobile, 200% zoom, keyboard, screen-reader, light, dark, and reduced-motion conditions per SC-024–SC-027 and Constitution XVII (partial)
 - [ ] T319 Execute and record production-like AI retrieval, grounding, citation, abstention, JD, document-corpus, artifact, and interview evaluation gates using defined fixtures and thresholds per SC-005–SC-010 and Constitution X/XIV (partial)
 - [ ] T320 Execute and record public/private performance profiles, public AI stream/retrieval limits, search fan-out behavior, and scale/index benchmarks with threshold enforcement per SC-001–SC-004 and Constitution XI (partial)
@@ -743,12 +743,14 @@ path and independent fixture path both pass.
   credentials/fixtures and succeeds only with the complete required environment contract. The workflow
   now runs hosted migration/pgTAP checks, worker canary, browser/a11y, AI, performance, and artifact
   upload steps without successful deferrals.
-- T323 is reconciled against executable evidence. T317 now has a guarded hosted runner (`pnpm
-  test:db:hosted`) and the Cloud schema is aligned through 0118; the linked project now exposes the
-  `api` and `published` PostgREST schemas, and a read-only smoke check confirms the public projections
-  are reachable. The 12-file hosted pgTAP suite also passed transactionally against the linked project;
-  isolated seeded/object-storage fixture execution remains open. T318, T319, T320, and T321 remain open because this workstation lacks usable
-  Firefox/WebKit binaries, k6, and an isolated backup/restore environment. T284 remains the umbrella
-  release-validation task.
+- T323 is reconciled against executable evidence. T317 now runs against the isolated hosted
+  `Portfolio_Test` Supabase project with deterministic synthetic owner, career, evidence, and published
+  fixtures. All 13 pgTAP files pass transactionally, including Storage policy and public publication-view
+  boundaries. T318 remains open because Firefox cannot launch with the cached binary's missing
+  `libmozglue.dylib`, WebKit is unavailable, and screen-reader validation remains manual. T319 remains
+  open because production-provider/model credentials and the larger document/artifact/interview corpus
+  are not configured; deterministic local evaluations pass. T320 and T321 remain open because k6 and an
+  isolated backup/restore environment are not available. T284 remains the umbrella release-validation
+  task.
 - T324 remains open until those external gates are run and a final convergence review can truthfully
   close the release checklist.

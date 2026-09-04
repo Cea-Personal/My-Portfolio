@@ -48,11 +48,22 @@ for (const file of testFiles) {
         PGCONNECT_TIMEOUT: process.env.PGCONNECT_TIMEOUT ?? "15",
         PGSSLMODE: process.env.PGSSLMODE ?? "require"
       },
-      stdio: ["ignore", "inherit", "inherit"]
+      stdio: ["ignore", "pipe", "pipe"]
+    });
+    let stdout = "";
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk;
+      process.stdout.write(chunk);
+    });
+    child.stderr.on("data", (chunk) => {
+      process.stderr.write(chunk);
     });
     child.once("error", reject);
     child.once("exit", (code, signal) => {
       if (signal) return resolveCode(1);
+      // psql exits zero when pgTAP assertions return `not ok`; treat those
+      // assertion failures as a failed hosted gate rather than a false pass.
+      if (code !== 0 || /(^|\n)not ok\b/i.test(stdout)) return resolveCode(1);
       resolveCode(code ?? 1);
     });
   }).catch((error) => {

@@ -10,6 +10,8 @@ test-results/
 pnpm-lock.yaml
 apps/worker/uv.lock
 supabase/migrations/
+supabase/.temp/
+supabase/supabase/.temp/
 .agents/
 .specify/
 specs/
