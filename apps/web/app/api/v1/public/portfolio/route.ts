@@ -57,6 +57,8 @@ export async function GET(request: Request) {
       version: snapshot.publication ? Number(snapshot.publication.version ?? 0) : 0,
       contentHash: snapshot.publication?.content_hash ?? null,
       schemaVersion: snapshot.publication?.schema_version ?? "portfolio.v1",
+      source: snapshot.source,
+      stale: snapshot.stale,
       sections,
       evidence: snapshot.evidence.map((item) => ({
         publicEvidenceId: item.public_evidence_id,
@@ -67,8 +69,7 @@ export async function GET(request: Request) {
         sourceLocationLabel: item.source_location_label,
         evidenceType: item.evidence_type,
         sourceVersionHash: item.source_version_hash
-      })),
-      stale: !snapshot.publication
+      }))
     },
     request
   );

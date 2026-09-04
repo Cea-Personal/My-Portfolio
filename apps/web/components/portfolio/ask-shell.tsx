@@ -16,6 +16,7 @@ export function AskShell() {
   const [submittedQuestion, setSubmittedQuestion] = useState<string | null>(null);
   const [answer, setAnswer] = useState<string | null>(null);
   const [citations, setCitations] = useState<string[]>([]);
+  const [unavailable, setUnavailable] = useState(false);
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
 
   async function ask(nextQuestion = question) {
@@ -26,6 +27,7 @@ export function AskShell() {
     setStatus("loading");
     setAnswer(null);
     setCitations([]);
+    setUnavailable(false);
     try {
       const response = await fetch("/api/v1/public/chat", {
         method: "POST",
@@ -33,13 +35,14 @@ export function AskShell() {
         body: JSON.stringify({ question: normalizedQuestion })
       });
       const payload = (await response.json()) as {
-        data?: { answer?: string; citations?: string[] };
+        data?: { answer?: string; citations?: string[]; unavailable?: boolean };
       };
       if (!response.ok) throw new Error("request failed");
       setAnswer(
         payload.data?.answer ?? "I don't have enough approved public evidence to answer that."
       );
       setCitations(payload.data?.citations ?? []);
+      setUnavailable(payload.data?.unavailable === true);
       setStatus("idle");
     } catch {
       setStatus("error");
@@ -136,6 +139,12 @@ export function AskShell() {
             ) : null}
             {status === "error" ? (
               <p role="alert">The public assistant is unavailable. Try again.</p>
+            ) : null}
+            {unavailable ? (
+              <p className="assistant-unavailable" role="status">
+                Live evidence is reconnecting. Ask Basil will resume when the approved public source
+                is available.
+              </p>
             ) : null}
             {answer ? (
               <div className="assistant-answer">

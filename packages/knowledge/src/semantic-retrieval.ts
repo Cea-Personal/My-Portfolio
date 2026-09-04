@@ -3,9 +3,12 @@ import { cosineSimilarity } from "./vector-retrieval";
 import { reciprocalRankFusion } from "./hybrid-retrieval";
 import type { RetrievalCandidate } from "./lexical-retrieval";
 
-const DIMENSIONS = 384;
+// Keep the in-process fallback aligned with app.chunk_embeddings.embedding,
+// which is vector(1536) in Supabase.  A dimension mismatch silently removes
+// every stored candidate from cosine retrieval.
+export const EMBEDDING_DIMENSIONS = 1536;
 
-export function tokenHashEmbedding(text: string, dimensions = DIMENSIONS): number[] {
+export function tokenHashEmbedding(text: string, dimensions = EMBEDDING_DIMENSIONS): number[] {
   if (dimensions < 8 || dimensions > 3072) throw new Error("embedding dimensions out of bounds");
   const vector = Array.from<number>({ length: dimensions }).fill(0);
   const tokens = text.toLowerCase().match(/[\p{L}\p{N}+#.-]{2,}/gu) ?? [];

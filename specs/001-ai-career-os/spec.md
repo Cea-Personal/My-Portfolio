@@ -4,7 +4,8 @@
 
 **Created**: 2026-08-31
 
-**Status**: Approved for Implementation; reconciled by owner-approved amendment on 2026-09-01
+**Status**: Approved for Implementation; reconciled by owner-approved amendments on 2026-09-01 and
+2026-09-04
 
 **Implementation Gate**: APPROVED on 2026-08-31 by explicit human instruction to proceed with
 `$speckit-implement` after review of the specification, plan, contracts, data model, dependency graph,
@@ -17,7 +18,7 @@ interview preparation, content, analytics, and owner-controlled AI assistance."
 
 ## Reconciliation Amendment — Portfolio, Career Arc, and Completion Evidence
 
-**Approved**: 2026-09-01
+**Approved**: 2026-09-01; public resilience exception E-001 added 2026-09-04
 
 **Purpose**: Reconcile the original master prompt with the owner’s later portfolio, career-story, and
 private-workspace decisions. This amendment is normative and takes precedence wherever an earlier
@@ -25,6 +26,15 @@ example, section list, career sequence, label, or presentation rule conflicts wi
 explicitly changed here remain in force, especially Career Brain authority, evidence grounding,
 owner-controlled publication, private-data protection, deterministic scoring, and the prohibition on
 automatic application submission or live interview assistance.
+
+### Public Resilience Exception E-001
+
+During a typed transport, timeout, or response-validation failure while reading the live public
+projection, the anonymous portfolio MAY use a bundled `PublicFallbackSnapshot` generated from the most
+recent owner-approved active publication. This exception covers portfolio presentation sections only and
+must display stale metadata. It MUST NOT be hand-authored in frontend code, contain private or unapproved
+claims, power Ask Basil/role-fit answers, or serve authenticated/private routes. An explicit withdrawal or
+`no_active_publication` response always takes precedence and MUST render the honest unpublished state.
 
 ### Reconciled Public Experience
 
@@ -101,8 +111,10 @@ technology.
   persists in the system of record, remains correct after reload, enforces authorization and evidence
   rules, exposes required history or run state, and passes its acceptance tests.
 - When no active Portfolio Projection exists, the public portfolio MUST remain usable but MUST show an
-  honest unpublished or empty state. It MUST NOT substitute hard-coded career claims, employers,
-  projects, impacts, skills, or metrics.
+  honest unpublished or empty state. During a typed live public-read transport/timeout/validation failure,
+  the E-001 exception MAY serve a build-generated snapshot of the most recent owner-approved publication
+  for anonymous portfolio sections only. E-001 MUST NOT introduce hand-authored or unapproved career
+  claims, and an explicit withdrawal or `no_active_publication` response MUST always override the snapshot.
 
 ## Product Vision
 
@@ -188,8 +200,10 @@ and mobile without authenticating.
    organization and dates, and concise summary remain visible; **When** it is expanded, **Then** its work,
    professional projects, impact, skills, tools, and approved supporting detail open immediately below it.
 6. **Given** no active Portfolio Projection exists, **When** a visitor opens the portfolio, **Then** the
-   page remains usable and honestly indicates that approved career content is not yet published without
-   substituting hard-coded career claims.
+   page remains usable and honestly indicates that approved career content is not yet published. **Given**
+   a transient live public-read failure, **When** a visitor opens the portfolio, **Then** the page may use
+   E-001’s generated last-approved snapshot with a stale notice; an explicit withdrawal or no-publication
+   response MUST render the honest empty state instead.
 7. **Given** the visitor uses light mode, dark mode, a smaller desktop, or a mobile viewport, **When** they
    view the hero, navigation, profile rail, proof content, and Ask Basil states, **Then** text remains
    readable, spacing remains intentional, and no content is clipped or causes horizontal overflow.
@@ -511,8 +525,12 @@ and sanitized error details, disable the schedule, and verify that no consequent
   contact methods without exposing private profile fields. The profile rail MUST show centered,
   owner-approved social/contact links where supplied.
 - **FR-038**: The public portfolio MUST remain browseable when AI, document ingestion, job sources, or
-  other private services are unavailable. If no active publication exists, it MUST provide an honest
-  empty state and MUST NOT substitute hard-coded professional claims.
+  other private services are unavailable. If the live public projection read fails with a typed
+  transport/timeout/validation error, E-001 MAY serve a build-generated, allowlisted snapshot of the most
+  recent owner-approved publication to anonymous portfolio sections with a stale indicator. If no active
+  publication exists or the API explicitly reports withdrawal, it MUST provide an honest empty state and
+  MUST NOT use E-001. E-001 MUST never serve private fields, AI answers, citations, scores, or mutation
+  results.
 
 #### Evidence Retrieval, Public AI, and Role Matching
 

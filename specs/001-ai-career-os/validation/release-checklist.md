@@ -1,7 +1,7 @@
 # Release checklist
 
 - [x] Lint, typecheck, unit, worker, and production build pass.
-- [x] Supabase Cloud migration dry run is up to date through migration 0115; application schema lint
+- [x] Supabase Cloud migration dry run is up to date through migration 0118; application schema lint
   errors are cleared.
 - [x] Public responses use approved publication data and safe AI degradation.
 - [x] Automation denylist blocks consequential actions and live interview assistance.

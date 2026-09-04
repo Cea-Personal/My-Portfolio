@@ -9,7 +9,7 @@ function requestKey(request: Request): string {
 }
 
 function streamResponse(
-  result: ReturnType<typeof answerPublicQuestion>,
+  result: ReturnType<typeof answerPublicQuestion> & { unavailable?: boolean },
   request: Request,
   lastEventId: string | null
 ): Response {
@@ -66,6 +66,17 @@ export async function POST(request: Request) {
       400
     );
   const snapshot = await loadPublicPortfolio();
+  if (snapshot.source !== "live") {
+    const unavailable = {
+      answer: "The public assistant is temporarily unavailable while approved evidence reconnects.",
+      citations: [] as string[],
+      abstained: true,
+      unavailable: true
+    };
+    if (request.headers.get("accept")?.includes("text/event-stream"))
+      return streamResponse(unavailable, request, request.headers.get("last-event-id"));
+    return publicApiResponse(unavailable, request, 200);
+  }
   const evidence = snapshot.evidence.flatMap((item) => {
     const text = typeof item.sanitized_excerpt === "string" ? item.sanitized_excerpt : "";
     if (!text || typeof item.public_evidence_id !== "string") return [];

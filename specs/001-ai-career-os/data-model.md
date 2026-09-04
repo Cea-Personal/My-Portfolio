@@ -240,7 +240,11 @@ Personal project items include an approved destination state (`detail`, `demo`, 
 carry sanitized visual media. Professional project items are emitted as children/references of their
 Experience stage rather than as standalone personal-project chapters. Publication metadata contains the
 owner-approved profile-rail image/media reference, summary, social/contact links, and availability state.
-An owner with no active publication has no synthetic publication row or fallback career items.
+An owner with no active publication has no synthetic publication row or fallback career items. E-001 does
+not add a database row or Career Brain fact: `PublicFallbackSnapshot` is a build output generated from an
+active approved publication, containing the same allowlisted fields plus source publication version,
+content hash, generated timestamp, and schema version. It is invalidated/rebuilt on publication changes
+and is never readable by private repositories or AI/retrieval paths.
 
 ### `published.public_evidence`
 

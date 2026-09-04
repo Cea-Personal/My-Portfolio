@@ -36,6 +36,7 @@ jobs:
           GOOGLE_DRIVE_CLIENT_SECRET: ${{ secrets.GOOGLE_DRIVE_CLIENT_SECRET }}
         run: pnpm release:preflight
       - run: pnpm format:check
+      - run: pnpm validate:public-fallback
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test:unit

@@ -23,11 +23,24 @@ tools are not independent top-level sections; they belong to an Experience stage
 
 - Career and project content comes only from the active immutable publication returned by the public
   portfolio contract.
-- The frontend may provide layout labels and non-career empty-state copy but cannot provide fallback
-  roles, organizations, dates, projects, impacts, skills, tools, metrics, or career claims.
-- No active publication produces an honest `unpublished` state. Navigation, theme control, Owner Login,
-  and owner-approved non-career contact shell may remain usable.
+- **E-001 exception**: on a typed live-read transport, timeout, or response-validation failure, anonymous
+  portfolio sections may read a build-generated `PublicFallbackSnapshot` containing the most recent
+  owner-approved publication. The snapshot is allowlisted, immutable, versioned with its source publication
+  and hash, and carries generated time/stale metadata. It is not hand-authored frontend career content.
+- The frontend may provide layout labels and non-career empty-state copy, but neither live data nor E-001
+  may provide unapproved roles, organizations, dates, projects, impacts, skills, tools, metrics, or claims.
+- An explicit `no_active_publication` or `withdrawn` response always takes precedence over E-001 and
+  produces an honest `unpublished` state. Navigation, theme control, Owner Login, and the owner-approved
+  non-career contact shell may remain usable.
+- E-001 is never valid for private routes, Ask Basil/role-fit answers, retrieval/citations, analytics,
+  embeddings, contact mutations, or any other authenticated or AI response.
 - Withdrawal removes the prior publication’s public reachability before a replacement is rendered.
+
+### Public read outcome
+
+Every public portfolio read returns one typed outcome: `live` (current active publication), `fallback`
+(E-001 snapshot plus stale metadata), `empty` (explicit no publication/withdrawal), or `error` (no safe
+content). Callers must preserve this distinction; an error cannot be silently converted into empty content.
 
 ## Hero Contract
 

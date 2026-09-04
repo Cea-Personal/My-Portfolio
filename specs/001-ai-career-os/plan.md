@@ -1,6 +1,6 @@
 # Implementation Plan: AI Career OS and Intelligent Portfolio
 
-**Branch**: `001-ai-career-os` | **Date**: 2026-08-31 | **Reconciled**: 2026-09-02 | **Spec**: [spec.md](spec.md)
+**Branch**: `001-ai-career-os` | **Date**: 2026-08-31 | **Reconciled**: 2026-09-04 | **Spec**: [spec.md](spec.md)
 
 **Input**: Feature specification from `/specs/001-ai-career-os/spec.md`
 
@@ -29,6 +29,13 @@ and tools into evidence-backed Experience chapters; and treats Portfolio as Proo
 requires a configured single-owner authorization boundary, honest empty-publication behavior, complete
 workflow acceptance evidence, and fail-closed release gates. Existing schemas or route names do not
 constitute delivery without durable behavior and end-to-end verification.
+
+This remediation plan records one narrowly scoped constitutional exception (E-001): a public-only,
+build-generated snapshot of the most recent owner-approved publication may be served when the live public
+read fails. The snapshot is generated from the canonical publication, is never hand-authored in UI code,
+contains no private or AI-generated response data, and never overrides an explicit withdrawal or
+no-publication response. This preserves portfolio availability during outages without creating a second
+career-truth store.
 
 ## Technical Context
 
@@ -76,7 +83,7 @@ plus planned-expansion releases
 
 | # | Constitutional gate | Pre-design | Post-design evidence |
 |---|---------------------|------------|----------------------|
-| I | Career Brain is canonical | PASS | All projections, retrieval, artifacts, jobs, and interview material reference versioned Career Brain facts/evidence; an absent publication produces an honest empty state, never hard-coded career copy. |
+| I | Career Brain is canonical | PASS with E-001 | All projections, retrieval, artifacts, jobs, and interview material reference versioned Career Brain facts/evidence. E-001 permits only a generated, allowlisted last-approved public snapshot during a typed live-read failure; it cannot introduce or edit career claims. |
 | II | Evidence-grounded AI | PASS | Immutable source/chunk provenance, generation contexts, claim-evidence links, deterministic citation validation, and abstention contracts. |
 | III | Impact-first representation | PASS | Projection, achievement, metric, ResumeData, and public portfolio contracts prioritize contextualized verified impact. |
 | IV | Owner-controlled career truth | PASS | Extracted facts remain candidates; only owner review transitions to approved/public eligibility. Original sources and journals are append-only. |
@@ -105,10 +112,10 @@ plus planned-expansion releases
 | Observability and failure isolation documented | PASS | Inngest event/step contracts, app-owned runs, Collector privacy boundary, and failure-mode scenarios. |
 | Migration, rollout, and recovery documented | PASS | Data model migration section and deployment/rollout strategy below. |
 | AI provider/prompt/evidence/eval contracts documented | PASS | `contracts/ai-contracts.md`, research decisions 7–16, evaluation gates. |
-| Constitutional exceptions | PASS | None required. |
+| Constitutional exceptions | EXCEPTION RECORDED | E-001 is limited to anonymous public reads during transport/timeout/validation failure. Scope, stale-data risk, mitigations, owner, and expiry are defined in the remediation section below. |
 
-**Gate result**: DESIGN PASS with no constitutional exception. Because the specification changed on
-2026-09-01, the current `tasks.md` is stale and does not authorize further implementation until its
+**Gate result**: DESIGN PASS with exception E-001. Because the specification changed on
+2026-09-04, the current `tasks.md` is stale and does not authorize further implementation until its
 metadata, dependencies, completion criteria, and verification methods are reconciled and explicitly
 approved. Production merge and deployment remain separately gated.
 
@@ -283,8 +290,9 @@ All runtimes ──> OpenTelemetry Collector ──> sanitized Sentry/PostHog/tr
   impact, metrics, skills, tools, contribution, and approved case-study material directly below.
 - Treat the final AI stage as a capability unless the Career Brain provides approved employer-title
   evidence. Do not infer the ordered narrative from frontend constants; publication items carry stage and
-  display order. When no active publication exists, render an honest unpublished state with no fallback
-  professional claims.
+  display order. When a live read fails, E-001 may render the generated last-approved public snapshot;
+  when the API explicitly reports no active publication or withdrawal, render an honest unpublished state
+  and never use the snapshot. Show a non-blocking stale-data notice whenever E-001 is active.
 - The hero is a bounded client enhancement over accessible static content. It cycles Data Engineer, Data
   Platform Engineer, AI Data Engineer, AI Engineer, AI Software Engineer, and Software Engineer while
   visually retaining “Engineer.” Each state exposes a complete accessible name; reduced motion uses a
@@ -611,6 +619,8 @@ Failure expectations:
 | Interview stages unknown | `Interview Process Unknown`; manual stage path |
 | Publication validation fails | staged findings; active public version unchanged |
 | Worker restarts | resume at durable step without duplicate effects |
+| Public projection read fails | serve E-001 snapshot for anonymous portfolio sections, expose stale status and retry; never use it for private routes, Ask Basil responses, citations, or mutations |
+| Explicit withdrawal/no active publication | ignore E-001 and render the honest unpublished state; invalidate the snapshot during the next build/release |
 
 ## Testing and AI Evaluation Plan
 
@@ -632,8 +642,9 @@ Failure expectations:
 Every behavior-bearing test must prove an observable contract, not merely page reachability, component
 existence, or the absence of a prohibited button. Authenticated workflows use seeded owner and
 authenticated-non-owner identities, perform the mutation through the UI or HTTP boundary, reload, and
-verify durable state/history. Public portfolio tests exercise an active publication and an empty
-publication separately; no frontend fallback facts are permitted.
+verify durable state/history. Public portfolio tests exercise active, transient-read-failure-with-fallback,
+and explicit-withdrawal/empty states separately. The fallback fixture must be generated from an allowlisted
+publication export; hand-authored frontend career facts are prohibited.
 
 ### Release Metrics
 
@@ -697,7 +708,8 @@ it. Exact tasks and dependencies are produced by `$speckit-tasks`.
    provenance, extraction candidates, idempotent embeddings, projection rules, and staged publication.
 3. **Public Portfolio**: reconciled Hero, About, evidence-backed Experience accordion, personal Projects
    with Portfolio as Proof, Ask Basil shell, Blog, Let’s Talk, profile rail, public detail routes,
-   honest empty publication, and light/dark/responsive/accessibility baselines.
+   E-001 generated fallback with stale/withdrawal precedence, honest empty publication, and
+   light/dark/responsive/accessibility baselines.
 4. **Public Intelligence**: hybrid retrieval, evidence handles, grounded Ask Basil questions, integrated
    “How do I fit?” JD matcher,
    deterministic scoring, evaluations, abuse controls.
@@ -722,7 +734,7 @@ it. Exact tasks and dependencies are produced by `$speckit-tasks`.
 |--------------|---------------------|--------------------|
 | FR-001–FR-006, PSR-001–PSR-003 | Auth/RLS, public/private repositories, audit, dashboard | quickstart 1–2; DB negative tests |
 | FR-007–FR-027, ST-001–ST-002 | Career Brain, evidence, documents, review, projection | quickstart 2–3; provenance/integrity tests |
-| FR-028–FR-038, NFR-001–NFR-003 | Public UI architecture | quickstart 1; E2E/a11y/performance |
+| FR-028–FR-038, NFR-001–NFR-003 | Public UI architecture and E-001 generated resilience snapshot | quickstart 1; live/fallback/empty E2E, a11y, performance, invalidation tests |
 | FR-039–FR-050, AIR-001–AIR-008 | RAG, public AI, JD match | quickstart 5–6; AI/security evals |
 | FR-051–FR-068, ST-003 | Job adapters, workflows, canonical jobs/scores | quickstart 7; contract/resilience tests |
 | FR-069–FR-092, ST-004 | Application/artifact/compensation domains | quickstart 8; schema/render/evidence tests |
@@ -735,7 +747,107 @@ it. Exact tasks and dependencies are produced by `$speckit-tasks`.
 
 ## Complexity Tracking
 
-No constitutional violations or exceptions are required. The second deployable (`apps/worker`) is not a
-domain microservice: it is the mandated isolation/runtime boundary for untrusted document parsing and
-Python-specific AI/data processing. Its necessity, narrow interface, and failure isolation are documented
-in research decisions 1, 9, 11, 17, and 18.
+The second deployable (`apps/worker`) is not a domain microservice: it is the mandated isolation/runtime
+boundary for untrusted document parsing and Python-specific AI/data processing. Its necessity, narrow
+interface, and failure isolation are documented in research decisions 1, 9, 11, 17, and 18.
+
+## Remediation Plan — Public Resilience Exception and Implementation Closure
+
+### Constitutional exception E-001
+
+**Decision**: Permit a bundled-at-build-time `PublicFallbackSnapshot` containing the most recent
+owner-approved active publication. It is a generated public artifact (for example,
+`apps/web/public/generated/public-fallback.json`), not a second source of career truth and not a file for
+hand-authored career copy. Live Supabase publication data remains authoritative whenever it is available.
+
+**Scope**: Anonymous public rendering only: Hero, About, Experience, Projects (including Portfolio as
+Proof), Blog overview, profile rail, and the Let’s Talk shell. The snapshot is read-only and may contain
+only the same sanitized allowlisted fields as the public publication contract.
+
+**Exclusions**: Private routes and dashboards, owner/authentication state, Ask Basil or “How do I fit?”
+answers, retrieval/citations, analytics, search, embeddings, contact persistence, and every mutation. No
+fallback may fabricate a role, employer, metric, project, skill, link, article, or evidence claim.
+
+**Trigger precedence**: Use the snapshot only for a typed transport, timeout, or response-validation
+failure from the live public read. An explicit `no_active_publication` or `withdrawn` response always wins
+and renders the honest unpublished state; it must also mark the snapshot for invalidation.
+
+**Risk and mitigation**: The risk is stale approved copy being visible during an outage after a correction
+or withdrawal. Mitigate with an allowlist/schema validator, source publication version/hash and generated
+timestamp in the artifact, CI rejection of malformed or over-age snapshots, rebuild/invalidate on every
+publication change, an accessible stale notice, owner-runbook invalidation, and monitoring/alerting on
+snapshot age. Basil Ogbonna owns approval and review. Re-review each release; target expiry/review is
+2026-12-31, or earlier if an edge/publication cache provides equivalent availability with immediate
+withdrawal semantics.
+
+### Dependency-ordered remediation work packages
+
+1. **R-001 — Reconcile contracts and outcomes**: Amend `spec.md`, `contracts/portfolio-experience.md`,
+   and the public API schema to describe E-001 and typed outcomes `live | fallback | empty | error`.
+2. **R-002 — Generate the snapshot**: Add a build-time exporter (for example,
+   `scripts/generate-public-fallback.ts`) that reads only the active approved publication, strips private
+   fields, writes the bundled snapshot, records publication version/hash/generated time, and fails closed
+   when no active publication exists. Define `PublicFallbackSnapshot` as a versioned schema.
+3. **R-003 — Validate and invalidate**: Add CI/build validation, age/hash/signature checks, publication-
+   triggered regeneration, an explicit owner invalidation/rebuild command, and release metadata/alerts.
+4. **R-004 — Harden public loaders**: Add bounded timeout, typed response validation, safe error logging,
+   and independent Blog loading in `apps/web/lib/api/public-data.ts`; distinguish explicit empty from read
+   failure and return the outcome enum.
+5. **R-005 — Wire the public composition**: Route E-001 through the existing Server Component portfolio
+   composition for Hero/About/Experience/Projects/Proof/Blog/profile rail/contact shell without duplicating
+   section facts in React. Include an accessible stale banner and retry control.
+6. **R-006 — Keep public intelligence fail-closed**: Ask Basil and integrated role-fit must show an
+   unavailable/insufficient-evidence state during fallback; they must not answer from the snapshot or emit
+   citations, scores, or private hints.
+7. **R-007 — Preserve contact honesty**: Let’s Talk may expose a `mailto`/approved external contact link
+   during fallback, with clear delivery expectations; never report a persisted message as sent without the
+   backend mutation succeeding.
+8. **R-008 — Close owner entry flow**: Verify `/sign-in` detects an existing valid owner session and sends
+   the owner to `/dashboard`, while unauthenticated and authenticated non-owner requests remain distinct;
+   cover sign-out and every private-route guard in browser tests.
+9. **R-009 — Repair knowledge indexing**: Complete canonical chunk offsets/page/section provenance,
+   1536-dimension validation, input hashes, idempotent evidence/embedding upserts, and hosted Supabase
+   re-index/reconciliation checks before public AI is enabled.
+10. **R-010 — Finish private workflow closure**: Verify Documents/Drive → Career Brain → publication →
+    jobs/sources → applications/artifacts → interviews/journal → Blog/analytics → automation in order,
+    with durable state/history and owner/non-owner authorization tests.
+11. **R-011 — Test the exception and all regressions**: Add unit, contract, integration, E2E, accessibility,
+    performance, security, AI-evaluation, and recovery coverage for live/fallback/empty public outcomes,
+    explicit withdrawal precedence, stale notices, no-leakage, browser/viewport behavior, and restore drills.
+12. **R-012 — Release and operate**: Generate E-001 from the approved production publication, deploy
+    compatible web/worker/database changes, verify Supabase vectors and public reads, monitor snapshot age
+    and withdrawal invalidation, document rollback/invalidation, and obtain human release approval.
+
+### Artifact and acceptance updates
+
+- `spec.md`: replace the absolute no-fallback sentence with E-001’s bounded exception and precedence rule.
+- `contracts/portfolio-experience.md`: add `PublicFallbackSnapshot`, outcome typing, stale metadata, and
+  explicit exclusions.
+- `research.md`: record E-001 as the superseding decision to the rejected hand-authored frontend constants.
+- `data-model.md`: describe the artifact as build output, not a database publication or Career Brain row.
+- `quickstart.md`: add transient public-read failure, stale notice, explicit withdrawal, and invalidation
+  scenarios; retain the honest empty-state scenario.
+- `tasks.md`: reconcile T294 and related public fallback tasks so they prohibit hand-authored facts while
+  requiring the generated artifact and the tests above.
+
+### Exit criteria
+
+The remediation is complete only when a production-like public read failure still renders the approved
+portfolio sections from E-001, an explicit withdrawal renders empty content, Ask Basil/private routes do
+not consume the artifact, the artifact is traceable to a publication version/hash, and all R-011 release
+gates pass.
+
+### Implementation status — 2026-09-04
+
+- **Implemented locally**: R-001 through R-007 and R-009 foundations. Public reads now return typed
+  `live/fallback/empty/error` outcomes; the generated allowlisted snapshot, expiry/invalidation tooling,
+  stale notices, public AI fail-closed guards, contact honesty, and 1536-dimension ingestion safeguards
+  are present. T294 is marked complete in `tasks.md`.
+- **Verified locally**: fallback validator, web lint, web typecheck, production build, and targeted public
+  contract tests.
+- **Hosted verification update**: migration `0118_expose_public_schemas.sql` is applied to the linked
+  Supabase project; anonymous PostgREST reads of `api` and `published` now succeed. The project currently
+  has no active publication, so the explicit unpublished outcome remains expected. Hosted pgTAP/isolated
+  fixtures and restore drills, the full Chromium/Firefox/WebKit matrix, k6 performance, production-like AI
+  evaluation, and final release evidence remain gated externally (T284, T317–T321, T324). R-010 and R-012
+  remain open until those workflows and hosted gates are run with owner fixtures.

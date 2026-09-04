@@ -1,12 +1,13 @@
 import { ArticleBody } from "@/components/portfolio/article-body";
-import { loadPublicBlogPost } from "@/lib/api/public-data";
+import { loadPublicBlogPostWithStatus } from "@/lib/api/public-data";
 import { PublicEvents } from "@/components/analytics/public-events";
 
 export const dynamic = "force-dynamic";
 
 export default async function BlogPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const post = await loadPublicBlogPost(slug);
+  const result = await loadPublicBlogPostWithStatus(slug);
+  const post = result.post;
   if (!post) {
     return (
       <main>
@@ -18,6 +19,11 @@ export default async function BlogPage({ params }: { params: Promise<{ slug: str
   return (
     <main>
       <PublicEvents name="article_view" properties={{ article: post.slug }} />
+      {result.stale ? (
+        <p className="portfolio-stale-notice" role="status">
+          Showing the latest approved article snapshot while live content reconnects.
+        </p>
+      ) : null}
       <a href="/blog">← All articles</a>
       <h1>{post.title}</h1>
       <p>{post.excerpt}</p>

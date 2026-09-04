@@ -1,7 +1,8 @@
 # Quickstart and End-to-End Validation Guide
 
 **Purpose**: Prove the implemented AI Career OS satisfies the specification and architecture contracts.  
-**Status**: Planning contract — commands become executable as implementation tasks create the workspace.
+**Status**: Implementation/validation contract — local fallback checks are executable; hosted and browser
+release gates require isolated owner fixtures.
 
 ## Prerequisites
 
@@ -74,6 +75,7 @@ The seeded test owner signs in using the local authentication fixture documented
 
 ```bash
 pnpm format:check
+pnpm validate:public-fallback
 pnpm lint
 pnpm typecheck
 pnpm test:unit
@@ -86,6 +88,23 @@ pnpm test:a11y
 pnpm test:ai-evals
 pnpm test:security
 pnpm test:performance
+```
+
+To rebuild the public fallback from an owner-approved sanitized publication export, run:
+
+```bash
+pnpm generate:public-fallback -- --input /absolute/path/to/public-publication.json
+pnpm validate:public-fallback
+```
+
+The export must contain `publication`, `items`, `evidence`, and `blog`; the generator strips fields outside
+the public allowlist and rejects anything that is not an active published version.
+
+If a publication is withdrawn before a replacement is ready, invalidate the bundled artifact and rebuild
+it after the next approved publication:
+
+```bash
+pnpm invalidate:public-fallback
 ```
 
 Expected result: all commands exit successfully, no test connects to production, and generated reports
@@ -126,18 +145,23 @@ SC-023–SC-027.
 8. Open each personal project destination and verify professional projects remain within Experience.
 9. Use both Ask Basil modes and distinguish a cited conversational answer from deterministic role-fit
    results.
-10. Stop AI/workflow/worker processes and reload the portfolio; then withdraw the active publication and
-    reload again.
+10. Stop AI/workflow/worker processes and simulate a typed public projection transport/timeout failure;
+    reload the portfolio and verify the generated E-001 snapshot renders with an accessible stale notice.
+11. Withdraw the active publication (or return an explicit `no_active_publication` response), reload again,
+    and verify E-001 is not used; run the snapshot invalidation/rebuild command.
 
 Expected outcomes:
 
 - The primary experience stays on one page and uses the reconciled composition.
-- Career content originates only from the active publication; the AI capability is not presented as an
-  employer title without evidence, and withdrawal produces an honest empty state with no fallback claims.
+- Career content originates from the active publication, or from E-001 only during the simulated transient
+  read failure; the AI capability is not presented as an employer title without evidence. Withdrawal or
+  no-publication produces an honest empty state and invalidates the snapshot.
 - Hero, navigation, rail, chapters, projects, proof, and Ask Basil produce no clipped essential text or
   horizontal page overflow across the viewport/zoom matrix.
 - Focus, landmarks, complete role names, accordion relationships, contrast, and controls meet WCAG AA.
 - Approved content remains available when AI and private workers are unavailable.
+- E-001 contains the source publication version/hash and generated time, shows a stale status, and cannot
+  be consumed by Ask Basil, role-fit, private routes, or mutation paths.
 - The performance report meets the 2.5-second usable-content target on the defined mobile profile.
 
 ## Scenario 2: Manual Career Fact, Evidence, and Publication
@@ -384,3 +408,13 @@ A release candidate is acceptable only when:
    production promotion—neither implementation authorization nor deployment is autonomous.
 10. no mandatory promotion job reports success by silently skipping for missing credentials, tools,
     browsers, fixtures, staging services, or reports.
+
+## Convergence verification — 2026-09-04
+
+The linked Supabase Cloud project was checked read-only after applying
+`0118_expose_public_schemas.sql`. The anonymous PostgREST role can reach the `api` and `published`
+schemas used by the public reader. The project currently has no active publication or public blog rows,
+so the application returns the explicit unpublished state; it does not substitute the E-001 fallback.
+The ingestion corpus contains two evidence versions, six chunks, and six non-null `vector(1536)`
+embeddings. Full hosted pgTAP fixtures, cross-engine browser runs, k6 profiles, production-like AI
+evaluation, and backup/restore remain open release gates until an isolated staging environment is provided.

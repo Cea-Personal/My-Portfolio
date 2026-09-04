@@ -1,13 +1,19 @@
 import { PortfolioNavigation } from "@/components/portfolio/navigation";
-import { loadPublicBlogPosts } from "@/lib/api/public-data";
+import { loadPublicBlogPostsWithStatus } from "@/lib/api/public-data";
 
 export const dynamic = "force-dynamic";
 
 export default async function PublicBlogIndex() {
-  const posts = await loadPublicBlogPosts();
+  const result = await loadPublicBlogPostsWithStatus();
+  const posts = result.posts;
   return (
     <>
       <PortfolioNavigation />
+      {result.stale ? (
+        <p className="portfolio-stale-notice" role="status">
+          Showing the latest approved writing snapshot while live content reconnects.
+        </p>
+      ) : null}
       <main id="main-content" className="portfolio-main blog-index-page">
         <header>
           <p className="eyebrow">Basil Ogbonna · Blog</p>

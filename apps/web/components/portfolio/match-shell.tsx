@@ -7,6 +7,7 @@ export function RoleFit() {
   const [result, setResult] = useState<{
     score: string;
     abstained?: boolean;
+    unavailable?: boolean;
     requirements: readonly {
       id: string;
       text?: string;
@@ -33,6 +34,7 @@ export function RoleFit() {
         data?: {
           score?: string;
           abstained?: boolean;
+          unavailable?: boolean;
           requirements?: readonly {
             id: string;
             text?: string;
@@ -49,7 +51,8 @@ export function RoleFit() {
         requirements: payload.data?.requirements ?? [],
         ...(typeof payload.data?.abstained === "boolean"
           ? { abstained: payload.data.abstained }
-          : {})
+          : {}),
+        ...(payload.data?.unavailable === true ? { unavailable: true } : {})
       });
     } catch {
       setError(true);
@@ -92,6 +95,12 @@ export function RoleFit() {
         {error ? <p role="alert">Matching is unavailable. Try again.</p> : null}
         {result ? (
           <div className="role-fit-results">
+            {result.unavailable ? (
+              <p className="assistant-unavailable" role="status">
+                Live public evidence is reconnecting. Role fit will be available when the approved
+                publication is reachable.
+              </p>
+            ) : null}
             <p>
               Match score: {result.score}
               {result.abstained ? " (no approved evidence matched)" : ""}

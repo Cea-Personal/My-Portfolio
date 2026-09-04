@@ -31,6 +31,11 @@ interface ParserResult {
   candidates?: ParserCandidate[];
 }
 
+const EMBEDDING_DIMENSIONS = 1536;
+const EMBEDDING_PROVIDER = "career-worker";
+const EMBEDDING_MODEL = "deterministic-private-index";
+const EMBEDDING_VERSION = "deterministic-private-index.v1";
+
 function configuredClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -55,17 +60,40 @@ function isParserResult(value: unknown): value is ParserResult {
   const result = value as Record<string, unknown>;
   if (result.status === "quarantined") return typeof result.code === "string";
   if (result.status !== "completed" || !Array.isArray(result.chunks)) return false;
-  return result.chunks.every((chunk) => {
+  const chunks = result.chunks;
+  const validChunks = chunks.every((chunk) => {
     if (!chunk || typeof chunk !== "object") return false;
     const item = chunk as Record<string, unknown>;
     return (
       Number.isInteger(item.ordinal) &&
       typeof item.content === "string" &&
+      item.content.trim().length > 0 &&
       item.content.length <= 20_000 &&
       typeof item.contentHash === "string" &&
+      Number.isInteger(item.charStart) &&
+      Number.isInteger(item.charEnd) &&
+      Number(item.charStart) >= 0 &&
+      Number(item.charEnd) > Number(item.charStart) &&
+      (item.pageStart === null ||
+        (Number.isInteger(item.pageStart) && Number(item.pageStart) > 0)) &&
+      (item.pageEnd === null || (Number.isInteger(item.pageEnd) && Number(item.pageEnd) > 0)) &&
+      (item.pageStart === null ||
+        item.pageEnd === null ||
+        Number(item.pageEnd) >= Number(item.pageStart)) &&
+      Array.isArray(item.sectionPath) &&
+      item.sectionPath.every((section) => typeof section === "string") &&
       Array.isArray(item.embedding) &&
-      item.embedding.length === 1536 &&
+      item.embedding.length === EMBEDDING_DIMENSIONS &&
       item.embedding.every((number) => typeof number === "number" && Number.isFinite(number))
+    );
+  });
+  if (!validChunks) return false;
+  const typedChunks = chunks as ParserChunk[];
+  return typedChunks.every((chunk, index) => {
+    const previous = typedChunks[index - 1];
+    return (
+      chunk.ordinal === index &&
+      (index === 0 || (previous !== undefined && chunk.charStart > previous.charStart))
     );
   });
 }
@@ -201,37 +229,57 @@ export const documentIngestion = inngest.createFunction(
       const parsed = (await response.json().catch(() => null)) as unknown;
       if (!isParserResult(parsed)) throw new Error("DOCUMENT_PARSER_RESPONSE_INVALID");
 
-      const { data: prior } = await client
+      const { data: existingVersion } = await client
         .schema("app")
         .from("evidence_versions")
         .select("id,ordinal")
         .eq("evidence_source_id", sourceId)
+        .eq("external_revision", documentVersionId)
         .order("ordinal", { ascending: false })
         .limit(1)
         .maybeSingle();
-      const priorOrdinal = typeof prior?.ordinal === "number" ? prior.ordinal : 0;
-      const { data: evidenceVersion, error: evidenceError } = await client
-        .schema("app")
-        .from("evidence_versions")
-        .insert({
-          evidence_source_id: sourceId,
-          ordinal: priorOrdinal + 1,
-          external_revision: documentVersionId,
-          raw_object_key: objectPath,
-          raw_sha256: version.internal_sha256,
-          normalized_text_sha256: version.internal_sha256,
-          media_type: document.source_mime,
-          byte_size: bytes.byteLength,
-          parser_name: parsed.parser ?? "career-worker",
-          parser_version: parsed.parserVersion ?? "1",
-          processed_at: new Date().toISOString(),
-          quarantine_status: parsed.status === "completed" ? "approved" : "quarantined",
-          prior_version_id: prior?.id ?? null
-        })
-        .select("id")
-        .single();
-      if (evidenceError || !evidenceVersion)
-        throw evidenceError ?? new Error("EVIDENCE_VERSION_CREATE_FAILED");
+      let evidenceVersion = existingVersion;
+      let evidenceError: unknown = null;
+      if (!evidenceVersion) {
+        const { data: prior } = await client
+          .schema("app")
+          .from("evidence_versions")
+          .select("id,ordinal")
+          .eq("evidence_source_id", sourceId)
+          .order("ordinal", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        const priorOrdinal = typeof prior?.ordinal === "number" ? prior.ordinal : 0;
+        const inserted = await client
+          .schema("app")
+          .from("evidence_versions")
+          .insert({
+            evidence_source_id: sourceId,
+            ordinal: priorOrdinal + 1,
+            external_revision: documentVersionId,
+            raw_object_key: objectPath,
+            raw_sha256: version.internal_sha256,
+            normalized_text_sha256: version.internal_sha256,
+            media_type: document.source_mime,
+            byte_size: bytes.byteLength,
+            parser_name: parsed.parser ?? "career-worker",
+            parser_version: parsed.parserVersion ?? "1",
+            processed_at: new Date().toISOString(),
+            quarantine_status: parsed.status === "completed" ? "approved" : "quarantined",
+            prior_version_id: prior?.id ?? null
+          })
+          .select("id,ordinal")
+          .single();
+        evidenceVersion = inserted.data;
+        evidenceError = inserted.error;
+      }
+      if (evidenceError || !evidenceVersion) {
+        const message =
+          evidenceError && typeof evidenceError === "object" && "message" in evidenceError
+            ? String(evidenceError.message)
+            : "EVIDENCE_VERSION_CREATE_FAILED";
+        throw new Error(message);
+      }
 
       if (parsed.status === "quarantined") {
         await client
@@ -262,19 +310,22 @@ export const documentIngestion = inngest.createFunction(
         const { data: persistedChunk, error: chunkError } = await client
           .schema("app")
           .from("evidence_chunks")
-          .insert({
-            evidence_version_id: evidenceVersion.id,
-            ordinal: chunk.ordinal,
-            page_start: chunk.pageStart,
-            page_end: chunk.pageEnd,
-            section_path: chunk.sectionPath,
-            char_start: chunk.charStart,
-            char_end: chunk.charEnd,
-            content: chunk.content,
-            content_hash: chunk.contentHash,
-            visibility: "private",
-            trust_level: "ai_extracted"
-          })
+          .upsert(
+            {
+              evidence_version_id: evidenceVersion.id,
+              ordinal: chunk.ordinal,
+              page_start: chunk.pageStart,
+              page_end: chunk.pageEnd,
+              section_path: chunk.sectionPath,
+              char_start: chunk.charStart,
+              char_end: chunk.charEnd,
+              content: chunk.content,
+              content_hash: chunk.contentHash,
+              visibility: "private",
+              trust_level: "ai_extracted"
+            },
+            { onConflict: "evidence_version_id,ordinal" }
+          )
           .select("id")
           .single();
         if (chunkError || !persistedChunk)
@@ -282,18 +333,21 @@ export const documentIngestion = inngest.createFunction(
         const { error: embeddingError } = await client
           .schema("app")
           .from("chunk_embeddings")
-          .insert({
-            chunk_id: persistedChunk.id,
-            provider: "career-worker",
-            model: "deterministic-private-index",
-            model_version: "1",
-            dimensions: 1536,
-            embedding_version: "deterministic-private-index.v1",
-            embedding: `[${chunk.embedding.join(",")}]`,
-            normalization: "l2",
-            input_hash: chunk.contentHash,
-            status: "completed"
-          });
+          .upsert(
+            {
+              chunk_id: persistedChunk.id,
+              provider: EMBEDDING_PROVIDER,
+              model: EMBEDDING_MODEL,
+              model_version: "1",
+              dimensions: EMBEDDING_DIMENSIONS,
+              embedding_version: EMBEDDING_VERSION,
+              embedding: `[${chunk.embedding.join(",")}]`,
+              normalization: "l2",
+              input_hash: chunk.contentHash,
+              status: "completed"
+            },
+            { onConflict: "chunk_id,embedding_version" }
+          );
         if (embeddingError) throw embeddingError;
       }
       const candidates = parsed.candidates ?? [];

@@ -18,6 +18,11 @@ export default async function ProjectPage({ params }: { params: Promise<{ slug: 
   }
   return (
     <main>
+      {snapshot.stale ? (
+        <p className="portfolio-stale-notice" role="status">
+          Showing the latest approved project snapshot while live content reconnects.
+        </p>
+      ) : null}
       <h1>{typeof project.title === "string" ? project.title : "Project"}</h1>
       {typeof project.subtitle === "string" ? <p>{project.subtitle}</p> : null}
       <p>{typeof project.public_summary === "string" ? project.public_summary : ""}</p>

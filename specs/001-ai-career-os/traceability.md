@@ -17,7 +17,7 @@ are kept in commit history and CI output.
 
 | Gate | Evidence | Status |
 | --- | --- | --- |
-| Hosted schema and vector index | Supabase migrations `0001–0115`; six completed `app.chunk_embeddings` rows; linked lint exits 0 | PASS |
+| Hosted schema and vector index | Supabase migrations `0001–0118`; six completed `app.chunk_embeddings` rows; linked lint exits 0 | PASS |
 | Hosted validation runner | `scripts/hosted-pgtap.mjs` executes committed SQL with SSL and no database URL in process arguments | IMPLEMENTED; execution OPEN |
 | Public UX/accessibility | Chromium axe + responsive/zoom/keyboard/reduced-motion suite | PASS |
 | AI safety/evaluation | 6 eval + 5 adversarial + 4 AI package tests; 100/100 hostile unsupported prompts abstained | PASS |

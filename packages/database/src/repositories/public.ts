@@ -6,6 +6,13 @@ export interface PublicPortfolioSnapshot {
   evidence: Record<string, unknown>[];
 }
 
+export class PublicPublicationReadError extends Error {
+  constructor(message = "The public publication could not be read.") {
+    super(message);
+    this.name = "PublicPublicationReadError";
+  }
+}
+
 export function publicRepository(client: SupabaseClient) {
   return {
     scope: "public" as const,
@@ -15,13 +22,16 @@ export function publicRepository(client: SupabaseClient) {
         client.schema("api").from("current_publication").select("*").maybeSingle(),
         client.schema("api").from("public_portfolio_items").select("*").order("display_order")
       ]);
-      if (publicationResult.error || itemsResult.error || !publicationResult.data)
-        return { publication: null, items: [], evidence: [] };
+      if (publicationResult.error)
+        throw new PublicPublicationReadError(publicationResult.error.message);
+      if (itemsResult.error) throw new PublicPublicationReadError(itemsResult.error.message);
+      if (!publicationResult.data) return { publication: null, items: [], evidence: [] };
       const evidenceResult = await client
         .schema("published")
         .from("public_evidence")
         .select("*")
         .eq("publication_id", publicationResult.data.id);
+      if (evidenceResult.error) throw new PublicPublicationReadError(evidenceResult.error.message);
       return {
         publication: publicationResult.data as Record<string, unknown>,
         items: (itemsResult.data ?? []) as Record<string, unknown>[],

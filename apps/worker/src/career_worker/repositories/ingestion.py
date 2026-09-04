@@ -8,6 +8,14 @@ import httpx
 
 from career_worker.extraction.career_facts import ExtractedFactCandidate
 from career_worker.ingestion.chunking import Chunk
+from career_worker.ingestion.embeddings import (
+    EMBEDDING_DIMENSIONS,
+    EMBEDDING_MODEL,
+    EMBEDDING_PROVIDER,
+    EMBEDDING_VERSION,
+    embed_deterministically,
+    embedding_literal,
+)
 
 
 def _now() -> str:
@@ -51,6 +59,7 @@ class SupabaseIngestionStore:
         *,
         params: dict[str, str] | None = None,
         payload: dict[str, Any] | list[dict[str, Any]] | None = None,
+        prefer: str = "return=representation",
     ) -> list[dict[str, Any]]:
         if self.client is None:  # pragma: no cover - guarded by __post_init__
             raise RuntimeError("Supabase client is not initialized")
@@ -65,7 +74,7 @@ class SupabaseIngestionStore:
                 "accept-profile": "app",
                 "content-profile": "app",
                 "content-type": "application/json",
-                "prefer": "return=representation",
+                "prefer": prefer,
             },
         )
         response.raise_for_status()
@@ -239,9 +248,16 @@ class SupabaseIngestionStore:
         existing = self._request(
             "GET",
             "evidence_chunks",
-            params={"select": "ordinal", "evidence_version_id": f"eq.{evidence_version_id}"},
+            params={
+                "select": "id,ordinal,content_hash",
+                "evidence_version_id": f"eq.{evidence_version_id}",
+            },
         )
-        existing_ordinals = {item.get("ordinal") for item in existing}
+        chunk_rows: dict[int, dict[str, Any]] = {
+            int(item["ordinal"]): item
+            for item in existing
+            if isinstance(item.get("ordinal"), int) and isinstance(item.get("id"), str)
+        }
         payload = [
             {
                 "evidence_version_id": evidence_version_id,
@@ -257,10 +273,50 @@ class SupabaseIngestionStore:
                 "trust_level": "ai_extracted",
             }
             for chunk in chunks
-            if chunk.ordinal not in existing_ordinals
+            if chunk.ordinal not in chunk_rows
         ]
         if payload:
-            self._request("POST", "evidence_chunks", payload=payload)
+            inserted = self._request("POST", "evidence_chunks", payload=payload)
+            for item in inserted:
+                ordinal = item.get("ordinal")
+                if isinstance(ordinal, int) and isinstance(item.get("id"), str):
+                    chunk_rows[ordinal] = item
+
+        # The direct worker ingestion path must write the same pgvector rows as
+        # the HTTP parser path.  Upserting by (chunk_id, embedding_version)
+        # makes retries safe while keeping the source chunk immutable.
+        embeddings: list[dict[str, Any]] = []
+        for chunk in chunks:
+            row = chunk_rows.get(chunk.ordinal)
+            chunk_id = row.get("id") if row is not None else None
+            if not isinstance(chunk_id, str):
+                raise RuntimeError("EVIDENCE_CHUNK_PERSIST_FAILED")
+            if row is None:  # pragma: no cover - guarded by the id check above
+                raise RuntimeError("EVIDENCE_CHUNK_PERSIST_FAILED")
+            if row.get("content_hash") not in (None, chunk.content_hash):
+                raise RuntimeError("EVIDENCE_CHUNK_IMMUTABLE_CONFLICT")
+            vector = embed_deterministically(chunk.content, EMBEDDING_DIMENSIONS)
+            embeddings.append(
+                {
+                    "chunk_id": chunk_id,
+                    "provider": EMBEDDING_PROVIDER,
+                    "model": EMBEDDING_MODEL,
+                    "model_version": "1",
+                    "embedding_version": EMBEDDING_VERSION,
+                    "dimensions": EMBEDDING_DIMENSIONS,
+                    "embedding": embedding_literal(vector),
+                    "normalization": "l2",
+                    "input_hash": chunk.content_hash,
+                    "status": "completed",
+                }
+            )
+        self._request(
+            "POST",
+            "chunk_embeddings",
+            params={"on_conflict": "chunk_id,embedding_version"},
+            payload=embeddings,
+            prefer="resolution=merge-duplicates,return=representation",
+        )
 
     def _persist_candidates(
         self, run_id: str, candidates: tuple[ExtractedFactCandidate, ...]

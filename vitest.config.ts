@@ -5,6 +5,7 @@ export default defineConfig({
   root: resolve(import.meta.dirname),
   resolve: {
     alias: {
+      "@": resolve(import.meta.dirname, "apps/web"),
       "@career-os/ai": resolve(import.meta.dirname, "packages/ai/src/index.ts"),
       "@career-os/analytics": resolve(import.meta.dirname, "packages/analytics/src/index.ts"),
       "@career-os/applications": resolve(import.meta.dirname, "packages/applications/src/index.ts"),

@@ -28,6 +28,9 @@
     "test:ai-evals": "vitest run tests/evals",
     "test:security": "vitest run tests/security",
     "test:performance": "k6 run tests/performance/release.js",
+    "generate:public-fallback": "node scripts/generate-public-fallback.mjs",
+    "validate:public-fallback": "node scripts/validate-public-fallback.mjs",
+    "invalidate:public-fallback": "node scripts/invalidate-public-fallback.mjs",
     "release:preflight": "node scripts/release-preflight.mjs",
     "db:reset": "supabase db reset",
     "seed:acceptance": "supabase db reset"

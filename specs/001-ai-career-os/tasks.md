@@ -693,7 +693,7 @@ path and independent fixture path both pass.
 - [X] T291 Implement bounded document parsing, quarantine, extraction, embeddings/indexing, source provenance, and failure/retry observability for uploaded and Drive material per FR-014–FR-018 and plan: ingestion pipeline (partial)
 - [X] T292 Build structured Career Brain capture/edit/review flows with fact type fields, supporting evidence, approve/reject/defer controls, reviewer history, and projection eligibility per FR-007–FR-012 and US1/AC2–4 (partial)
 - [X] T293 Make publication creation, activation, rollback, and public-snapshot rebuild transactional and owner-visible, with evidence visibility/citation validation and truthful no-publication behavior per FR-019–FR-027 and Constitution IV/V (partial)
-- [X] T294 Remove the hard-coded public career-stage fallback and render the portfolio exclusively from the active approved projection, retaining an honest empty state when no active publication exists per FR-028–FR-038, FR-131, and SC-023 (contradicts)
+- [X] T294 Reconcile public resilience with E-001: remove hand-authored career constants, generate and validate an allowlisted `PublicFallbackSnapshot` from the last approved publication, use it only for typed transient public-read failures, and retain explicit withdrawal/no-publication empty-state precedence per FR-028–FR-038, FR-131, and SC-023; implemented in `apps/web/lib/api/public-data.ts`, `apps/web/lib/api/public-fallback.ts`, generated artifact/scripts, and public AI guards
 - [X] T295 Complete the reconciled public portfolio composition: Basil Ogbonna branding, profile rail, ordered career accordion, experience-bound work/impact/tools, personal-project chapters, Blog, and contact flow backed by projection data per FR-127/FR-130/FR-133 and `contracts/portfolio-experience.md` (partial)
 - [X] T296 Complete the centered fixed-Engineer hero role sequence, accessible role announcements, reduced-motion behavior, theme contrast, zoom/narrow-layout overflow prevention, and Experience anchor interaction per FR-128–FR-130 and SC-024–SC-027 (partial)
 - [X] T297 Complete Portfolio as Proof with its public architecture/process/technology narrative, safely described private capabilities, verified proof links, and an explicit unavailable-state policy per FR-131/FR-133 and `contracts/portfolio-experience.md` (partial)
@@ -735,13 +735,18 @@ path and independent fixture path both pass.
 
 ### Convergence ledger notes — 2026-09-04
 
+- T294 is implemented and locally verified: public projection/blog reads now distinguish live, fallback,
+  explicit empty, and error outcomes; the generated allowlisted snapshot is schema/expiry validated,
+  public pages display stale status, and Ask Basil/role-fit refuse fallback evidence. `pnpm
+  validate:public-fallback`, web lint/typecheck, and targeted contract tests pass.
 - T322 is implemented and locally verified: the release preflight fails closed with missing hosted
   credentials/fixtures and succeeds only with the complete required environment contract. The workflow
   now runs hosted migration/pgTAP checks, worker canary, browser/a11y, AI, performance, and artifact
   upload steps without successful deferrals.
 - T323 is reconciled against executable evidence. T317 now has a guarded hosted runner (`pnpm
-  test:db:hosted`) and the Cloud schema is aligned through 0115, but its isolated fixture execution
-  remains open. T318, T319, T320, and T321 remain open because this workstation lacks usable
+  test:db:hosted`) and the Cloud schema is aligned through 0118; the linked project now exposes the
+  `api` and `published` PostgREST schemas, and a read-only smoke check confirms the public projections
+  are reachable. Its isolated fixture execution remains open. T318, T319, T320, and T321 remain open because this workstation lacks usable
   Firefox/WebKit binaries, k6, and an isolated backup/restore environment. T284 remains the umbrella
   release-validation task.
 - T324 remains open until those external gates are run and a final convergence review can truthfully

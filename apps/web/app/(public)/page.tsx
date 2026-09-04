@@ -11,16 +11,22 @@ import { PageIntro } from "../../components/portfolio/page-intro";
 import { ProfileRail } from "../../components/portfolio/profile-rail";
 import { EngineeringProcesses } from "../../components/portfolio/engineering-processes";
 import type { CareerTimelineStage } from "../../components/portfolio/career-timeline";
-import { loadPublicBlogPosts, loadPublicPortfolio } from "@/lib/api/public-data";
+import { loadPublicBlogPostsWithStatus, loadPublicPortfolio } from "@/lib/api/public-data";
 import { PublicEvents } from "@/components/analytics/public-events";
 
 export const dynamic = "force-dynamic";
 
 export default async function PublicPortfolioPage() {
-  const [snapshot, publishedPosts] = await Promise.all([
+  const [snapshot, publishedPostsResult] = await Promise.all([
     loadPublicPortfolio(),
-    loadPublicBlogPosts()
+    loadPublicBlogPostsWithStatus()
   ]);
+  const publishedPosts =
+    snapshot.source === "empty" && publishedPostsResult.source === "fallback"
+      ? []
+      : publishedPostsResult.posts;
+  const publicReadIsStale =
+    snapshot.stale || (snapshot.source !== "empty" && publishedPostsResult.stale);
   const items = snapshot.items;
   const profile = snapshot.publication;
   // if (!profile) {
@@ -128,8 +134,18 @@ export default async function PublicPortfolioPage() {
   const timelineProjectIds = new Set(
     timelineStages.flatMap((stage) => (stage.projects ?? []).map((project) => project.title))
   );
+  // These narratives already have canonical presentations below: PortfolioProof is
+  // rendered inside Projects and EngineeringProcesses owns its own section. A
+  // projection row for either would show the same content a second time.
+  const standaloneProjectTitles = new Set([
+    "portfolio as proof",
+    "engineering process",
+    "engineering processes"
+  ]);
   const personalProjectItems = projectItems.filter(
-    (project) => !timelineProjectIds.has(text(project.title))
+    (project) =>
+      !timelineProjectIds.has(text(project.title)) &&
+      !standaloneProjectTitles.has(text(project.title).trim().toLowerCase())
   );
   // Use the included local portrait when a deployment does not supply an external image URL.
   const profileImage =
@@ -199,6 +215,11 @@ export default async function PublicPortfolioPage() {
       />
       <PageIntro name={displayName} />
       <PortfolioNavigation />
+      {publicReadIsStale ? (
+        <p className="portfolio-stale-notice" role="status">
+          Showing the latest approved portfolio snapshot while live content reconnects.
+        </p>
+      ) : null}
       <main id="main-content" className="portfolio-main" tabIndex={-1}>
         <PortfolioMotion />
         <div className="portfolio-layout">

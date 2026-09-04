@@ -29,7 +29,11 @@ export function Contact({ email }: { email?: string }) {
       return;
     }
     setStatus("error");
-    setMessage("That didn’t send. Please try again or use the email link below.");
+    setMessage(
+      email
+        ? "That didn’t send. Please try again or use the email link below."
+        : "That didn’t send. Please try again when the contact service is available."
+    );
   }
 
   return (

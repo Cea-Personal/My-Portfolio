@@ -25,6 +25,17 @@ export async function POST(request: Request) {
     );
   const requirements = extractRequirements(description);
   const snapshot = await loadPublicPortfolio();
+  if (snapshot.source !== "live")
+    return publicApiResponse(
+      {
+        score: "0.0000",
+        requirements: [],
+        abstained: true,
+        unavailable: true,
+        reason: "PUBLIC_EVIDENCE_UNAVAILABLE"
+      },
+      request
+    );
   const evidence = snapshot.evidence.flatMap((item) => {
     const content = typeof item.sanitized_excerpt === "string" ? item.sanitized_excerpt : "";
     const id = typeof item.public_evidence_id === "string" ? item.public_evidence_id : "";

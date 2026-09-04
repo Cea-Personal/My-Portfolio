@@ -1,0 +1,116 @@
+{
+  "schema_version": "portfolio-fallback.v1",
+  "source_publication_version": 1,
+  "source_content_hash": "112959a3798ef356be5e323e13626cb0e64a456298434041c93edf25b9ba929f",
+  "generated_at": "2026-09-04T00:00:00.000Z",
+  "expires_at": "2026-12-31T23:59:59.000Z",
+  "publication": {
+    "id": "public-fallback-baseline",
+    "version": 1,
+    "status": "published",
+    "schema_version": "portfolio.v1",
+    "display_name": "Basil Ogbonna",
+    "headline": "Data Engineer",
+    "bio": "I engineer software, data platforms, and AI systems that move difficult ideas into reliable production."
+  },
+  "items": [
+    {
+      "public_id": "fallback-about",
+      "source_entity_type": "profile",
+      "source_entity_id": "public-fallback-profile",
+      "section": "about",
+      "display_order": 1,
+      "title": "About",
+      "public_summary": "Software taught me structure. Data taught me scale. AI taught me to keep asking better questions."
+    },
+    {
+      "public_id": "fallback-experience-web",
+      "source_entity_type": "experience",
+      "source_entity_id": "public-fallback-experience-web",
+      "section": "experience",
+      "career_stage": "web-developer",
+      "display_order": 1,
+      "title": "Web Developer",
+      "public_summary": "Started with interfaces and services that make complex work easier to use."
+    },
+    {
+      "public_id": "fallback-experience-software",
+      "source_entity_type": "experience",
+      "source_entity_id": "public-fallback-experience-software",
+      "section": "experience",
+      "career_stage": "software-engineer",
+      "display_order": 2,
+      "title": "Software Engineer",
+      "public_summary": "Built maintainable software around clear contracts, tests, and useful feedback."
+    },
+    {
+      "public_id": "fallback-experience-lead",
+      "source_entity_type": "experience",
+      "source_entity_id": "public-fallback-experience-lead",
+      "section": "experience",
+      "career_stage": "lead-software-engineer",
+      "display_order": 3,
+      "title": "Lead Software Engineer",
+      "public_summary": "Led technical decisions that helped teams ship reliable systems together."
+    },
+    {
+      "public_id": "fallback-experience-data",
+      "source_entity_type": "experience",
+      "source_entity_id": "public-fallback-experience-data",
+      "section": "experience",
+      "career_stage": "data-engineer",
+      "display_order": 4,
+      "title": "Data Engineer",
+      "public_summary": "Moved data from source to trusted product with lineage and validation in the loop."
+    },
+    {
+      "public_id": "fallback-experience-senior-data",
+      "source_entity_type": "experience",
+      "source_entity_id": "public-fallback-experience-senior-data",
+      "section": "experience",
+      "career_stage": "senior-data-engineer",
+      "display_order": 5,
+      "title": "Senior Data Engineer",
+      "public_summary": "Designed dependable data platforms that balance scale, quality, and operational clarity."
+    },
+    {
+      "public_id": "fallback-experience-ai",
+      "source_entity_type": "experience",
+      "source_entity_id": "public-fallback-experience-ai",
+      "section": "experience",
+      "career_stage": "ai-engineer",
+      "display_order": 6,
+      "title": "AI Engineer",
+      "public_summary": "Turned uncertain questions into evaluated AI systems with retrieval, citations, and safe abstention."
+    },
+    {
+      "public_id": "fallback-project-proof",
+      "source_entity_type": "project",
+      "source_entity_id": "public-fallback-portfolio-proof",
+      "section": "projects",
+      "display_order": 1,
+      "title": "Portfolio as Proof",
+      "subtitle": "A real product, built to make the work inspectable.",
+      "public_summary": "An evidence-backed portfolio with a private Career Brain, retrieval, application preparation, interview support, and resilient public publishing.",
+      "detail_slug": "portfolio-as-proof",
+      "display_technologies": ["Next.js", "TypeScript", "Supabase", "PostgreSQL", "pgvector", "RAG"]
+    }
+  ],
+  "evidence": [],
+  "blog": [
+    {
+      "id": "fallback-blog-note",
+      "slug": "notes-from-making-solutions-people-use",
+      "title": "Notes from making solutions people actually use",
+      "excerpt": "Field notes on turning difficult engineering problems into systems people can trust.",
+      "markdown": "Reliable systems are made in the seams: clear contracts, useful feedback, and enough evidence to know when an answer should be trusted.",
+      "cover_url": null,
+      "tags": ["engineering", "data", "ai"],
+      "seo_title": null,
+      "seo_description": null,
+      "visible_at": "2026-09-04T00:00:00.000Z",
+      "evidence_type": "technical_knowledge",
+      "supports_employment_claim": false
+    }
+  ]
+}

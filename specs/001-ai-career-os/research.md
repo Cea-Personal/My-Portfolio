@@ -2,7 +2,7 @@
 
 **Date**: 2026-08-31
 
-**Reconciled**: 2026-09-02
+**Reconciled**: 2026-09-04
 
 **Status**: Complete — all technical-context and reconciliation unknowns resolved
 
@@ -508,7 +508,10 @@ accessible name and published evidence remain complete and authoritative.
 
 **Alternatives considered**:
 
-- Frontend constants as fallback career content: rejected under Constitution I and FR-038/SC-023.
+- Hand-authored frontend constants as fallback career content remain rejected under Constitution I and
+  FR-038/SC-023. E-001 supersedes that rejected approach only for a build-generated, allowlisted snapshot
+  of the most recent owner-approved publication during a typed live-read failure; it is not a second
+  source of career truth and never applies to explicit withdrawal/no-publication responses.
 - Treating AI Engineer as an employer title by default: rejected as a potentially unsupported claim.
 - Motion-only meaning: rejected for accessibility and reduced-motion requirements.
 
@@ -562,10 +565,30 @@ separate statuses.
 - Run release checks against production: rejected for privacy and operational risk.
 - Treat checked-in test files as validation evidence: rejected because SC outcomes require measured runs.
 
+## 26. Public Resilience Snapshot (E-001)
+
+**Decision**: During a typed anonymous public projection transport, timeout, or response-validation
+failure, serve a bundled `PublicFallbackSnapshot` generated from the most recent owner-approved active
+publication. Preserve an explicit `withdrawn`/`no_active_publication` response as empty and invalidate the
+artifact. The snapshot is limited to sanitized portfolio sections and is unavailable to private, AI,
+retrieval, citation, analytics, and mutation paths.
+
+**Rationale**: The public portfolio is a durable proof surface and should remain viewable during transient
+backend outages, but hand-authored frontend claims would violate Career Brain canonicality. A generated,
+versioned artifact provides availability while preserving provenance, allowlisting, and withdrawal
+precedence.
+
+**Alternatives considered**:
+
+- Hand-authored React/frontend constants: rejected because they create a divergent career-truth store.
+- Fallback for Ask Basil, role-fit, or private routes: rejected because it could fabricate evidence,
+  citations, scores, or authorization state.
+- Fallback after an explicit withdrawal: rejected because withdrawal must remove public reachability.
+
 ## Research Closure
 
 All Technical Context and reconciliation choices are resolved; no planning unknowns remain. Version pins
 are planning baselines and MUST be revalidated for security and compatibility during implementation
 without changing the architectural decisions silently. The amendment changes presentation grouping,
-owner authorization, completion evidence, and release gating but introduces no additional deployable
-service or constitutional exception.
+owner authorization, completion evidence, release gating, and records the bounded E-001 public-read
+exception; it introduces no additional deployable service.

@@ -51,6 +51,19 @@ body {
   overflow-x: clip;
 }
 
+.portfolio-stale-notice {
+  width: min(100% - 2rem, 78rem);
+  margin: 0.75rem auto 0;
+  padding: 0.65rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent-soft) 78%, var(--surface));
+  color: var(--muted);
+  font-size: 0.82rem;
+  letter-spacing: 0.02em;
+  text-align: center;
+}
+
 .sr-only {
   position: absolute;
   width: 1px;
