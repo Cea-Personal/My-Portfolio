@@ -63,8 +63,8 @@ export function PublicationControl() {
     <section aria-labelledby="publication-title">
       <h2 id="publication-title">Portfolio publication</h2>
       <p>
-        Build an immutable preview from approved, public, cited evidence. Activating it atomically
-        replaces the current public snapshot.
+        Build an immutable preview from the Career Brain items you selected plus approved cited
+        evidence. Activating it atomically replaces the current public snapshot.
       </p>
       <button disabled={busy} type="button" onClick={() => void mutate("stage")}>
         {busy ? "Working…" : "Build staged snapshot"}

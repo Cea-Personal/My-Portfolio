@@ -94,6 +94,7 @@ function validateItem(value: unknown): Record<string, unknown> | null {
     safe.display_technologies = value.display_technologies;
   if (Array.isArray(value.sanitized_media)) safe.sanitized_media = value.sanitized_media;
   if (Array.isArray(value.public_citations)) safe.public_citations = value.public_citations;
+  if (isRecord(value.structured_content)) safe.structured_content = value.structured_content;
   return safe;
 }
 

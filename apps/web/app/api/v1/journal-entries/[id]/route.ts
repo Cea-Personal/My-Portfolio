@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { apiResponse } from "@/lib/api/response";
 import { withPrivateApi } from "@/lib/api/private";
+import { requestCareerBrainRefresh } from "@/inngest/career-brain-events";
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   return withPrivateApi(request, async ({ client, ownerId }) => {
@@ -26,6 +27,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       .maybeSingle();
     if (previous.error) throw previous.error;
     const next = typeof previous.data?.version === "number" ? previous.data.version + 1 : 1;
+    const contentHash = createHash("sha256").update(text).digest("hex");
     const version = await client
       .schema("app")
       .from("journal_versions")
@@ -33,7 +35,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         entry_id: id,
         version: next,
         text,
-        content_hash: createHash("sha256").update(text).digest("hex")
+        content_hash: contentHash
       })
       .select("*")
       .single();
@@ -48,6 +50,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       .eq("id", id)
       .eq("owner_id", ownerId);
     if (update.error) throw update.error;
+    await requestCareerBrainRefresh(ownerId, "journal", `${id}:${contentHash}`).catch(
+      () => undefined
+    );
     return apiResponse({ version: version.data }, request);
   });
 }

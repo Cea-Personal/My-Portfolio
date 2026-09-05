@@ -1,12 +1,8 @@
 import { describe, expect, it } from "vitest";
-import {
-  EMBEDDING_DIMENSIONS,
-  hybridPublicRetrieval,
-  tokenHashEmbedding
-} from "./semantic-retrieval";
+import { EMBEDDING_DIMENSIONS, hybridPublicRetrieval } from "./semantic-retrieval";
 
 describe("hybrid public retrieval", () => {
-  it("combines lexical and vector ranks and excludes private evidence", () => {
+  it("ranks approved public evidence lexically and excludes private evidence", () => {
     const results = hybridPublicRetrieval("reliable data platform", [
       { id: "direct", content: "Built a reliable data platform.", visibility: "public" },
       { id: "other", content: "Designed frontend interfaces.", visibility: "public" },
@@ -14,7 +10,7 @@ describe("hybrid public retrieval", () => {
     ]);
     expect(results[0]?.id).toBe("direct");
     expect(results.map((item) => item.id)).not.toContain("private");
-    expect(tokenHashEmbedding("data")).toHaveLength(EMBEDDING_DIMENSIONS);
+    expect(EMBEDDING_DIMENSIONS).toBe(1536);
   });
 
   it("limits repeated evidence from one source", () => {

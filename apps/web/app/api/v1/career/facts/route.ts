@@ -1,27 +1,23 @@
 import { apiResponse } from "@/lib/api/response";
 import { withPrivateApi } from "@/lib/api/private";
+import { normalizeCareerFactType, normalizeStructuredValue } from "@/lib/career-fact-taxonomy";
+import { requestCareerBrainRefresh } from "@/inngest/career-brain-events";
 
 export function GET(request: Request) {
   return withPrivateApi(request, async ({ client, ownerId }) => {
     const { data: facts, error } = await client
       .schema("app")
       .from("career_facts")
-      .select("*")
+      .select("*,currentVersion:career_fact_versions!career_facts_current_version_fk(*)")
       .eq("owner_id", ownerId)
-      .order("updated_at", { ascending: false });
+      .neq("review_status", "rejected")
+      .order("updated_at", { ascending: false })
+      .limit(1_000);
     if (error) throw error;
-    const versionIds = (facts ?? [])
-      .map((fact) => fact.current_version_id as string | null)
-      .filter((id): id is string => Boolean(id));
-    const { data: versions, error: versionError } = versionIds.length
-      ? await client.schema("app").from("career_fact_versions").select("*").in("id", versionIds)
-      : { data: [], error: null };
-    if (versionError) throw versionError;
-    const byId = new Map((versions ?? []).map((version) => [version.id, version]));
     return apiResponse(
       (facts ?? []).map((fact) => ({
         ...fact,
-        currentVersion: byId.get(fact.current_version_id) ?? null,
+        fact_type: normalizeCareerFactType(fact.fact_type),
         projectionEligible:
           ["approved", "edited_approved"].includes(fact.review_status) &&
           fact.verified_by_owner === true &&
@@ -36,13 +32,13 @@ export async function POST(request: Request) {
     const body = await request.json().catch(() => ({}));
     if (typeof body.statement !== "string" || !body.statement.trim())
       return apiResponse({ code: "INVALID_FACT", detail: "statement is required" }, request, 400);
+    const factType = normalizeCareerFactType(body.factType);
     const { data: fact, error } = await client
       .schema("app")
       .from("career_facts")
       .insert({
         owner_id: ownerId,
-        fact_type:
-          typeof body.factType === "string" ? body.factType.trim().slice(0, 80) : "achievement",
+        fact_type: factType,
         subject_type:
           typeof body.subjectType === "string" ? body.subjectType.trim().slice(0, 80) : "career",
         subject_id: typeof body.subjectId === "string" ? body.subjectId : crypto.randomUUID(),
@@ -63,8 +59,8 @@ export async function POST(request: Request) {
         statement: body.statement.trim().slice(0, 10_000),
         structured_value:
           typeof body.structuredValue === "object" && body.structuredValue !== null
-            ? body.structuredValue
-            : {},
+            ? normalizeStructuredValue(factType, body.structuredValue)
+            : normalizeStructuredValue(factType, {}),
         source_type: typeof body.sourceType === "string" ? body.sourceType : "manual",
         editor_actor: "owner",
         content_hash: await crypto.subtle
@@ -87,6 +83,11 @@ export async function POST(request: Request) {
       .select("*")
       .single();
     if (updateError || !updated) throw updateError ?? new Error("FACT_CREATE_FAILED");
+    await requestCareerBrainRefresh(
+      ownerId,
+      "fact",
+      `${updated.id}:${String(updated.revision)}`
+    ).catch(() => undefined);
     return apiResponse({ ...updated, currentVersion: version }, request, 201);
   });
 }

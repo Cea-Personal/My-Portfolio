@@ -1,17 +1,17 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
-const tasks = [
-  "public_qa",
-  "role_fit",
-  "evidence_extraction",
-  "career_gap",
-  "job_scoring",
-  "document_composition",
-  "compensation",
-  "interview_preparation",
-  "writing_assistance"
-];
+const subagents = [
+  ["Portfolio assistant", "public_qa"],
+  ["Role-fit analyst", "role_fit"],
+  ["Career synthesizer", "evidence_extraction"],
+  ["Career gap analyst", "career_gap"],
+  ["Job matcher", "job_scoring"],
+  ["Application writer", "document_composition"],
+  ["Compensation analyst", "compensation"],
+  ["Interview coach", "interview_preparation"],
+  ["Writing editor", "writing_assistance"]
+] as const;
 interface Provider {
   id: string;
   provider: string;
@@ -52,7 +52,8 @@ async function post(endpoint: string, body: unknown, method: "POST" | "PATCH" = 
     method,
     headers: {
       "content-type": "application/json",
-      "idempotency-key": `${method.toLowerCase()}-${crypto.randomUUID()}`
+      "idempotency-key": `${method.toLowerCase()}-${crypto.randomUUID()}`,
+      ...(method === "PATCH" ? { "if-match": "*" } : {})
     },
     body: JSON.stringify(body)
   });
@@ -61,25 +62,26 @@ async function post(endpoint: string, body: unknown, method: "POST" | "PATCH" = 
   };
   if (!response.ok) throw new Error(payload.data?.detail ?? payload.data?.code ?? "Request failed");
 }
-export function AiCapabilitiesWorkspace() {
+export function AiCapabilitiesWorkspace({ view = "agents" }: { view?: "agents" | "providers" }) {
   const [providers, setProviders] = useState<Provider[]>([]);
   const [capabilities, setCapabilities] = useState<Capability[]>([]);
   const [runs, setRuns] = useState<AiRun[]>([]);
   const [message, setMessage] = useState("");
   const load = useCallback(async () => {
-    const [response, runResponse] = await Promise.all([
-      fetch("/api/v1/settings/ai-capabilities", { cache: "no-store" }),
-      fetch("/api/v1/ai-runs", { cache: "no-store" })
-    ]);
-    if (!response.ok || !runResponse.ok) throw new Error();
+    const response = await fetch("/api/v1/settings/ai-capabilities", { cache: "no-store" });
+    if (!response.ok) throw new Error();
     const payload = (await response.json()) as {
       data?: { providers?: Provider[]; capabilities?: Capability[] };
     };
-    const runPayload = (await runResponse.json()) as { data?: { runs?: AiRun[] } };
     setProviders(payload.data?.providers ?? []);
     setCapabilities(payload.data?.capabilities ?? []);
-    setRuns(runPayload.data?.runs ?? []);
-  }, []);
+    if (view === "agents") {
+      const runResponse = await fetch("/api/v1/ai-runs", { cache: "no-store" });
+      if (!runResponse.ok) throw new Error();
+      const runPayload = (await runResponse.json()) as { data?: { runs?: AiRun[] } };
+      setRuns(runPayload.data?.runs ?? []);
+    }
+  }, [view]);
   useEffect(() => {
     void load().catch(() => {
       setMessage("AI configuration could not be loaded.");
@@ -87,7 +89,8 @@ export function AiCapabilitiesWorkspace() {
   }, [load]);
   async function register(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const target = event.currentTarget;
+    const form = new FormData(target);
     try {
       await post("/api/v1/settings/ai-providers", {
         provider: form.get("provider"),
@@ -99,7 +102,7 @@ export function AiCapabilitiesWorkspace() {
           .map((item) => item.trim())
           .filter(Boolean)
       });
-      event.currentTarget.reset();
+      target.reset();
       setMessage("Provider reference registered. No secret value was stored or returned.");
       await load();
     } catch (error) {
@@ -109,13 +112,13 @@ export function AiCapabilitiesWorkspace() {
   async function configure(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const task = formText(form.get("task"));
+    const task = "orchestrator";
     try {
       await post(
         `/api/v1/settings/ai-capabilities/${task}`,
         {
           providerId: form.get("providerId"),
-          fallbackProviderId: form.get("fallbackProviderId") || undefined,
+          fallbackProviderId: undefined,
           modelClass: form.get("modelClass"),
           creativity: Number(form.get("creativity")),
           lengthLimit: Number(form.get("lengthLimit")),
@@ -131,70 +134,95 @@ export function AiCapabilitiesWorkspace() {
       setMessage(error instanceof Error ? error.message : "Configuration failed");
     }
   }
+  if (view === "providers") {
+    return (
+      <main className="workspace-page">
+        <header className="workspace-heading">
+          <p className="eyebrow">Model connections</p>
+          <h1>AI providers</h1>
+          <p>
+            Register model endpoints and environment-variable references. Provider settings define
+            where inference runs; they do not decide which agent task uses a model.
+          </p>
+        </header>
+        <form className="knowledge-entry-form" onSubmit={(event) => void register(event)}>
+          <h2>Register an available provider</h2>
+          <label>
+            Provider identifier
+            <input name="provider" required placeholder="openai" />
+          </label>
+          <label>
+            Model
+            <input name="model" required placeholder="text-embedding-3-small" />
+          </label>
+          <label>
+            Model version
+            <input name="modelVersion" required />
+          </label>
+          <label>
+            Server secret environment variable
+            <input
+              name="secretRef"
+              required
+              pattern="[A-Z][A-Z0-9_]{2,80}"
+              placeholder="OPENAI_API_KEY"
+            />
+          </label>
+          <label>
+            Supported capabilities
+            <input name="capabilities" required defaultValue="embeddings" />
+          </label>
+          <button type="submit">Register reference</button>
+        </form>
+        <section>
+          <h2>Registered providers</h2>
+          <p>
+            For non-OpenAI providers, set a server variable named like
+            <code> PROVIDER_EMBEDDINGS_URL</code> for embeddings and
+            <code> PROVIDER_CHAT_COMPLETIONS_URL</code> for reasoning tasks. Endpoints must accept
+            the corresponding OpenAI-compatible request shape.
+          </p>
+          {providers.length ? (
+            <ul className="workspace-list">
+              {providers.map((provider) => (
+                <li key={provider.id}>
+                  <strong>
+                    {provider.provider} · {provider.model}
+                  </strong>
+                  <p>
+                    Version {provider.model_version} · {provider.capabilities.join(", ")}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p>No provider has been registered.</p>
+          )}
+        </section>
+        {message ? <p role="status">{message}</p> : null}
+      </main>
+    );
+  }
   return (
     <main className="workspace-page">
       <header className="workspace-heading">
-        <p className="eyebrow">Bounded AI controls</p>
-        <h1>Agents & providers</h1>
+        <p className="eyebrow">Task orchestration</p>
+        <h1>Agents</h1>
         <p>
-          Choose provider behavior per capability. Secret values stay in server environment
-          variables; only references are stored.
+          One orchestrator model coordinates every bounded reasoning subagent. Agents are focused
+          roles with their own instructions and tools; they never select independent models.
         </p>
       </header>
-      <form className="knowledge-entry-form" onSubmit={(event) => void register(event)}>
-        <h2>Register an available provider</h2>
-        <label>
-          Provider identifier
-          <input name="provider" required placeholder="openai" />
-        </label>
-        <label>
-          Model
-          <input name="model" required />
-        </label>
-        <label>
-          Model version
-          <input name="modelVersion" required />
-        </label>
-        <label>
-          Server secret environment variable
-          <input
-            name="secretRef"
-            required
-            pattern="[A-Z][A-Z0-9_]{2,80}"
-            placeholder="OPENAI_API_KEY"
-          />
-        </label>
-        <label>
-          Supported capabilities
-          <input name="capabilities" required defaultValue={tasks.join(",")} />
-        </label>
-        <button type="submit">Register reference</button>
-      </form>
       <form className="knowledge-entry-form" onSubmit={(event) => void configure(event)}>
-        <h2>Configure a capability</h2>
+        <h2>Configure the orchestrator</h2>
+        <p>
+          Choose the one reasoning model used by all subagents. Embeddings remain a separate
+          retrieval model and are configured under AI providers.
+        </p>
         <label>
-          Task
-          <select name="task">
-            {tasks.map((task) => (
-              <option key={task}>{task}</option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Primary provider
+          Orchestrator provider
           <select name="providerId" required>
             <option value="">Select provider</option>
-            {providers.map((provider) => (
-              <option key={provider.id} value={provider.id}>
-                {provider.provider} · {provider.model}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Fallback provider
-          <select name="fallbackProviderId">
-            <option value="">No fallback</option>
             {providers.map((provider) => (
               <option key={provider.id} value={provider.id}>
                 {provider.provider} · {provider.model}
@@ -230,12 +258,27 @@ export function AiCapabilitiesWorkspace() {
           <input name="enabled" type="checkbox" /> Enable after validation
         </label>
         <button type="submit" disabled={!providers.length}>
-          Save capability
+          Save orchestrator
         </button>
       </form>
       <section>
-        <h2>Active configuration and circuit state</h2>
-        {capabilities.length ? (
+        <h2>Subagents</h2>
+        <p>
+          Each role below is a subagent running under the same orchestrator model. Role prompts,
+          permissions, and output schemas stay independent even though model selection is shared.
+        </p>
+        <ul className="workspace-list">
+          {subagents.map(([label, task]) => (
+            <li key={task}>
+              <strong>{label}</strong>
+              <p>{task} · delegated to the orchestrator</p>
+            </li>
+          ))}
+        </ul>
+      </section>
+      <section>
+        <h2>Active orchestrator configuration</h2>
+        {capabilities.filter((capability) => capability.task_type === "orchestrator").length ? (
           <table>
             <thead>
               <tr>
@@ -246,33 +289,41 @@ export function AiCapabilitiesWorkspace() {
               </tr>
             </thead>
             <tbody>
-              {capabilities.map((capability) => (
-                <tr key={capability.task_type}>
-                  <th scope="row">{capability.task_type}</th>
-                  <td>
-                    {capability.provider} · {capability.model}
-                  </td>
-                  <td>
-                    {capability.model_class}; creativity {capability.creativity}; max{" "}
-                    {capability.length_limit}; timeout {capability.timeout_ms}ms; retries{" "}
-                    {capability.retry_limit}; {capability.enabled ? "enabled" : "disabled"}
-                  </td>
-                  <td>
-                    {capability.health_status}; {capability.consecutive_failures} consecutive
-                    failures
-                    {capability.circuit_open_until
-                      ? `; circuit open until ${capability.circuit_open_until}`
-                      : ""}
-                    {capability.last_error_code ? `; ${capability.last_error_code}` : ""}
-                  </td>
-                </tr>
-              ))}
+              {capabilities
+                .filter((capability) => capability.task_type === "orchestrator")
+                .map((capability) => (
+                  <tr key={capability.task_type}>
+                    <th scope="row">single_model_orchestrator</th>
+                    <td>
+                      {capability.provider} · {capability.model}
+                    </td>
+                    <td>
+                      {capability.model_class}; creativity {capability.creativity}; max{" "}
+                      {capability.length_limit}; timeout {capability.timeout_ms}ms; retries{" "}
+                      {capability.retry_limit}; {capability.enabled ? "enabled" : "disabled"}
+                    </td>
+                    <td>
+                      {capability.health_status}; {capability.consecutive_failures} consecutive
+                      failures
+                      {capability.circuit_open_until
+                        ? `; circuit open until ${capability.circuit_open_until}`
+                        : ""}
+                      {capability.last_error_code ? `; ${capability.last_error_code}` : ""}
+                    </td>
+                  </tr>
+                ))}
             </tbody>
           </table>
         ) : (
-          <p>No capability has been configured yet.</p>
+          <p>No orchestrator has been configured yet. Save one above before running agents.</p>
         )}
       </section>
+      {capabilities.some((capability) => capability.task_type !== "orchestrator") ? (
+        <p role="note">
+          Older task-specific configurations still exist for migration visibility. They are ignored
+          once the orchestrator is enabled and can be removed after verification.
+        </p>
+      ) : null}
       <section>
         <h2>Sanitized execution diagnostics</h2>
         <p>Inputs, outputs, prompts, secret references, and credentials are never included here.</p>

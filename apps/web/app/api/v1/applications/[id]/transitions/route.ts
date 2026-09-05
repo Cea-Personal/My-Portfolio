@@ -5,6 +5,7 @@ import {
   transitionApplication,
   type ApplicationStatus
 } from "@career-os/applications";
+import { requestCareerBrainRefresh } from "@/inngest/career-brain-events";
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   return withPrivateApi(request, async ({ client, ownerId }) => {
     const { id } = await params;
@@ -74,6 +75,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         reason: typeof body.reason === "string" ? body.reason.slice(0, 1000) : null
       });
     if (history.error) throw history.error;
+    await requestCareerBrainRefresh(ownerId, "application", `${id}:${String(data.revision)}`).catch(
+      () => undefined
+    );
     return apiResponse(data, request);
   });
 }

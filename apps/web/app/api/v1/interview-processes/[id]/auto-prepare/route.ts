@@ -1,10 +1,8 @@
-import {
-  generateInterviewKit,
-  type InterviewEvidence,
-  type InterviewStory
-} from "@career-os/interviews";
+import { type InterviewEvidence, type InterviewStory } from "@career-os/interviews";
+import { createServiceSupabaseClient } from "@career-os/database/service";
 import { apiResponse } from "@/lib/api/response";
 import { withPrivateApi } from "@/lib/api/private";
+import { generateInterviewKitWithLlm } from "@/lib/server/interview-kit-llm";
 
 type ProcessApplication = {
   job_id?: string | null;
@@ -66,6 +64,12 @@ function inferredStages(description: string): Array<{ name: string; stageType: s
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   return withPrivateApi(request, async ({ client, ownerId }) => {
     const { id: processId } = await params;
+    const supabaseUrl =
+      globalThis.process.env.NEXT_PUBLIC_SUPABASE_URL ?? globalThis.process.env.SUPABASE_URL;
+    const serviceRoleKey = globalThis.process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!supabaseUrl || !serviceRoleKey)
+      return apiResponse({ code: "AI_SERVICE_UNAVAILABLE" }, request, 503);
+    const serviceClient = createServiceSupabaseClient(supabaseUrl, serviceRoleKey);
     const { data: process, error: processError } = await client
       .schema("app")
       .from("interview_processes")
@@ -212,7 +216,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     });
     const generated: Array<{ stageId: string; kit: unknown; limitations: string[] }> = [];
     for (const stage of stages ?? []) {
-      const kit = generateInterviewKit({
+      const generation = await generateInterviewKitWithLlm(serviceClient, ownerId, {
         jobTitle: title,
         company,
         description,
@@ -221,6 +225,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         stories: (stories ?? []) as InterviewStory[],
         documentContext
       });
+      const kit = generation.kit;
       const previous = await client
         .schema("app")
         .from("preparation_kits")
@@ -252,6 +257,20 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         .update({ preparation_state: "ready" })
         .eq("id", stage.id);
       if (stageUpdate.error) throw stageUpdate.error;
+      const aiRun = await serviceClient.schema("app").from("ai_runs").insert({
+        owner_id: ownerId,
+        task: "interview_preparation",
+        provider_config_id: generation.run.providerConfigId,
+        status: "completed",
+        input_hash: generation.run.inputHash,
+        output_hash: generation.run.outputHash,
+        instruction_version: "interview-preparation.v1",
+        elapsed_ms: generation.run.elapsedMs,
+        related_type: "interview_stage",
+        related_id: stage.id,
+        finished_at: new Date().toISOString()
+      });
+      if (aiRun.error) throw aiRun.error;
       generated.push({ stageId: stage.id, kit: inserted.data, limitations: kit.limitations });
     }
     return apiResponse(
@@ -263,7 +282,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         kits: generated,
         limitations: [
           "Interview question probabilities are preparation signals, not guarantees.",
-          "Only approved private Career Brain evidence was used; missing evidence is surfaced as a gap."
+          "Approved Career Brain facts and private indexed CV excerpts ground the package; missing details are surfaced for verification."
         ]
       },
       request,

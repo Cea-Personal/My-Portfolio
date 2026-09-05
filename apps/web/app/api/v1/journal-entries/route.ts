@@ -1,6 +1,7 @@
 import { apiResponse } from "@/lib/api/response";
 import { withPrivateApi } from "@/lib/api/private";
 import { createHash } from "node:crypto";
+import { requestCareerBrainRefresh } from "@/inngest/career-brain-events";
 export function GET(request: Request) {
   return withPrivateApi(request, async ({ client, ownerId }) => {
     const { data, error } = await client
@@ -63,6 +64,9 @@ export async function POST(request: Request) {
         .insert(tags.map((tag: string) => ({ entry_id: entry.id, tag })));
       if (insertedTags.error) throw insertedTags.error;
     }
+    await requestCareerBrainRefresh(ownerId, "journal", `${entry.id}:${contentHash}`).catch(
+      () => undefined
+    );
     return apiResponse({ ...entry, currentVersion: version }, request, 201);
   });
 }

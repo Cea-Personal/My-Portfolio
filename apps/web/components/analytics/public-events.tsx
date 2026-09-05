@@ -18,6 +18,18 @@ async function capture(name: string, properties: Record<string, string | number 
     keepalive: true
   });
 }
+function referralSource(): string {
+  const campaign = new URLSearchParams(window.location.search).get("utm_source")?.toLowerCase();
+  const candidate = campaign || document.referrer;
+  if (!candidate) return "direct";
+  if (candidate === window.location.origin || candidate.startsWith(`${window.location.origin}/`))
+    return "internal";
+  if (/linkedin/i.test(candidate)) return "linkedin";
+  if (/github/i.test(candidate)) return "github";
+  if (/google/i.test(candidate)) return "google";
+  if (/bing/i.test(candidate)) return "bing";
+  return "other";
+}
 export function PublicEvents({
   name = "page_view",
   properties = {},
@@ -34,15 +46,35 @@ export function PublicEvents({
   }, []);
   useEffect(() => {
     if (consent !== "granted") return;
-    void capture(name, properties);
+    const page =
+      typeof properties.page === "string"
+        ? properties.page
+        : window.location.pathname === "/"
+          ? "home"
+          : window.location.pathname.startsWith("/blog")
+            ? "blog"
+            : "project";
+    void capture(
+      name,
+      name === "page_view" ? { ...properties, page, source: referralSource() } : properties
+    );
     const observed = new Set<string>();
+    const enteredAt = new Map<string, number>();
     const observer = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
           const id = (entry.target as HTMLElement).id;
           if (entry.isIntersecting && id && !observed.has(id)) {
             observed.add(id);
+            enteredAt.set(id, performance.now());
             void capture("section_view", { section: id });
+          } else if (!entry.isIntersecting && id && enteredAt.has(id)) {
+            const started = enteredAt.get(id);
+            enteredAt.delete(id);
+            if (started === undefined) continue;
+            const duration = Math.min(1800, Math.round((performance.now() - started) / 1000));
+            if (duration >= 1)
+              void capture("section_engagement", { section: id, duration_seconds: duration });
           }
         }
       },
@@ -54,7 +86,19 @@ export function PublicEvents({
       .forEach((element) => {
         observer.observe(element);
       });
+    const pageStarted = performance.now();
+    const recordPageEngagement = () => {
+      const duration = Math.min(1800, Math.round((performance.now() - pageStarted) / 1000));
+      if (duration >= 1) void capture("page_engagement", { page, duration_seconds: duration });
+    };
+    window.addEventListener("pagehide", recordPageEngagement, { once: true });
     return () => {
+      for (const [section, started] of enteredAt) {
+        const duration = Math.min(1800, Math.round((performance.now() - started) / 1000));
+        if (duration >= 1)
+          void capture("section_engagement", { section, duration_seconds: duration });
+      }
+      window.removeEventListener("pagehide", recordPageEngagement);
       observer.disconnect();
     };
   }, [consent, name, properties, sections]);
@@ -62,8 +106,8 @@ export function PublicEvents({
   return (
     <aside className="analytics-consent" aria-label="Privacy preference">
       <p>
-        Allow anonymous, low-volume-suppressed page and section counts? No URLs, queries, prompts,
-        or free text are collected.
+        Allow anonymous, low-volume-suppressed visits, referral category, country, and time spent by
+        section? No IP address, full URL, query, prompt, or free text is stored.
       </p>
       <button
         type="button"

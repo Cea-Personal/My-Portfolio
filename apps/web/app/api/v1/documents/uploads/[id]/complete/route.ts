@@ -41,6 +41,36 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       .select("id")
       .single();
     if (versionError || !version) throw versionError ?? new Error("DOCUMENT_VERSION_CREATE_FAILED");
+    const { data: matchingVersion, error: matchingError } = await client
+      .schema("app")
+      .from("document_versions")
+      .select("document_id,documents!inner(id,owner_id,duplicate_of_id)")
+      .eq("internal_sha256", hash)
+      .eq("documents.owner_id", ownerId)
+      .is("documents.duplicate_of_id", null)
+      .neq("document_id", id)
+      .limit(1)
+      .maybeSingle();
+    if (matchingError) throw matchingError;
+    if (matchingVersion?.document_id) {
+      const { error: duplicateError } = await client
+        .schema("app")
+        .from("documents")
+        .update({ availability: "unavailable", duplicate_of_id: matchingVersion.document_id })
+        .eq("id", id)
+        .eq("owner_id", ownerId);
+      if (duplicateError) throw duplicateError;
+      return apiResponse(
+        {
+          documentId: matchingVersion.document_id,
+          duplicateDocumentId: id,
+          status: "duplicate",
+          detail: "An identical document is already in the knowledge base."
+        },
+        request,
+        200
+      );
+    }
     const { error: statusError } = await client
       .schema("app")
       .from("documents")

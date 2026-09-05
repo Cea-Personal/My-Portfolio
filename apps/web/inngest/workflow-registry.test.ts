@@ -4,6 +4,7 @@ import { durableEventNames } from "./durable-domain-events";
 const specialized = [
   "career/drive.sync.requested.v1",
   "career/document.changed.v1",
+  "career/brain.refresh.requested.v1",
   "career/job-search.requested.v1",
   "career/analytics.aggregate.requested.v1",
   "career/export.requested.v1"

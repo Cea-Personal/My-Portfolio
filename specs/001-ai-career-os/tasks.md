@@ -788,3 +788,31 @@ path and independent fixture path both pass.
   integration: validate a fixed folder ID, verify Viewer sharing before activation, list only direct
   children of that folder, reconcile removed files, disable user OAuth endpoints, revoke stored
   personal-OAuth connections/credentials, and document the server-only configuration contract.
+
+### Phase 17 — Public remote job feeds
+
+- [X] T335 Add a dedicated unauthenticated Jobgether REST adapter with search-profile query translation,
+  bounded response mapping, source URL preservation, and malformed-record filtering.
+- [X] T336 Add a dedicated unauthenticated Remote OK JSON adapter with tag filtering, metadata-record
+  rejection, source URL preservation, and normalized job output.
+- [X] T337 Expose Jobgether and Remote OK presets in Job Sources, document credential/terms guidance
+  for public and employer-authenticated providers, and add adapter unit coverage.
+- [X] T338 Add explicit multi-source selection in Jobs, dispatch one durable fan-out run, poll for
+  completion, and present the deduplicated compiled opportunity list with source-count feedback.
+- [X] T339 Add opt-in owner-only live web job discovery through the configured OpenAI orchestrator,
+  optional private-vector Career Brain grounding, allowlisted domains, bounded structured extraction,
+  provenance/URL validation, and review-before-save import into the private Jobs pipeline.
+- [X] T340 Make Remote OK collection resilient to its Cloudflare bot redirect by sending the required
+  browser User-Agent/JSON headers and retrying an unfiltered feed when tag filtering yields no jobs;
+  make Jobgether fall back from empty location/title combinations to a broad page for local filtering.
+- [X] T341 Apply search-profile eligibility before canonical job persistence: hard-filter title and
+  location mismatches, reject explicit missing technology requirements when descriptions contain
+  searchable content, preserve description-less listings as reviewable, and retain explicit reasons.
+- [X] T342 Apply the same deterministic search-profile eligibility to live-web candidates and return
+  discovered, filtered, and review counts to the Jobs workspace.
+- [X] T343 Reconcile stale source-discovered jobs after successful non-empty runs by expiring only
+  untouched discovered records, preserving job history and owner-progressed opportunities; default
+  the Jobs view to active opportunities while retaining an all-status history filter.
+- [X] T344 Map Jobgether's documented keyword, location, industry, contract, experience, remote,
+  hybrid, salary, currency, and language filters from the active search profile, with safe retries
+  when provider taxonomy values are invalid.

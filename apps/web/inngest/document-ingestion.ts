@@ -1,6 +1,15 @@
 import { createHash, createHmac } from "node:crypto";
 import { createServiceSupabaseClient } from "@career-os/database/service";
+import { classifyCareerDocument } from "@/lib/document-classification";
+import {
+  embedWithFallback,
+  embedWithProvider,
+  PRODUCTION_EMBEDDING_DIMENSIONS,
+  resolveEmbeddingProviders,
+  type ResolvedEmbeddingProvider
+} from "@/lib/server/embedding-provider";
 import { inngest } from "./client";
+import { requestCareerBrainRefresh } from "./career-brain-events";
 
 interface ParserChunk {
   ordinal: number;
@@ -11,7 +20,6 @@ interface ParserChunk {
   pageStart: number | null;
   pageEnd: number | null;
   sectionPath: string[];
-  embedding: number[];
 }
 
 interface ParserCandidate {
@@ -20,6 +28,8 @@ interface ParserCandidate {
   confidence: number;
   sourceStart: number;
   sourceEnd: number;
+  section?: string | null;
+  structuredValue?: Record<string, unknown>;
 }
 
 interface ParserResult {
@@ -30,11 +40,6 @@ interface ParserResult {
   chunks?: ParserChunk[];
   candidates?: ParserCandidate[];
 }
-
-const EMBEDDING_DIMENSIONS = 1536;
-const EMBEDDING_PROVIDER = "career-worker";
-const EMBEDDING_MODEL = "deterministic-private-index";
-const EMBEDDING_VERSION = "deterministic-private-index.v1";
 
 function configuredClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL;
@@ -81,10 +86,7 @@ function isParserResult(value: unknown): value is ParserResult {
         item.pageEnd === null ||
         Number(item.pageEnd) >= Number(item.pageStart)) &&
       Array.isArray(item.sectionPath) &&
-      item.sectionPath.every((section) => typeof section === "string") &&
-      Array.isArray(item.embedding) &&
-      item.embedding.length === EMBEDDING_DIMENSIONS &&
-      item.embedding.every((number) => typeof number === "number" && Number.isFinite(number))
+      item.sectionPath.every((section) => typeof section === "string")
     );
   });
   if (!validChunks) return false;
@@ -137,7 +139,8 @@ export const documentIngestion = inngest.createFunction(
         .eq("document_id", documentId)
         .maybeSingle();
       if (versionError || !version) throw versionError ?? new Error("DOCUMENT_VERSION_NOT_FOUND");
-      if (version.evidence_version_id)
+      const forceExtraction = metadata.forceExtraction === true;
+      if (version.evidence_version_id && !forceExtraction)
         return { status: "unchanged" as const, evidenceVersionId: version.evidence_version_id };
 
       let sourceId = document.evidence_source_id as string | null;
@@ -228,6 +231,21 @@ export const documentIngestion = inngest.createFunction(
       });
       const parsed = (await response.json().catch(() => null)) as unknown;
       if (!isParserResult(parsed)) throw new Error("DOCUMENT_PARSER_RESPONSE_INVALID");
+      const classification = classifyCareerDocument(
+        document.name as string,
+        (parsed.chunks ?? []).map((chunk) => chunk.content).join("\n")
+      );
+      const { error: classificationError } = await client
+        .schema("app")
+        .from("documents")
+        .update({
+          document_kind: classification.kind,
+          classification_confidence: classification.confidence,
+          classification_reason: classification.reason
+        })
+        .eq("id", documentId)
+        .eq("owner_id", ownerId);
+      if (classificationError) throw classificationError;
 
       const { data: existingVersion } = await client
         .schema("app")
@@ -306,12 +324,56 @@ export const documentIngestion = inngest.createFunction(
       }
 
       const chunks = parsed.chunks ?? [];
-      for (const chunk of chunks) {
-        const { data: persistedChunk, error: chunkError } = await client
+      const embeddingProviders = await resolveEmbeddingProviders(client, ownerId);
+      const embeddedChunks: Array<{
+        chunk: ParserChunk;
+        vector: number[];
+        provider: (typeof embeddingProviders)[number];
+      }> = [];
+      let selectedEmbeddingProvider: (typeof embeddingProviders)[number] | null = null;
+      for (let offset = 0; offset < chunks.length; offset += 64) {
+        const batch = chunks.slice(offset, offset + 64);
+        const embedded: { provider: ResolvedEmbeddingProvider; vectors: number[][] } =
+          selectedEmbeddingProvider
+            ? {
+                provider: selectedEmbeddingProvider,
+                vectors: await embedWithProvider(
+                  selectedEmbeddingProvider,
+                  batch.map((chunk) => chunk.content)
+                )
+              }
+            : await embedWithFallback(
+                embeddingProviders,
+                batch.map((chunk) => chunk.content)
+              );
+        selectedEmbeddingProvider = embedded.provider;
+        batch.forEach((chunk, index) => {
+          const vector = embedded.vectors[index];
+          if (!vector) throw new Error("EMBEDDING_PROVIDER_RESPONSE_INVALID");
+          embeddedChunks.push({
+            chunk,
+            vector,
+            provider: embedded.provider
+          });
+        });
+      }
+      for (const { chunk, vector, provider } of embeddedChunks) {
+        const { data: existingChunk, error: existingChunkError } = await client
           .schema("app")
           .from("evidence_chunks")
-          .upsert(
-            {
+          .select("id,content_hash")
+          .eq("evidence_version_id", evidenceVersion.id)
+          .eq("ordinal", chunk.ordinal)
+          .maybeSingle();
+        if (existingChunkError) throw existingChunkError;
+        if (existingChunk && existingChunk.content_hash !== chunk.contentHash)
+          throw new Error("EVIDENCE_CHUNK_IMMUTABLE_CONFLICT");
+        let persistedChunk = existingChunk;
+        if (!persistedChunk) {
+          const inserted = await client
+            .schema("app")
+            .from("evidence_chunks")
+            .insert({
               evidence_version_id: evidenceVersion.id,
               ordinal: chunk.ordinal,
               page_start: chunk.pageStart,
@@ -323,34 +385,73 @@ export const documentIngestion = inngest.createFunction(
               content_hash: chunk.contentHash,
               visibility: "private",
               trust_level: "ai_extracted"
-            },
-            { onConflict: "evidence_version_id,ordinal" }
-          )
-          .select("id")
-          .single();
-        if (chunkError || !persistedChunk)
-          throw chunkError ?? new Error("EVIDENCE_CHUNK_CREATE_FAILED");
-        const { error: embeddingError } = await client
+            })
+            .select("id,content_hash")
+            .single();
+          if (inserted.error || !inserted.data)
+            throw inserted.error ?? new Error("EVIDENCE_CHUNK_CREATE_FAILED");
+          persistedChunk = inserted.data;
+        }
+        const embeddingVersion = `${provider.provider}:${provider.model}:${provider.model_version}`;
+        const { data: existingEmbedding, error: existingEmbeddingError } = await client
           .schema("app")
           .from("chunk_embeddings")
-          .upsert(
-            {
+          .select("id,input_hash")
+          .eq("chunk_id", persistedChunk.id)
+          .eq("embedding_version", embeddingVersion)
+          .maybeSingle();
+        if (existingEmbeddingError) throw existingEmbeddingError;
+        if (existingEmbedding && existingEmbedding.input_hash !== chunk.contentHash)
+          throw new Error("CHUNK_EMBEDDING_IMMUTABLE_CONFLICT");
+        if (!existingEmbedding) {
+          const { error: embeddingError } = await client
+            .schema("app")
+            .from("chunk_embeddings")
+            .insert({
               chunk_id: persistedChunk.id,
-              provider: EMBEDDING_PROVIDER,
-              model: EMBEDDING_MODEL,
-              model_version: "1",
-              dimensions: EMBEDDING_DIMENSIONS,
-              embedding_version: EMBEDDING_VERSION,
-              embedding: `[${chunk.embedding.join(",")}]`,
+              provider: provider.provider,
+              model: provider.model,
+              model_version: provider.model_version,
+              dimensions: PRODUCTION_EMBEDDING_DIMENSIONS,
+              embedding_version: embeddingVersion,
+              embedding: `[${vector.join(",")}]`,
               normalization: "l2",
               input_hash: chunk.contentHash,
               status: "completed"
-            },
-            { onConflict: "chunk_id,embedding_version" }
-          );
-        if (embeddingError) throw embeddingError;
+            });
+          if (embeddingError) throw embeddingError;
+        }
       }
-      const candidates = parsed.candidates ?? [];
+      const candidates =
+        classification.kind === "cover_letter"
+          ? []
+          : Array.from(
+              new Map(
+                (parsed.candidates ?? []).map((candidate) => [
+                  `${candidate.factType}:${candidate.statement.trim().toLocaleLowerCase()}`,
+                  candidate
+                ])
+              ).values()
+            );
+      if (forceExtraction) {
+        const { data: priorItems, error: priorItemsError } = await client
+          .schema("app")
+          .from("ingestion_items")
+          .select("id")
+          .eq("document_id", documentId);
+        if (priorItemsError) throw priorItemsError;
+        const priorItemIds = (priorItems ?? [])
+          .map((priorItem) => priorItem.id as string)
+          .filter((priorItemId) => priorItemId !== item.id);
+        if (priorItemIds.length) {
+          const { error: staleCandidateError } = await client
+            .schema("app")
+            .from("extracted_facts")
+            .update({ review_status: "superseded_reprocess" })
+            .in("ingestion_item_id", priorItemIds);
+          if (staleCandidateError) throw staleCandidateError;
+        }
+      }
       if (candidates.length) {
         const { error: candidatesError } = await client
           .schema("app")
@@ -360,14 +461,18 @@ export const documentIngestion = inngest.createFunction(
               ingestion_item_id: item.id,
               original_extraction: candidate,
               statement: candidate.statement,
-              subject_candidate: { factType: candidate.factType },
+              subject_candidate: {
+                factType: candidate.factType,
+                section: candidate.section ?? candidate.factType,
+                ...(candidate.structuredValue ?? {})
+              },
               confidence: candidate.confidence,
               trust_level: "ai_extracted",
-              model_version: "deterministic-extractor.v1",
+              model_version: "career-structure-extractor.v3",
               prompt_version: "none",
-              schema_version: "career-fact-candidate.v1",
+              schema_version: "career-fact-candidate.v3",
               source_offsets: { start: candidate.sourceStart, end: candidate.sourceEnd },
-              review_status: "candidate"
+              review_status: "available_private"
             }))
           );
         if (candidatesError) throw candidatesError;
@@ -387,7 +492,11 @@ export const documentIngestion = inngest.createFunction(
           parser_metrics: {
             bytes: bytes.byteLength,
             chunks: chunks.length,
-            candidates: candidates.length
+            candidates: candidates.length,
+            documentKind: classification.kind,
+            classificationConfidence: classification.confidence,
+            embeddingProvider: selectedEmbeddingProvider?.provider,
+            embeddingModel: selectedEmbeddingProvider?.model
           },
           sanitized_error: null,
           finished_at: new Date().toISOString()
@@ -400,6 +509,9 @@ export const documentIngestion = inngest.createFunction(
         .eq("id", runId)
         .eq("owner_id", ownerId)
         .neq("trigger", "drive");
+      await requestCareerBrainRefresh(ownerId, "document", documentVersionId).catch(
+        () => undefined
+      );
       return {
         status: "completed" as const,
         evidenceVersionId: evidenceVersion.id,

@@ -1,5 +1,6 @@
 import { apiResponse } from "@/lib/api/response";
 import { withPrivateApi } from "@/lib/api/private";
+import { requestCareerBrainRefresh } from "@/inngest/career-brain-events";
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   return withPrivateApi(request, async ({ client, ownerId }) => {
     const { id: jobId } = await params;
@@ -103,6 +104,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       .eq("id", jobId)
       .eq("owner_id", ownerId)
       .in("status", ["interested", "shortlisted", "ready_to_apply"]);
+    await requestCareerBrainRefresh(ownerId, "application", data.id).catch(() => undefined);
     return apiResponse(data, request, 201);
   });
 }

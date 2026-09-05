@@ -18,11 +18,12 @@ def test_oversized_payload_is_rejected() -> None:
     assert result.reason == "FILE_TOO_LARGE"
 
 
-def test_parser_transport_returns_bounded_chunks_and_embeddings() -> None:
+def test_parser_transport_returns_bounded_chunks_for_provider_embedding() -> None:
     payload = b"Improved data delivery by 40%. Built reliable software systems."
     status, result = parse_transport_payload(payload, "text/plain")
     assert status == 200
     assert isinstance(result, dict)
     assert result["status"] == "completed"
-    assert len(result["chunks"][0]["embedding"]) == 1536
+    assert result["chunks"][0]["content"] == payload.decode()
+    assert "embedding" not in result["chunks"][0]
     assert result["candidates"]

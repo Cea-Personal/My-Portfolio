@@ -1,5 +1,6 @@
 import { apiResponse } from "@/lib/api/response";
 import { withPrivateApi } from "@/lib/api/private";
+import { requestCareerBrainRefresh } from "@/inngest/career-brain-events";
 export function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   return withPrivateApi(request, async ({ client, ownerId }) => {
     const { id } = await params;
@@ -85,6 +86,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       .select("*")
       .maybeSingle();
     if (error) throw error;
+    if (data)
+      await requestCareerBrainRefresh(
+        ownerId,
+        "application",
+        `${id}:${String(data.revision)}`
+      ).catch(() => undefined);
     return apiResponse(data, request, data ? 200 : 409);
   });
 }

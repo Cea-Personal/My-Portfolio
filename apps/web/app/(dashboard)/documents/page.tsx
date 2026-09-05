@@ -5,13 +5,14 @@ import { createBrowserSupabaseClient } from "@career-os/database/browser";
 
 export default function DocumentsPage() {
   const [documents, setDocuments] = useState<
-    readonly { id: string; name: string; status: string; error?: string }[]
+    readonly { id: string; name: string; status: string; kind?: string | undefined; error?: string }[]
   >([]);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [file, setFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [reprocessingId, setReprocessingId] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [drive, setDrive] = useState<{
     id: string;
@@ -53,6 +54,7 @@ export default function DocumentsPage() {
               id?: string;
               name?: string;
               availability?: string;
+              document_kind?: string;
               document_versions?: readonly {
                 download_status?: string;
                 evidence_version_id?: string | null;
@@ -86,6 +88,7 @@ export default function DocumentsPage() {
                         return {
                           id: document.id,
                           name: document.name ?? "Untitled document",
+                          kind: document.document_kind,
                           status: version?.evidence_version_id
                             ? "indexed"
                             : ingestion?.status === "failed"
@@ -240,6 +243,7 @@ export default function DocumentsPage() {
     if (!file) return;
     setSaving(true);
     setSaveError(null);
+    setSaveMessage(null);
     try {
       const response = await fetch("/api/v1/documents/uploads", {
         method: "POST",
@@ -271,15 +275,25 @@ export default function DocumentsPage() {
         },
         body: "{}"
       });
-      if (!completed.ok) throw new Error("Upload could not be confirmed.");
-      setDocuments((current) => [
-        {
-          id: created.documentId,
-          name: created.filename ?? file.name,
-          status: "indexing · pending"
-        },
-        ...current
-      ]);
+      const completion = (await completed.json().catch(() => ({}))) as {
+        data?: { status?: string; detail?: string };
+      };
+      if (!completed.ok)
+        throw new Error(completion.data?.detail ?? "Upload could not be confirmed.");
+      if (completion.data?.status === "duplicate") {
+        setSaveMessage(
+          completion.data.detail ?? "An identical document is already in the knowledge base."
+        );
+      } else {
+        setDocuments((current) => [
+          {
+            id: created.documentId,
+            name: created.filename ?? file.name,
+            status: "indexing · pending"
+          },
+          ...current
+        ]);
+      }
       setFile(null);
       setState("ready");
     } catch (error) {
@@ -403,6 +417,7 @@ export default function DocumentsPage() {
           {saving ? "Uploading…" : "Upload source"}
         </button>
         {saveError ? <p role="alert">{saveError}</p> : null}
+        {saveMessage ? <p role="status">{saveMessage}</p> : null}
       </form>
       {state === "loading" ? <p role="status">Loading documents…</p> : null}
       {state === "error" ? <p role="alert">{loadError ?? "Documents are unavailable."}</p> : null}
@@ -410,7 +425,16 @@ export default function DocumentsPage() {
         <ul>
           {documents.map((document) => (
             <li key={document.id}>
-              <strong>{document.name}</strong> <span>— {document.status}</span>
+              <strong>{document.name}</strong>{" "}
+              <span>
+                —{" "}
+                {document.kind === "cover_letter"
+                  ? "Cover-letter reference"
+                  : document.kind === "resume"
+                    ? "CV / resume"
+                    : "Other document"}{" "}
+                · {document.status}
+              </span>
               {document.error ? <small>{document.error}</small> : null}
               {["uploaded", "indexing failed"].includes(document.status) ? (
                 <button

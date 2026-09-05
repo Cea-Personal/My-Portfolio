@@ -82,7 +82,7 @@ async function persistDriveFile(
   const { data: existing, error: existingError } = await client
     .schema("app")
     .from("documents")
-    .select("id,last_seen_version")
+    .select("id,last_seen_version,duplicate_of_id,evidence_source_id")
     .eq("owner_id", ownerId)
     .eq("integration_connection_id", connectionId)
     .eq("external_file_id", file.id)
@@ -101,6 +101,35 @@ async function persistDriveFile(
     throw error;
   }
   const hash = contentHash(downloaded.bytes);
+  const { data: matchingVersion, error: matchingError } = await client
+    .schema("app")
+    .from("document_versions")
+    .select("document_id,documents!inner(id,owner_id,duplicate_of_id)")
+    .eq("internal_sha256", hash)
+    .eq("documents.owner_id", ownerId)
+    .is("documents.duplicate_of_id", null)
+    .limit(1)
+    .maybeSingle();
+  if (matchingError) throw matchingError;
+  if (matchingVersion?.document_id && matchingVersion.document_id !== existing?.id) {
+    const { error: duplicateError } = await client.schema("app").from("documents").upsert(
+      {
+        owner_id: ownerId,
+        integration_connection_id: connectionId,
+        external_file_id: file.id,
+        name: file.name,
+        source_mime: file.mimeType,
+        availability: "unavailable",
+        last_seen_version: file.version,
+        duplicate_of_id: matchingVersion.document_id,
+        removed_at: null,
+        permission_lost_at: null
+      },
+      { onConflict: "integration_connection_id,external_file_id" }
+    );
+    if (duplicateError) throw duplicateError;
+    return "unchanged";
+  }
   const { data: document, error: documentError } = await client
     .schema("app")
     .from("documents")
@@ -113,6 +142,7 @@ async function persistDriveFile(
         source_mime: file.mimeType,
         availability: "available",
         last_seen_version: file.version,
+        duplicate_of_id: null,
         removed_at: null,
         permission_lost_at: null
       },
@@ -121,6 +151,15 @@ async function persistDriveFile(
     .select("id")
     .single();
   if (documentError || !document) throw documentError ?? new Error("DRIVE_DOCUMENT_PERSIST_FAILED");
+  if (existing?.duplicate_of_id && existing.evidence_source_id) {
+    const { error: restoreEvidenceError } = await client
+      .schema("app")
+      .from("evidence_sources")
+      .update({ availability: "available" })
+      .eq("id", existing.evidence_source_id)
+      .eq("owner_id", ownerId);
+    if (restoreEvidenceError) throw restoreEvidenceError;
+  }
 
   const { data: prior, error: priorError } = await client
     .schema("app")

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import json
-
 import httpx
 
 from career_worker.ingestion.chunking import Chunk
@@ -52,7 +50,7 @@ def test_supabase_store_marks_removed_documents_without_deleting_history() -> No
     assert '"permission_lost_at"' in payload
 
 
-def test_supabase_store_persists_one_vector_for_each_chunk() -> None:
+def test_parser_store_persists_chunks_without_generating_local_vectors() -> None:
     requests: list[httpx.Request] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -82,15 +80,5 @@ def test_supabase_store_persists_one_vector_for_each_chunk() -> None:
     finally:
         store.close()
 
-    embedding_request = next(
-        request for request in requests if request.url.path.endswith("/chunk_embeddings")
-    )
-    assert "on_conflict=chunk_id%2Cembedding_version" in str(embedding_request.url)
-    assert embedding_request.headers["prefer"] == (
-        "resolution=merge-duplicates,return=representation"
-    )
-    payload = json.loads(embedding_request.content)
-    assert isinstance(payload, list)
-    assert payload[0]["chunk_id"] == "chunk-1"
-    assert payload[0]["dimensions"] == 1536
-    assert len(payload[0]["embedding"].strip("[]").split(",")) == 1536
+    assert any(request.url.path.endswith("/evidence_chunks") for request in requests)
+    assert not any(request.url.path.endswith("/chunk_embeddings") for request in requests)

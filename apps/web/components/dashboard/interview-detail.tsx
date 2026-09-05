@@ -84,7 +84,7 @@ export function InterviewDetail({ id }: { id: string }) {
       <h1>Interview process</h1>
       <p>Confidence: {display(payload.confidence, "low")}</p>
       <button type="button" disabled={generating} onClick={() => void generatePackage()}>
-        {generating ? "Generating…" : "Generate / refresh interview package"}
+        {generating ? "Generating with the configured LLM…" : "Generate / refresh LLM package"}
       </button>
       {message ? <p role="status">{message}</p> : null}
       {stages.length ? (

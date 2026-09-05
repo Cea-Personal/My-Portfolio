@@ -10,6 +10,14 @@ export async function POST(request: Request) {
       .schema("app")
       .rpc("stage_portfolio_publication");
     if (error) throw error;
+    const synthesis = await client
+      .schema("app")
+      .rpc("stage_career_brain_items", { target_publication_id: publicationId });
+    if (synthesis.error) throw synthesis.error;
+    const education = await client
+      .schema("app")
+      .rpc("stage_career_brain_education_items", { target_publication_id: publicationId });
+    if (education.error) throw education.error;
     const { data: publication, error: publicationError } = await client
       .schema("published")
       .from("portfolio_publications")

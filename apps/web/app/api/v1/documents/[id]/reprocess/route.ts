@@ -32,13 +32,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         request,
         409
       );
-    if (version.evidence_version_id)
-      return apiResponse(
-        { code: "DOCUMENT_ALREADY_INDEXED", evidenceVersionId: version.evidence_version_id },
-        request,
-        409
-      );
-
     const objectPath = version.storage_object_path ?? document.parent_path;
     if (!objectPath)
       return apiResponse(
@@ -82,7 +75,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           resourceId: id,
           operationKey,
           requestedBy: "owner",
-          metadata: { documentVersionId: version.id, ingestionRunId: run.id }
+          metadata: {
+            documentVersionId: version.id,
+            ingestionRunId: run.id,
+            forceExtraction: true
+          }
         }
       });
     } catch {

@@ -43,25 +43,6 @@ interface Application {
   status: string;
   jobs?: { canonical_title?: string; canonical_company?: string } | null;
 }
-interface CareerFact {
-  id: string;
-  review_status: string;
-  verified_by_owner: boolean;
-  currentVersion?: { statement?: string } | null;
-}
-interface StarStory {
-  id: string;
-  title: string;
-  situation: string;
-  task: string;
-  action: string;
-  result: string;
-  metrics: unknown[];
-  skills: string[];
-  technologies: string[];
-  evidence_ids: string[];
-  visibility: string;
-}
 async function write(endpoint: string, method: "POST" | "PATCH", body: unknown) {
   const response = await fetch(endpoint, {
     method,
@@ -90,37 +71,21 @@ const comma = (value: FormDataEntryValue | null) =>
 export function InterviewsWorkspace() {
   const [processes, setProcesses] = useState<Process[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
-  const [facts, setFacts] = useState<CareerFact[]>([]);
-  const [stories, setStories] = useState<StarStory[]>([]);
   const [message, setMessage] = useState("");
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const load = useCallback(async () => {
     try {
-      const [processResponse, applicationResponse, factResponse, storyResponse] = await Promise.all(
-        [
-          fetch("/api/v1/interviews", { cache: "no-store" }),
-          fetch("/api/v1/applications", { cache: "no-store" }),
-          fetch("/api/v1/career/facts", { cache: "no-store" }),
-          fetch("/api/v1/star-stories", { cache: "no-store" })
-        ]
-      );
-      if (!processResponse.ok || !applicationResponse.ok || !factResponse.ok || !storyResponse.ok)
-        throw new Error();
+      const [processResponse, applicationResponse] = await Promise.all([
+        fetch("/api/v1/interviews", { cache: "no-store" }),
+        fetch("/api/v1/applications", { cache: "no-store" })
+      ]);
+      if (!processResponse.ok || !applicationResponse.ok) throw new Error();
       const processPayload = (await processResponse.json()) as { data?: { processes?: Process[] } };
       const applicationPayload = (await applicationResponse.json()) as {
         data?: { applications?: Application[] };
       };
-      const factPayload = (await factResponse.json()) as { data?: CareerFact[] };
-      const storyPayload = (await storyResponse.json()) as { data?: StarStory[] };
       setProcesses(processPayload.data?.processes ?? []);
       setApplications(applicationPayload.data?.applications ?? []);
-      setFacts(
-        (factPayload.data ?? []).filter(
-          (fact) =>
-            fact.verified_by_owner && ["approved", "edited_approved"].includes(fact.review_status)
-        )
-      );
-      setStories(storyPayload.data ?? []);
       setState("ready");
     } catch {
       setState("error");
@@ -137,10 +102,18 @@ export function InterviewsWorkspace() {
         }
       )) as { id?: string };
       if (process.id) {
-        await write(`/api/v1/interview-processes/${process.id}/auto-prepare`, "POST", {});
-        setMessage("Interview process created and the AI preparation package is ready.");
+        try {
+          await write(`/api/v1/interview-processes/${process.id}/auto-prepare`, "POST", {});
+          setMessage("Interview process created and the LLM preparation package is ready.");
+        } catch (error) {
+          setMessage(
+            `Interview process created, but its LLM package could not be generated: ${
+              error instanceof Error ? error.message : "check the orchestrator configuration"
+            }`
+          );
+        }
       } else {
-        setMessage("Interview process created. Generate its preparation package below.");
+        setMessage("Interview process created. Generate its LLM package below.");
       }
       await load();
     } catch (error) {
@@ -180,34 +153,10 @@ export function InterviewsWorkspace() {
   async function generatePackage(processId: string) {
     try {
       await write(`/api/v1/interview-processes/${processId}/auto-prepare`, "POST", {});
-      setMessage("AI preparation package generated from the selected job and approved evidence.");
+      setMessage("LLM preparation package generated from the selected job and approved evidence.");
       await load();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not create kit.");
-    }
-  }
-  async function createStory(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const target = event.currentTarget;
-    const form = new FormData(target);
-    try {
-      await write("/api/v1/star-stories", "POST", {
-        title: form.get("title"),
-        situation: form.get("situation"),
-        task: form.get("task"),
-        action: form.get("action"),
-        result: form.get("result"),
-        metrics: comma(form.get("metrics")),
-        skills: comma(form.get("skills")),
-        technologies: comma(form.get("technologies")),
-        evidenceIds: form.getAll("evidenceIds"),
-        visibility: form.get("visibility")
-      });
-      target.reset();
-      setMessage("Reusable STAR story saved against approved Career Brain evidence.");
-      await load();
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not create STAR story.");
     }
   }
   async function createMock(stage: Stage, mode: string) {
@@ -279,6 +228,11 @@ export function InterviewsWorkspace() {
           meeting assistance is provided.
         </p>
       </header>
+      <p>
+        Generation uses the interview-coach subagent under the single model configured in{" "}
+        <a href="/settings/agents">Settings → Agents</a>. Register that chat model under{" "}
+        <a href="/settings/providers">AI Providers</a> with a reasoning capability.
+      </p>
       <section>
         <h2>Create a process</h2>
         {withoutProcess.length ? (
@@ -297,72 +251,6 @@ export function InterviewsWorkspace() {
           <p>Every current application already has a process, or no application is ready.</p>
         )}
       </section>
-      <section>
-        <h2>Reusable evidence-backed stories</h2>
-        <form className="knowledge-entry-form" onSubmit={(event) => void createStory(event)}>
-          <label>
-            Story title
-            <input name="title" required />
-          </label>
-          {(["situation", "task", "action", "result"] as const).map((field) => (
-            <label key={field}>
-              {field.charAt(0).toUpperCase() + field.slice(1)}
-              <textarea name={field} required />
-            </label>
-          ))}
-          <label>
-            Metrics (comma separated)
-            <input name="metrics" />
-          </label>
-          <label>
-            Skills (comma separated)
-            <input name="skills" />
-          </label>
-          <label>
-            Technologies (comma separated)
-            <input name="technologies" />
-          </label>
-          <fieldset>
-            <legend>Controlling evidence (at least one required)</legend>
-            {facts.length ? (
-              facts.map((fact) => (
-                <label key={fact.id}>
-                  <input type="checkbox" name="evidenceIds" value={fact.id} />
-                  {fact.currentVersion?.statement ?? fact.id}
-                </label>
-              ))
-            ) : (
-              <p>Approve a Career Brain fact before creating a story.</p>
-            )}
-          </fieldset>
-          <label>
-            Visibility
-            <select name="visibility" defaultValue="private">
-              <option value="private">Private</option>
-              <option value="public">Public candidate (still requires publication workflow)</option>
-            </select>
-          </label>
-          <button type="submit" disabled={!facts.length}>
-            Save STAR story
-          </button>
-        </form>
-        {stories.length ? (
-          <ul className="workspace-list">
-            {stories.map((story) => (
-              <li key={story.id}>
-                <strong>{story.title}</strong> · {story.visibility}
-                <p>{story.result}</p>
-                <small>
-                  {story.skills.join(", ") || "No skills labelled"} · {story.evidence_ids.length}{" "}
-                  evidence link(s)
-                </small>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p>No reusable stories yet.</p>
-        )}
-      </section>
       {state === "loading" ? <p role="status">Loading interview processes…</p> : null}
       {state === "error" ? <p role="alert">Could not load private interview data.</p> : null}
       {processes.map((process) => (
@@ -374,7 +262,7 @@ export function InterviewsWorkspace() {
           </p>
           <div className="workspace-actions">
             <button type="button" onClick={() => void generatePackage(process.id)}>
-              Generate / refresh AI interview package
+              Generate / refresh LLM interview package
             </button>
           </div>
           {process.interview_stages?.length ? (
@@ -406,7 +294,7 @@ export function InterviewsWorkspace() {
                   </div>
                   {stage.preparation_kits?.length ? (
                     <details>
-                      <summary>AI preparation package</summary>
+                      <summary>LLM preparation package</summary>
                       {[...stage.preparation_kits]
                         .sort((left, right) => right.version - left.version)
                         .slice(0, 1)
@@ -498,32 +386,63 @@ export function InterviewsWorkspace() {
                                   <li key={gap}>Evidence gap: {gap}</li>
                                 ))}
                               </ul>
-                              {(
-                                [
-                                  "strongestExperiences",
-                                  "projects",
-                                  "achievements",
-                                  "stories"
-                                ] as const
-                              ).map((key) => {
-                                const labels = {
-                                  strongestExperiences: "Strongest mapped experiences",
-                                  projects: "Relevant projects",
-                                  achievements: "Relevant impact / achievements",
-                                  stories: "Reusable STAR stories"
-                                } as const;
-                                const values = list(key);
-                                return values.length ? (
-                                  <div key={key}>
-                                    <h4>{labels[key]}</h4>
-                                    <ul>
-                                      {values.map((value) => (
-                                        <li key={value}>{value}</li>
-                                      ))}
-                                    </ul>
-                                  </div>
-                                ) : null;
-                              })}
+                              {Array.isArray(payload.storyDrafts) && payload.storyDrafts.length ? (
+                                <>
+                                  <h4>AI-prepared answer stories</h4>
+                                  {payload.storyDrafts.map((value, index) => {
+                                    const story =
+                                      typeof value === "object" && value !== null
+                                        ? (value as Record<string, unknown>)
+                                        : {};
+                                    const field = (name: string) =>
+                                      typeof story[name] === "string" ? story[name] : "";
+                                    return (
+                                      <details key={`${kit.id}-story-${String(index)}`}>
+                                        <summary>
+                                          {field("title") || `Story ${String(index + 1)}`}
+                                        </summary>
+                                        <p>
+                                          <strong>Situation:</strong> {field("situation")}
+                                        </p>
+                                        <p>
+                                          <strong>Task:</strong> {field("task")}
+                                        </p>
+                                        <p>
+                                          <strong>Action:</strong> {field("action")}
+                                        </p>
+                                        <p>
+                                          <strong>Result:</strong> {field("result")}
+                                        </p>
+                                      </details>
+                                    );
+                                  })}
+                                </>
+                              ) : (
+                                <p>
+                                  No grounded answer story could be generated from the available
+                                  evidence.
+                                </p>
+                              )}
+                              {(["strongestExperiences", "projects", "achievements"] as const).map(
+                                (key) => {
+                                  const labels = {
+                                    strongestExperiences: "Strongest mapped experiences",
+                                    projects: "Relevant projects",
+                                    achievements: "Relevant impact / achievements"
+                                  } as const;
+                                  const values = list(key);
+                                  return values.length ? (
+                                    <div key={key}>
+                                      <h4>{labels[key]}</h4>
+                                      <ul>
+                                        {values.map((value) => (
+                                          <li key={value}>{value}</li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  ) : null;
+                                }
+                              )}
                               <h4>Revision topics</h4>
                               <ul>
                                 {list("revisionTopics").map((topic) => (

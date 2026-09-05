@@ -9,7 +9,6 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from career_worker.contracts.events import EventEnvelope
 from career_worker.extraction.career_facts import extract_candidates
 from career_worker.ingestion.chunking import chunk_document
-from career_worker.ingestion.embeddings import EMBEDDING_DIMENSIONS, embed_deterministically
 from career_worker.parsing.parsers import parse_document
 
 
@@ -34,9 +33,6 @@ def parse_transport_payload(body: bytes, media_type: str) -> tuple[int, object]:
                         "pageStart": chunk.page_start,
                         "pageEnd": chunk.page_end,
                         "sectionPath": list(chunk.section_path),
-                        "embedding": embed_deterministically(
-                            chunk.content, EMBEDDING_DIMENSIONS
-                        ),
                     }
                     for chunk in chunks
                 ],
@@ -47,6 +43,8 @@ def parse_transport_payload(body: bytes, media_type: str) -> tuple[int, object]:
                         "confidence": candidate.confidence,
                         "sourceStart": candidate.source_start,
                         "sourceEnd": candidate.source_end,
+                        "section": candidate.section,
+                        "structuredValue": candidate.structured_value,
                     }
                     for candidate in candidates
                 ],

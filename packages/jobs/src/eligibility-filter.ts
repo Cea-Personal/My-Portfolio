@@ -62,24 +62,36 @@ export function evaluateJobEligibility(
 
   const titles = [...(profile.targetTitles ?? []), ...(profile.preferredTitles ?? [])];
   if (titles.length && !includesAny(title, titles))
-    reviews.push({
-      code: "TITLE_REQUIRES_REVIEW",
-      message: "The title is not a direct match for the configured title families."
+    failures.push({
+      code: "TITLE_NOT_MATCHED",
+      message: "The title does not match any configured target or preferred title."
     });
   const geographies = [...(profile.locations ?? []), ...(profile.regions ?? [])];
-  if (geographies.length && !includesAny(location, geographies) && !location.includes("remote"))
-    reviews.push({
-      code: "LOCATION_REQUIRES_REVIEW",
-      message: "The location does not confirm a configured geography or remote arrangement."
+  const remoteAllowed = geographies.some((geography) => normalized(geography).includes("remote"));
+  if (
+    geographies.length &&
+    !includesAny(location, geographies) &&
+    !(remoteAllowed && location.includes("remote"))
+  )
+    failures.push({
+      code: "LOCATION_NOT_MATCHED",
+      message: "The location does not match a configured geography or remote arrangement."
     });
   const missingRequired = (profile.requiredTechnologies ?? []).filter(
     (technology) => !includesAny(content, [technology])
   );
-  if (missingRequired.length)
-    reviews.push({
+  if (missingRequired.length) {
+    const reason = {
       code: "REQUIRED_TECHNOLOGY_UNCONFIRMED",
       message: `Not confirmed in the listing: ${missingRequired.join(", ")}.`
-    });
+    };
+    // A feed without a description cannot prove a required technology is
+    // absent. Keep it reviewable; a listing with searchable content that
+    // omits the requirement is filtered out deterministically.
+    if (normalized(job.description)) failures.push({ ...reason, code: "REQUIRED_TECHNOLOGY_NOT_FOUND" });
+    else reviews.push(reason);
+  }
+  if (failures.length) return { outcome: "FAIL", reasons: failures };
   if (profile.preferredCompanies?.length && !includesAny(company, profile.preferredCompanies))
     reviews.push({
       code: "COMPANY_PREFERENCE_UNCONFIRMED",

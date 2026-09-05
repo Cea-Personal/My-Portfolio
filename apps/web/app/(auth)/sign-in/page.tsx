@@ -18,6 +18,9 @@ export default async function SignInPage() {
   return (
     <main className="owner-sign-in-page">
       <section aria-labelledby="owner-sign-in-title">
+        <a className="owner-sign-in-back" href="/">
+          ← Back to Basil&apos;s portfolio
+        </a>
         <p>Private workspace</p>
         <h1 id="owner-sign-in-title">Welcome back, Basil.</h1>
         <span>Use your Supabase owner account to manage the systems behind the portfolio.</span>

@@ -1,112 +1,166 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { CAREER_FACT_TYPES } from "@/lib/career-fact-taxonomy";
+import type { CareerBrainContent, CareerBrainItem } from "@/lib/server/career-brain-synthesis";
 import { PublicationControl } from "../publication-control";
 
-interface CareerFact {
+interface Snapshot {
   id: string;
-  factType: string;
-  statement: string;
-  visibility: string;
-  reviewStatus: string;
-  projectionEligible: boolean;
-  structuredValue: Record<string, unknown>;
+  content: CareerBrainContent;
+  focus_jobs: unknown[];
+  provider: string | null;
+  model: string | null;
+  generated_at: string;
 }
 
-interface ExtractedCandidate {
-  id: string;
-  statement: string;
-  confidence: number | null;
-  factType: string;
-  sourceOffsets: Record<string, unknown>;
+interface Selection {
+  item_key: string;
+  item_type: string;
+  public_eligible: boolean;
 }
 
-const FACT_TYPES = [
-  "experience",
-  "responsibility",
-  "achievement",
-  "project",
-  "skill",
-  "education",
-  "certification"
-];
+const value = (item: CareerBrainItem, key: string) =>
+  typeof item[key] === "string" ? item[key] : "";
+const list = (item: CareerBrainItem, key: string) =>
+  Array.isArray(item[key])
+    ? item[key].filter((entry): entry is string => typeof entry === "string")
+    : [];
+
+function PublishChoice({
+  itemKey,
+  itemType,
+  selected,
+  busy,
+  onChange
+}: {
+  itemKey: string;
+  itemType: string;
+  selected: boolean;
+  busy: boolean;
+  onChange: (itemKey: string, itemType: string, selected: boolean) => Promise<void>;
+}) {
+  return (
+    <button
+      className={selected ? "career-publish-choice is-selected" : "career-publish-choice"}
+      disabled={busy}
+      type="button"
+      onClick={() => void onChange(itemKey, itemType, !selected)}
+    >
+      {selected ? "Selected for public portfolio" : "Keep private · select to publish"}
+    </button>
+  );
+}
 
 export function CareerBrain() {
-  const [facts, setFacts] = useState<CareerFact[]>([]);
-  const [candidates, setCandidates] = useState<ExtractedCandidate[]>([]);
+  const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
+  const [selections, setSelections] = useState<Selection[]>([]);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
-  const [statement, setStatement] = useState("");
-  const [factType, setFactType] = useState("achievement");
-  const [context, setContext] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [busyKey, setBusyKey] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [statement, setStatement] = useState("");
+  const [factType, setFactType] = useState<(typeof CAREER_FACT_TYPES)[number]>("experience");
+  const [organization, setOrganization] = useState("");
+  const [role, setRole] = useState("");
+  const [period, setPeriod] = useState("");
+  const [saving, setSaving] = useState(false);
 
-  const load = useCallback(async () => {
-    setState("loading");
-    try {
-      const [factsResponse, candidatesResponse] = await Promise.all([
-        fetch("/api/v1/career/facts", { cache: "no-store" }),
-        fetch("/api/v1/fact-reviews", { cache: "no-store" })
-      ]);
-      if (!factsResponse.ok || !candidatesResponse.ok) throw new Error("CAREER_BRAIN_UNAVAILABLE");
-      const factsPayload = (await factsResponse.json()) as { data?: Record<string, unknown>[] };
-      const candidatesPayload = (await candidatesResponse.json()) as {
-        data?: Record<string, unknown>[];
-      };
-      setFacts(
-        (factsPayload.data ?? []).map((fact) => {
-          const version =
-            fact.currentVersion && typeof fact.currentVersion === "object"
-              ? (fact.currentVersion as Record<string, unknown>)
-              : {};
-          return {
-            id: String(fact.id),
-            factType: typeof fact.fact_type === "string" ? fact.fact_type : "fact",
-            statement: typeof version.statement === "string" ? version.statement : "Untitled fact",
-            visibility: typeof fact.visibility === "string" ? fact.visibility : "private",
-            reviewStatus: typeof fact.review_status === "string" ? fact.review_status : "candidate",
-            projectionEligible: fact.projectionEligible === true,
-            structuredValue:
-              version.structured_value && typeof version.structured_value === "object"
-                ? (version.structured_value as Record<string, unknown>)
-                : {}
-          };
-        })
-      );
-      setCandidates(
-        (candidatesPayload.data ?? []).map((candidate) => {
-          const subject =
-            candidate.subject_candidate && typeof candidate.subject_candidate === "object"
-              ? (candidate.subject_candidate as Record<string, unknown>)
-              : {};
-          return {
-            id: String(candidate.id),
-            statement:
-              typeof candidate.statement === "string" ? candidate.statement : "Untitled candidate",
-            confidence: typeof candidate.confidence === "number" ? candidate.confidence : null,
-            factType: typeof subject.factType === "string" ? subject.factType : "responsibility",
-            sourceOffsets:
-              candidate.source_offsets && typeof candidate.source_offsets === "object"
-                ? (candidate.source_offsets as Record<string, unknown>)
-                : {}
-          };
-        })
-      );
+  const applyPayload = useCallback(
+    (payload: { snapshot?: Snapshot | null; selections?: Selection[] }) => {
+      setSnapshot(payload.snapshot ?? null);
+      setSelections(payload.selections ?? []);
       setState("ready");
-    } catch {
-      setState("error");
-    }
-  }, []);
+    },
+    []
+  );
+
+  const regenerate = useCallback(
+    async (quiet = false) => {
+      setGenerating(true);
+      if (!quiet) setNotice(null);
+      const response = await fetch("/api/v1/career/brain", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "idempotency-key": `career-brain-${crypto.randomUUID()}`
+        },
+        body: "{}"
+      });
+      const payload = (await response.json().catch(() => ({}))) as {
+        data?: {
+          snapshot?: Snapshot | null;
+          selections?: Selection[];
+          detail?: string;
+          code?: string;
+        };
+      };
+      setGenerating(false);
+      if (!response.ok) {
+        setNotice(
+          payload.data?.detail ?? payload.data?.code ?? "Career Brain could not be generated."
+        );
+        setState((current) => (current === "loading" ? "error" : current));
+        return;
+      }
+      applyPayload(payload.data ?? {});
+      if (!quiet) setNotice("Career Brain regenerated from the latest private evidence.");
+    },
+    [applyPayload]
+  );
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    let active = true;
+    void fetch("/api/v1/career/brain", { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error();
+        const payload = (await response.json()) as {
+          data?: { snapshot?: Snapshot | null; selections?: Selection[] };
+        };
+        if (!active) return;
+        applyPayload(payload.data ?? {});
+        void regenerate(true);
+      })
+      .catch(() => {
+        if (active) setState("error");
+      });
+    return () => {
+      active = false;
+    };
+  }, [applyPayload, regenerate]);
+
+  const selected = (key: string) =>
+    selections.some((item) => item.item_key === key && item.public_eligible);
+
+  async function selectForPortfolio(itemKey: string, itemType: string, publicEligible: boolean) {
+    setBusyKey(itemKey);
+    const response = await fetch("/api/v1/career/brain/selections", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "idempotency-key": `career-selection-${itemKey}-${crypto.randomUUID()}`
+      },
+      body: JSON.stringify({ itemKey, itemType, publicEligible })
+    });
+    setBusyKey(null);
+    if (!response.ok) {
+      setNotice("The portfolio selection could not be saved.");
+      return;
+    }
+    setSelections((current) => [
+      ...current.filter((item) => item.item_key !== itemKey),
+      { item_key: itemKey, item_type: itemType, public_eligible: publicEligible }
+    ]);
+    setNotice(
+      publicEligible
+        ? "Selected. It will appear after you build and activate a portfolio snapshot."
+        : "The item remains private and will be excluded from the next portfolio snapshot."
+    );
+  }
 
   async function addFact(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!statement.trim()) return;
     setSaving(true);
-    setNotice(null);
     const response = await fetch("/api/v1/career/facts", {
       method: "POST",
       headers: {
@@ -116,205 +170,311 @@ export function CareerBrain() {
       body: JSON.stringify({
         statement,
         factType,
-        subjectType: "career",
         visibility: "private",
-        structuredValue: context.trim() ? { context: context.trim() } : {}
+        structuredValue: factType === "experience" ? { organization, role, period } : {}
       })
     });
     setSaving(false);
     if (!response.ok) {
-      setNotice("The fact could not be saved. Check the fields and try again.");
+      setNotice("The private source could not be saved.");
       return;
     }
     setStatement("");
-    setContext("");
-    setNotice("Private fact saved. Review it before making it public.");
-    await load();
+    setOrganization("");
+    setRole("");
+    setPeriod("");
+    setNotice("Private source saved. Updating Career Brain…");
+    await regenerate(true);
   }
 
-  async function reviewCandidate(
-    candidate: ExtractedCandidate,
-    decision: "approve" | "edit" | "reject" | "defer"
-  ) {
-    setNotice(null);
-    const response = await fetch("/api/v1/fact-reviews", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "idempotency-key": `fact-review-${candidate.id}-${crypto.randomUUID()}`
-      },
-      body: JSON.stringify({
-        extractedFactId: candidate.id,
-        decision,
-        statement: candidate.statement,
-        structuredValue: { factType: candidate.factType },
-        visibility: "private"
-      })
-    });
-    if (!response.ok) {
-      setNotice("The review decision could not be saved.");
-      return;
-    }
-    setNotice(`Candidate ${decision === "defer" ? "deferred" : `${decision}d`}.`);
-    await load();
-  }
-
-  async function updateFact(fact: CareerFact, visibility: "private" | "public") {
-    const response = await fetch(`/api/v1/career/facts/${fact.id}`, {
-      method: "PATCH",
-      headers: {
-        "content-type": "application/json",
-        "idempotency-key": `fact-${fact.id}-${crypto.randomUUID()}`
-      },
-      body: JSON.stringify({
-        visibility,
-        reviewStatus: "approved",
-        verifiedByOwner: true
-      })
-    });
-    setNotice(response.ok ? "Fact visibility and approval saved." : "Fact update failed.");
-    if (response.ok) await load();
-  }
-
+  const content = snapshot?.content;
   return (
-    <section className="workspace-page" aria-labelledby="career-brain-title">
-      <header className="workspace-heading">
-        <p className="eyebrow">Trusted knowledge</p>
+    <section className="workspace-page career-brain" aria-labelledby="career-brain-title">
+      <header className="workspace-heading career-brain-heading">
+        <p className="eyebrow">Private, evolving career intelligence</p>
         <h1 id="career-brain-title">Career Brain</h1>
         <p>
-          Capture structured facts, review document suggestions, and choose what can be published.
+          One living profile synthesized from uploaded files, Google Drive, journals, manual facts,
+          and the jobs you have recently pursued. Nothing becomes public until you select it and
+          activate a portfolio snapshot.
         </p>
+        <button disabled={generating} type="button" onClick={() => void regenerate()}>
+          {generating ? "Reading and synthesizing…" : "Refresh from all private sources"}
+        </button>
+        {snapshot ? (
+          <small>
+            Last generated {new Date(snapshot.generated_at).toLocaleString()} · {snapshot.provider}{" "}
+            / {snapshot.model}
+            {snapshot.focus_jobs.length
+              ? ` · informed by ${String(snapshot.focus_jobs.length)} recent application(s)`
+              : ""}
+          </small>
+        ) : null}
       </header>
 
-      <form className="knowledge-entry-form" onSubmit={(event) => void addFact(event)}>
-        <h2>Add a private fact</h2>
-        <label htmlFor="knowledge-type">Fact type</label>
-        <select
-          id="knowledge-type"
-          value={factType}
-          onChange={(event) => {
-            setFactType(event.target.value);
-          }}
-        >
-          {FACT_TYPES.map((type) => (
-            <option key={type} value={type}>
-              {type}
-            </option>
-          ))}
-        </select>
-        <label htmlFor="knowledge-statement">Statement</label>
-        <textarea
-          id="knowledge-statement"
-          onChange={(event) => {
-            setStatement(event.target.value);
-          }}
-          placeholder="What did you build, improve, learn, or deliver?"
-          required
-          rows={4}
-          value={statement}
-        />
-        <label htmlFor="knowledge-context">Structured context</label>
-        <input
-          id="knowledge-context"
-          onChange={(event) => {
-            setContext(event.target.value);
-          }}
-          placeholder="Role, project, company, timeframe, or measurable context"
-          value={context}
-        />
-        <button disabled={saving} type="submit">
-          {saving ? "Saving…" : "Save private fact"}
-        </button>
-      </form>
-
       {notice ? <p role="status">{notice}</p> : null}
-      {state === "loading" ? <p role="status">Loading trusted knowledge…</p> : null}
-      {state === "error" ? <p role="alert">Career Brain could not be loaded.</p> : null}
+      {state === "loading" ? <p role="status">Loading your private career profile…</p> : null}
+      {state === "error" && !snapshot ? (
+        <p role="alert">
+          Career Brain is not available yet. Check the AI provider message above and try refresh.
+        </p>
+      ) : null}
 
-      {state === "ready" ? (
-        <div className="career-brain-columns">
-          <section aria-labelledby="candidate-title">
-            <h2 id="candidate-title">Review extracted evidence</h2>
-            <p>{candidates.length} document suggestion(s) need an owner decision.</p>
-            {candidates.length ? (
-              <ul className="workspace-list">
-                {candidates.map((candidate) => (
-                  <li key={candidate.id}>
-                    <p className="eyebrow">{candidate.factType}</p>
-                    <p>{candidate.statement}</p>
-                    <small>
-                      Confidence:{" "}
-                      {candidate.confidence === null
-                        ? "not supplied"
-                        : `${String(Math.round(candidate.confidence * 100))}%`}{" "}
-                      · Source offsets: {JSON.stringify(candidate.sourceOffsets)}
-                    </small>
-                    <div className="workspace-actions" aria-label={`Review ${candidate.statement}`}>
-                      <button
-                        type="button"
-                        onClick={() => void reviewCandidate(candidate, "approve")}
-                      >
-                        Approve
-                      </button>
-                      <button type="button" onClick={() => void reviewCandidate(candidate, "edit")}>
-                        Approve edited
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void reviewCandidate(candidate, "defer")}
-                      >
-                        Defer
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void reviewCandidate(candidate, "reject")}
-                      >
-                        Reject
-                      </button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p>No extracted facts are waiting for review.</p>
-            )}
+      {content ? (
+        <div className="career-synthesis">
+          <section className="career-narratives" aria-labelledby="career-narratives-title">
+            <header>
+              <p className="eyebrow">Profiles</p>
+              <h2 id="career-narratives-title">Your story, shaped for its destination.</h2>
+            </header>
+            <article>
+              <h3>CV profile summary</h3>
+              <p>{content.cvSummary || "More evidence is needed to form a CV summary."}</p>
+              <button
+                type="button"
+                onClick={() => void navigator.clipboard.writeText(content.cvSummary)}
+              >
+                Copy CV summary
+              </button>
+            </article>
+            <article>
+              <h3>Portfolio profile summary</h3>
+              <p>
+                {content.portfolioSummary || "More evidence is needed to form a portfolio summary."}
+              </p>
+              <PublishChoice
+                itemKey="profile:portfolio"
+                itemType="portfolio_summary"
+                selected={selected("profile:portfolio")}
+                busy={busyKey === "profile:portfolio"}
+                onChange={selectForPortfolio}
+              />
+            </article>
+            <article>
+              <h3>About me</h3>
+              <p>{content.about || "More evidence is needed to form an About narrative."}</p>
+              <PublishChoice
+                itemKey="profile:about"
+                itemType="about"
+                selected={selected("profile:about")}
+                busy={busyKey === "profile:about"}
+                onChange={selectForPortfolio}
+              />
+            </article>
           </section>
 
-          <section aria-labelledby="canonical-title">
-            <h2 id="canonical-title">Canonical facts</h2>
-            <p>Only owner-approved public facts become eligible for a future publication.</p>
-            {facts.length ? (
-              <ul className="workspace-list">
-                {facts.map((fact) => (
-                  <li key={fact.id}>
-                    <p className="eyebrow">{fact.factType}</p>
-                    <h3>{fact.statement}</h3>
-                    {Object.keys(fact.structuredValue).length ? (
-                      <pre>{JSON.stringify(fact.structuredValue, null, 2)}</pre>
+          <section aria-labelledby="career-experiences-title">
+            <header>
+              <p className="eyebrow">Experience</p>
+              <h2 id="career-experiences-title">Roles, organisations, and the work within them.</h2>
+            </header>
+            <div className="career-synthesis-list">
+              {content.experiences.map((item) => (
+                <details key={item.id}>
+                  <summary>
+                    <span>
+                      <strong>{value(item, "role")}</strong>
+                      <small>
+                        {value(item, "organization")} · {value(item, "period")}
+                      </small>
+                    </span>
+                    <em>{value(item, "summary")}</em>
+                  </summary>
+                  <div className="career-synthesis-detail">
+                    {(["responsibilities", "achievements", "projects"] as const).map((key) =>
+                      list(item, key).length ? (
+                        <section key={key}>
+                          <h3>{key === "achievements" ? "Achievements and impact" : key}</h3>
+                          <ul>
+                            {list(item, key).map((entry) => (
+                              <li key={entry}>{entry}</li>
+                            ))}
+                          </ul>
+                        </section>
+                      ) : null
+                    )}
+                    {list(item, "technologies").length ? (
+                      <p>
+                        <strong>Technical skills:</strong> {list(item, "technologies").join(", ")}
+                      </p>
                     ) : null}
+                    <PublishChoice
+                      itemKey={item.id}
+                      itemType="experience"
+                      selected={selected(item.id)}
+                      busy={busyKey === item.id}
+                      onChange={selectForPortfolio}
+                    />
+                  </div>
+                </details>
+              ))}
+            </div>
+          </section>
+
+          <section aria-labelledby="career-projects-title">
+            <header>
+              <p className="eyebrow">Selected projects</p>
+              <h2 id="career-projects-title">Systems and ideas with evidence behind them.</h2>
+            </header>
+            <div className="career-editorial-grid">
+              {content.projects.map((item) => (
+                <article key={item.id}>
+                  <h3>{value(item, "title")}</h3>
+                  <p>{value(item, "summary")}</p>
+                  {value(item, "outcome") ? (
                     <p>
-                      {fact.reviewStatus} · {fact.visibility} ·{" "}
-                      {fact.projectionEligible
-                        ? "eligible for projection"
-                        : "not projection eligible"}
+                      <strong>Outcome:</strong> {value(item, "outcome")}
                     </p>
-                    <div className="workspace-actions">
-                      <button type="button" onClick={() => void updateFact(fact, "public")}>
-                        Approve for publication
-                      </button>
-                      <button type="button" onClick={() => void updateFact(fact, "private")}>
-                        Keep private
-                      </button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p>No canonical facts yet. Add one or approve a document suggestion.</p>
-            )}
+                  ) : null}
+                  <small>{list(item, "technologies").join(" · ")}</small>
+                  <PublishChoice
+                    itemKey={item.id}
+                    itemType="project"
+                    selected={selected(item.id)}
+                    busy={busyKey === item.id}
+                    onChange={selectForPortfolio}
+                  />
+                </article>
+              ))}
+            </div>
+          </section>
+
+          <section className="career-credentials" aria-labelledby="career-credentials-title">
+            <header>
+              <p className="eyebrow">Credentials</p>
+              <h2 id="career-credentials-title">Education and certifications</h2>
+            </header>
+            <div className="career-lined-list">
+              {content.education.map((item) => (
+                <article key={item.id}>
+                  <div>
+                    <h3>{value(item, "qualification")}</h3>
+                    <p>
+                      {value(item, "institution")}{" "}
+                      {value(item, "period") ? `· ${value(item, "period")}` : ""}
+                    </p>
+                  </div>
+                  <PublishChoice
+                    itemKey={item.id}
+                    itemType="education"
+                    selected={selected(item.id)}
+                    busy={busyKey === item.id}
+                    onChange={selectForPortfolio}
+                  />
+                </article>
+              ))}
+              {content.certifications.map((item) => (
+                <article key={item.id}>
+                  <div>
+                    <h3>{value(item, "name")}</h3>
+                    <p>
+                      {value(item, "issuer")}{" "}
+                      {value(item, "date") ? `· ${value(item, "date")}` : ""}
+                    </p>
+                  </div>
+                  <PublishChoice
+                    itemKey={item.id}
+                    itemType="certification"
+                    selected={selected(item.id)}
+                    busy={busyKey === item.id}
+                    onChange={selectForPortfolio}
+                  />
+                </article>
+              ))}
+            </div>
+          </section>
+
+          <section className="career-skills" aria-labelledby="career-skills-title">
+            <header>
+              <p className="eyebrow">Technical practice</p>
+              <h2 id="career-skills-title">Skills grouped by how you use them.</h2>
+            </header>
+            <div className="career-lined-list">
+              {content.technicalSkills.map((item) => (
+                <article key={item.id}>
+                  <div>
+                    <h3>{value(item, "category")}</h3>
+                    <p>{list(item, "skills").join(" · ")}</p>
+                  </div>
+                  <PublishChoice
+                    itemKey={item.id}
+                    itemType="skill"
+                    selected={selected(item.id)}
+                    busy={busyKey === item.id}
+                    onChange={selectForPortfolio}
+                  />
+                </article>
+              ))}
+            </div>
           </section>
         </div>
       ) : null}
+
+      <details className="career-manual-source">
+        <summary>Add information that is not in a document or journal</summary>
+        <form className="knowledge-entry-form" onSubmit={(event) => void addFact(event)}>
+          <label>
+            Information type
+            <select
+              value={factType}
+              onChange={(event) => {
+                setFactType(event.target.value as (typeof CAREER_FACT_TYPES)[number]);
+              }}
+            >
+              {CAREER_FACT_TYPES.map((type) => (
+                <option key={type}>{type}</option>
+              ))}
+            </select>
+          </label>
+          {factType === "experience" ? (
+            <div className="career-experience-fields">
+              <label>
+                Organisation
+                <input
+                  required
+                  value={organization}
+                  onChange={(event) => {
+                    setOrganization(event.target.value);
+                  }}
+                />
+              </label>
+              <label>
+                Role
+                <input
+                  required
+                  value={role}
+                  onChange={(event) => {
+                    setRole(event.target.value);
+                  }}
+                />
+              </label>
+              <label>
+                Period
+                <input
+                  value={period}
+                  onChange={(event) => {
+                    setPeriod(event.target.value);
+                  }}
+                />
+              </label>
+            </div>
+          ) : null}
+          <label>
+            Information
+            <textarea
+              required
+              rows={4}
+              value={statement}
+              onChange={(event) => {
+                setStatement(event.target.value);
+              }}
+            />
+          </label>
+          <button disabled={saving} type="submit">
+            {saving ? "Saving…" : "Save privately and update Career Brain"}
+          </button>
+        </form>
+      </details>
       <PublicationControl />
     </section>
   );

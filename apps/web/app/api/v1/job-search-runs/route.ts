@@ -10,6 +10,7 @@ export function GET(request: Request) {
       .select("*")
       .eq("owner_id", ownerId)
       // job_search_runs is keyed by logical_date/started_at; it intentionally has no created_at.
+      .order("started_at", { ascending: false, nullsFirst: false })
       .order("logical_date", { ascending: false })
       .limit(50);
     if (error) throw error;

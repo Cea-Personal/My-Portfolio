@@ -165,7 +165,8 @@ export function JobSourcesWorkspace() {
   async function create(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setMessage("Saving source…");
-    const form = new FormData(event.currentTarget);
+    const target = event.currentTarget;
+    const form = new FormData(target);
     try {
       await request("/api/v1/job-sources", "POST", {
         name: form.get("name"),
@@ -179,7 +180,7 @@ export function JobSourcesWorkspace() {
         termsNote: form.get("termsNote"),
         enabled: form.get("enabled") === "on"
       });
-      event.currentTarget.reset();
+      target.reset();
       setMessage("Source saved. Test it before using it in a search.");
       await load();
     } catch (error) {
@@ -280,6 +281,8 @@ export function JobSourcesWorkspace() {
               <option value="teamtailor">Teamtailor</option>
               <option value="personio">Personio</option>
               <option value="recruitee">Recruitee</option>
+              <option value="jobgether">Jobgether (public API)</option>
+              <option value="remoteok">Remote OK (public JSON feed)</option>
               <option value="structured">Structured data (JSON-LD)</option>
               <option value="linkedin-authorized">LinkedIn (authorized feed)</option>
               <option value="rss">RSS</option>
@@ -295,6 +298,11 @@ export function JobSourcesWorkspace() {
               placeholder="https://boards-api.greenhouse.io/v1/boards/company/jobs"
             />
           </label>
+          <p>
+            No-key presets: Jobgether uses <code>https://jobgether.com/astroapi/ai/jobs.json</code>;
+            Remote OK uses <code>https://remoteok.com/api</code>. Both are fetched server-side and
+            preserve the source listing URL.
+          </p>
           <p>
             LinkedIn is supported through an authorized/licensed feed or partner endpoint only. For
             a normal LinkedIn listing, paste the URL in Jobs; this app stores the link and does not
@@ -542,7 +550,8 @@ export function SearchProfilesWorkspace() {
   async function create(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setMessage("Saving search profile…");
-    const form = new FormData(event.currentTarget);
+    const target = event.currentTarget;
+    const form = new FormData(target);
     try {
       await request("/api/v1/search-profiles", "POST", {
         name: form.get("name"),
@@ -556,7 +565,7 @@ export function SearchProfilesWorkspace() {
           logistics: Number(form.get("logistics"))
         }
       });
-      event.currentTarget.reset();
+      target.reset();
       setMessage("Search profile saved.");
       await load();
     } catch (error) {

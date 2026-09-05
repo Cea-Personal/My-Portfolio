@@ -91,9 +91,33 @@ Document vectors are stored in the `app.chunk_embeddings.embedding` column, not 
 schema. In Supabase Studio, select the `app` schema and open `chunk_embeddings`; source text chunks
 are in `app.evidence_chunks`. The `vector` extension may appear under `public` in Studio—this is the
 type provider and does not require vector-bearing tables to live in `public`. Uploading alone creates
-a private binary; keep both the Inngest development server and parser/indexer above running, then use
-**Index knowledge** on `/documents`. The status changes to `indexed` only after a durable ingestion
-run creates the evidence version, chunks, and embeddings.
+a private binary; keep both the Inngest development server and parser/indexer above running. New and
+changed documents are indexed automatically. The status changes to `indexed` only after a durable
+ingestion run creates the evidence version, chunks, and production model embeddings.
+
+Before indexing, open **Settings → AI providers** and register an embedding model (for example,
+provider `openai`, model `text-embedding-3-small`, capability `embeddings`, and secret reference
+`OPENAI_API_KEY`). Put that named secret in `apps/web/.env.local`, restart `pnpm dev`, then open
+**Settings → Agents** and enable the `embedding` task with that provider. Ingestion fails closed if
+no enabled embedding capability or server-side credential is available; deterministic hash vectors
+are not generated. Existing legacy vectors are ignored because retrieval filters by the selected
+provider, model, and model version. Reprocess an existing document to create production embeddings.
+
+All reasoning agents run as subagents under one owner-configured orchestrator model. In **Settings →
+AI providers**, register the chat/generation model with a reasoning capability (or `*`), then in
+**Settings → Agents** select it once and enable **Save orchestrator**. Portfolio Q&A, role fit,
+career synthesis, job matching, document composition, compensation, interview preparation, and
+writing use that same model; each role keeps its own prompt, tools, permissions, and output schema.
+Embeddings are intentionally separate because they are a retrieval model, not an agent. Creating an
+interview process automatically asks the interview subagent to prepare stage-specific likely
+questions, CV alignment, evidence-grounded answer stories, revision areas, and questions to ask the
+interviewer. There is no manual STAR-story form in the normal workflow.
+
+The web application exposes this orchestration boundary in `/api/v1/orchestrator/tasks`. The Codex
+app server can be used as the surrounding agent harness when you run the application through Codex,
+but it is not a credential or runtime dependency of the deployed Next.js server. The server remains
+portable and calls the configured OpenAI-compatible endpoint directly; no code claims access to a
+user's Codex session or account.
 
 Local development uses a parser-only default secret when none is configured. Deployed environments
 must set the same strong `CAREER_WORKER_SHARED_SECRET` on the Web/Inngest runtime and worker runtime;
@@ -122,6 +146,43 @@ owner-supplied URL is retained as a reference; the app does not scrape LinkedIn.
 discovery, configure **LinkedIn (authorized feed)** under **Settings → Job sources** with an
 authorized or licensed provider endpoint and a terms/access note.
 
+For no-key remote-job discovery, configure these presets under **Settings → Job sources**:
+
+- **Jobgether (public API)** — \`https://jobgether.com/astroapi/ai/jobs.json\`
+- **Remote OK (public JSON feed)** — \`https://remoteok.com/api\`
+
+The adapters translate the active search profile into each provider's query shape, discard malformed
+metadata records, preserve the provider listing URL, and feed the normal raw-job, eligibility,
+deduplication, and matching pipeline. Title/location mismatches and explicit exclusions are filtered
+before canonical jobs are created; required technologies are rejected when the listing contains
+searchable description text, while description-less listings remain reviewable. These feeds do not
+require a paid API key, but they do require
+reasonable request volume and source attribution. Jobgether's returned URL is its listing page, not
+necessarily the employer's application URL.
+
+For Jobgether, the adapter maps profile titles, technologies, preferred companies, locations/regions,
+industries, seniority, employment type, work arrangement, minimum salary, currency, and language into
+the documented `keyword`, `locations`, `industries`, `experience`, `contractType`, `remoteType`,
+`includeHybrid`, `salaryMin`, and `currency` parameters. Unsupported or unknown provider values are
+retried without the structured filter and remain subject to local profile eligibility.
+
+The Jobs workspace also has an opt-in **Live web discovery** action. It uses the configured OpenAI
+orchestrator with the Responses API web-search tool, restricts retrieval to the domains entered in the
+form, optionally grounds the query with indexed private Career Brain evidence, validates every returned
+HTTPS listing URL, and shows candidates for owner review before they are saved to the private
+opportunity pipeline. Configure and enable the orchestrator in **Settings → AI providers / Agents**
+first; no separate search key is required. Set `OPENAI_RESPONSES_URL` only when using an
+OpenAI-compatible proxy. Live discovery never logs in to or scrapes LinkedIn, never publishes results,
+and never submits an application.
+
+The ATS adapters have different credential rules. Greenhouse public job-board endpoints, Lever's
+public postings feed, and Ashby's public job-posting API generally need no key when you are reading
+published postings. SmartRecruiters, Workable, Teamtailor, Personio, Recruitee, and private/company
+endpoints may require an employer-issued API token or account. Obtain those credentials from the
+provider's developer/integrations area or from the employer who owns the board, then store only the
+environment-variable name in Job Sources (never the token itself). LinkedIn requires an
+authorized/licensed provider feed; a normal LinkedIn login is not an API key.
+
 In **Interview Kit**, create a process from an application and choose **Generate / refresh interview
 package**. The planner reads the selected job description, infers stages when evidence is present (or
 labels the process unknown), compares indexed private CV excerpts, and maps only approved Career Brain
@@ -147,7 +208,8 @@ The public navigation includes an **Owner login** link to `/sign-in` for the pri
 4. Sign in at `/sign-in`, open **Settings → Documents**, and select **Verify and activate shared
    folder**, followed by **Sync selected folder**.
 5. Keep the Inngest workflow process and career worker running. Imported files appear in Documents;
-   select **Index knowledge** for any item waiting on parsing or embeddings.
+   newly imported or changed files are queued for indexing automatically. Use **Reprocess** only to
+   retry a failed item or regenerate it with a newly selected embedding model.
 
 The active Drive integration does not use user OAuth and never requests access to your personal
 Drive. Its `drive.readonly` token belongs to the isolated service account, which can see only items

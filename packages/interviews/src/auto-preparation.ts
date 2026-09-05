@@ -65,6 +65,14 @@ export interface GeneratedInterviewKit {
   projects: string[];
   achievements: string[];
   stories: string[];
+  storyDrafts: Array<{
+    title: string;
+    situation: string;
+    task: string;
+    action: string;
+    result: string;
+    evidenceIds: string[];
+  }>;
   weakAreas: string[];
   companyResearch: string;
   revisionTopics: string[];
@@ -74,9 +82,12 @@ export interface GeneratedInterviewKit {
   personalNotes: string;
   limitations: string[];
   generation: {
-    method: "bounded-interview-planner.v1";
+    method: "bounded-interview-planner.v1" | "llm-interview-preparation.v1";
     inputs: string[];
     evidenceCount: number;
+    provider?: string;
+    model?: string;
+    modelVersion?: string;
   };
   cvAlignment: Array<{
     documentId: string;
@@ -262,6 +273,16 @@ export function generateInterviewKit(context: AutoPreparationContext): Generated
     projects: projectIds,
     achievements: achievementIds,
     stories: storyIds,
+    storyDrafts: (context.stories ?? []).slice(0, 8).map((story) => ({
+      title: story.title,
+      situation: story.situation ?? "",
+      task: story.task ?? "",
+      action: story.action ?? "",
+      result: story.result ?? "",
+      evidenceIds: (story.evidenceIds ?? []).filter((id) =>
+        context.evidence.some((item) => item.id === id)
+      )
+    })),
     weakAreas,
     companyResearch:
       "Company research was not supplied in the job record. Verify the employer's own public materials before the interview.",

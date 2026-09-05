@@ -16,8 +16,35 @@ describe("deterministic job eligibility", () => {
     });
   });
 
-  it("marks missing required evidence for review instead of inventing a match", () => {
+  it("filters out a listing that has content but misses a required technology", () => {
     expect(evaluateJobEligibility(job, { requiredTechnologies: ["Spark"] })).toMatchObject({
+      outcome: "FAIL",
+      reasons: [expect.objectContaining({ code: "REQUIRED_TECHNOLOGY_NOT_FOUND" })]
+    });
+  });
+
+  it("filters title and location mismatches before they reach the opportunity list", () => {
+    expect(
+      evaluateJobEligibility(job, {
+        targetTitles: ["Frontend Engineer"],
+        locations: ["Berlin"]
+      })
+    ).toMatchObject({
+      outcome: "FAIL",
+      reasons: [
+        expect.objectContaining({ code: "TITLE_NOT_MATCHED" }),
+        expect.objectContaining({ code: "LOCATION_NOT_MATCHED" })
+      ]
+    });
+  });
+
+  it("keeps a description-less listing reviewable when a requirement cannot be verified", () => {
+    expect(
+      evaluateJobEligibility(
+        { company: "Example", title: "Data Engineer", location: "Remote" },
+        { targetTitles: ["Data Engineer"], locations: ["Remote"], requiredTechnologies: ["Spark"] }
+      )
+    ).toMatchObject({
       outcome: "REVIEW",
       reasons: [expect.objectContaining({ code: "REQUIRED_TECHNOLOGY_UNCONFIRMED" })]
     });

@@ -9,7 +9,11 @@ const settingsAreas = [
     "/settings/analytics",
     "Review private portfolio, application, interview, and career-gap signals."
   ],
-  ["Agents", "/settings/agents", "Inspect bounded AI capabilities and owner-approved actions."],
+  [
+    "Agents",
+    "/settings/agents",
+    "Route tasks to primary and fallback models; control limits, retries, and execution health."
+  ],
   [
     "Automations",
     "/settings/automations",
@@ -25,7 +29,11 @@ const settingsAreas = [
     "/settings/job-sources",
     "Connect lawful feeds and run sanitized source health checks."
   ],
-  ["AI providers", "/settings/providers", "Configure task-level models without exposing secrets."],
+  [
+    "AI providers",
+    "/settings/providers",
+    "Register model connections, capabilities, versions, and secret environment references."
+  ],
   ["Data and exports", "/settings/data", "Request private exports and manage portability."]
 ] as const;
 

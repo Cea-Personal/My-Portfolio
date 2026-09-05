@@ -8,14 +8,6 @@ import httpx
 
 from career_worker.extraction.career_facts import ExtractedFactCandidate
 from career_worker.ingestion.chunking import Chunk
-from career_worker.ingestion.embeddings import (
-    EMBEDDING_DIMENSIONS,
-    EMBEDDING_MODEL,
-    EMBEDDING_PROVIDER,
-    EMBEDDING_VERSION,
-    embed_deterministically,
-    embedding_literal,
-)
 
 
 def _now() -> str:
@@ -282,10 +274,6 @@ class SupabaseIngestionStore:
                 if isinstance(ordinal, int) and isinstance(item.get("id"), str):
                     chunk_rows[ordinal] = item
 
-        # The direct worker ingestion path must write the same pgvector rows as
-        # the HTTP parser path.  Upserting by (chunk_id, embedding_version)
-        # makes retries safe while keeping the source chunk immutable.
-        embeddings: list[dict[str, Any]] = []
         for chunk in chunks:
             row = chunk_rows.get(chunk.ordinal)
             chunk_id = row.get("id") if row is not None else None
@@ -295,28 +283,6 @@ class SupabaseIngestionStore:
                 raise RuntimeError("EVIDENCE_CHUNK_PERSIST_FAILED")
             if row.get("content_hash") not in (None, chunk.content_hash):
                 raise RuntimeError("EVIDENCE_CHUNK_IMMUTABLE_CONFLICT")
-            vector = embed_deterministically(chunk.content, EMBEDDING_DIMENSIONS)
-            embeddings.append(
-                {
-                    "chunk_id": chunk_id,
-                    "provider": EMBEDDING_PROVIDER,
-                    "model": EMBEDDING_MODEL,
-                    "model_version": "1",
-                    "embedding_version": EMBEDDING_VERSION,
-                    "dimensions": EMBEDDING_DIMENSIONS,
-                    "embedding": embedding_literal(vector),
-                    "normalization": "l2",
-                    "input_hash": chunk.content_hash,
-                    "status": "completed",
-                }
-            )
-        self._request(
-            "POST",
-            "chunk_embeddings",
-            params={"on_conflict": "chunk_id,embedding_version"},
-            payload=embeddings,
-            prefer="resolution=merge-duplicates,return=representation",
-        )
 
     def _persist_candidates(
         self, run_id: str, candidates: tuple[ExtractedFactCandidate, ...]
@@ -338,11 +304,19 @@ class SupabaseIngestionStore:
                     "fact_type": candidate.fact_type,
                     "statement": candidate.statement,
                     "confidence": candidate.confidence,
+                    "section": candidate.section,
+                    "structured_value": candidate.structured_value,
                 },
                 "statement": candidate.statement,
                 "confidence": candidate.confidence,
                 "trust_level": "ai_extracted",
-                "schema_version": "career-fact-candidate.v1",
+                "subject_candidate": {
+                    "factType": candidate.fact_type,
+                    "section": candidate.section or candidate.fact_type,
+                    **candidate.structured_value,
+                },
+                "model_version": "deterministic-extractor.v2",
+                "schema_version": "career-fact-candidate.v2",
                 "source_offsets": {"start": candidate.source_start, "end": candidate.source_end},
                 "review_status": candidate.review_status,
             }

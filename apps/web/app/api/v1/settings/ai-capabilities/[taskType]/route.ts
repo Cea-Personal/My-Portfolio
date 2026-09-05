@@ -9,7 +9,9 @@ const taskTypes = new Set([
   "document_composition",
   "compensation",
   "interview_preparation",
-  "writing_assistance"
+  "writing_assistance",
+  "embedding",
+  "orchestrator"
 ]);
 interface AvailableProvider {
   id: string;
@@ -24,6 +26,16 @@ export async function PATCH(
     const body = await request.json().catch(() => ({}));
     if (!taskTypes.has(taskType) || typeof body.providerId !== "string")
       return apiResponse({ code: "INVALID_CAPABILITY_CONFIGURATION" }, request, 400);
+    if (taskType === "orchestrator" && body.fallbackProviderId)
+      return apiResponse(
+        {
+          code: "SINGLE_ORCHESTRATOR_MODEL_REQUIRED",
+          detail:
+            "The orchestrator uses one model for every reasoning subagent; remove the fallback provider."
+        },
+        request,
+        409
+      );
     const creativity = Number(body.creativity ?? 0.2);
     const lengthLimit = Number(body.lengthLimit ?? 2000);
     const timeoutMs = Number(body.timeoutMs ?? 30000);
@@ -54,7 +66,12 @@ export async function PATCH(
     const supports = (item: typeof provider) =>
       Boolean(
         item?.capabilities?.some(
-          (capability: string) => capability === "*" || capability === taskType
+          (capability: string) =>
+            capability === "*" ||
+            capability === taskType ||
+            (taskType === "embedding" && capability === "embeddings") ||
+            (taskType !== "embedding" && capability === "reasoning") ||
+            (taskType === "orchestrator" && capability !== "embeddings")
         )
       );
     if (

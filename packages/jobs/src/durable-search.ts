@@ -5,6 +5,8 @@ import { customRestAdapter } from "./adapters/custom-rest";
 import { greenhouseAdapter } from "./adapters/greenhouse";
 import { leverAdapter } from "./adapters/lever";
 import { linkedinAuthorizedAdapter } from "./adapters/linkedin-authorized";
+import { jobgetherAdapter } from "./adapters/jobgether";
+import { remoteOkAdapter } from "./adapters/remoteok";
 import { rssAdapter } from "./adapters/rss";
 import {
   personioAdapter,
@@ -26,6 +28,8 @@ const adapters: Record<string, JobSourceAdapter> = {
   greenhouse: greenhouseAdapter,
   lever: leverAdapter,
   "linkedin-authorized": linkedinAuthorizedAdapter,
+  jobgether: jobgetherAdapter,
+  remoteok: remoteOkAdapter,
   rss: rssAdapter,
   workable: workableAdapter,
   smartrecruiters: smartRecruitersAdapter,
@@ -63,9 +67,19 @@ interface SearchProfile {
   target_titles?: unknown;
   preferred_titles?: unknown;
   excluded_titles?: unknown;
+  seniority_levels?: unknown;
   locations?: unknown;
   regions?: unknown;
+  work_arrangements?: unknown;
+  remote_restrictions?: unknown;
+  employment_types?: unknown;
   required_technologies?: unknown;
+  preferred_technologies?: unknown;
+  industries?: unknown;
+  language_requirements?: unknown;
+  minimum_salary?: unknown;
+  preferred_salary?: unknown;
+  salary_currency?: unknown;
   excluded_technologies?: unknown;
   preferred_companies?: unknown;
   excluded_companies?: unknown;
@@ -300,11 +314,36 @@ async function persistJob(
 function adapterInput(config: Record<string, unknown>, profile: SearchProfile): JobSourceInput {
   const query: Record<string, string> = {};
   const titles = asStringArray(profile.target_titles);
-  const locations = asStringArray(profile.locations);
+  const preferredTitles = asStringArray(profile.preferred_titles);
+  const locations = [
+    ...asStringArray(profile.locations),
+    ...asStringArray(profile.regions)
+  ];
   const technologies = asStringArray(profile.required_technologies);
+  const preferredTechnologies = asStringArray(profile.preferred_technologies);
+  const preferredCompanies = asStringArray(profile.preferred_companies);
+  const seniority = asStringArray(profile.seniority_levels);
+  const workArrangements = asStringArray(profile.work_arrangements);
+  const remoteRestrictions = asStringArray(profile.remote_restrictions);
+  const employmentTypes = asStringArray(profile.employment_types);
+  const industries = asStringArray(profile.industries);
+  const languages = asStringArray(profile.language_requirements);
   if (titles.length) query.title = titles.join(",");
+  if (preferredTitles.length) query.preferredTitle = preferredTitles.join(",");
   if (locations.length) query.location = locations.join(",");
   if (technologies.length) query.technology = technologies.join(",");
+  if (preferredTechnologies.length) query.preferredTechnology = preferredTechnologies.join(",");
+  if (preferredCompanies.length) query.preferredCompany = preferredCompanies.join(",");
+  if (seniority.length) query.seniority = seniority.join(",");
+  if (workArrangements.length) query.workArrangement = workArrangements.join(",");
+  if (remoteRestrictions.length) query.remoteRestriction = remoteRestrictions.join(",");
+  if (employmentTypes.length) query.employmentType = employmentTypes.join(",");
+  if (industries.length) query.industry = industries.join(",");
+  if (languages.length) query.language = languages.join(",");
+  const minimumSalary = asNumber(profile.minimum_salary, Number.NaN);
+  const salaryCurrency = asString(profile.salary_currency);
+  if (Number.isFinite(minimumSalary)) query.minimumSalary = String(minimumSalary);
+  if (salaryCurrency) query.salaryCurrency = salaryCurrency;
   const endpoint = asString(config.endpoint);
   const fieldMapping = asStringRecord(config.field_mapping);
   const secretRef = asString(config.secret_ref);
@@ -336,7 +375,9 @@ async function loadSources(
   const profileResult = await client
     .schema("app")
     .from("job_search_profiles")
-    .select("target_titles,locations,required_technologies,scoring_weights")
+    .select(
+      "target_titles,preferred_titles,locations,regions,seniority_levels,work_arrangements,remote_restrictions,employment_types,required_technologies,preferred_technologies,industries,language_requirements,minimum_salary,preferred_salary,salary_currency,preferred_companies,scoring_weights"
+    )
     .eq("owner_id", ownerId)
     .eq("id", profileId)
     .limit(1)
@@ -431,6 +472,7 @@ export async function executePersistedSearch(input: DurableSearchInput): Promise
     excludedCompanies: asStringArray(profileResult.data?.excluded_companies)
   };
   const persistedJobIds = new Set<string>();
+  let expiredJobCount = 0;
   let filteredJobsCount = 0;
   let reviewJobsCount = 0;
   for (const sourceResult of result.sources) {
@@ -498,6 +540,7 @@ export async function executePersistedSearch(input: DurableSearchInput): Promise
       .eq("id", sourceResult.sourceId)
       .eq("owner_id", input.ownerId);
     if (healthUpdate.error) throw healthUpdate.error;
+    const currentSourceJobIds = new Set<string>();
     for (const { job } of eligibleJobs) {
       const persisted = await persistJob(
         input.client,
@@ -511,6 +554,57 @@ export async function executePersistedSearch(input: DurableSearchInput): Promise
         input.runId
       );
       persistedJobIds.add(persisted.id);
+      currentSourceJobIds.add(persisted.id);
+    }
+    // Keep the opportunity list current without deleting history. Only jobs
+    // still in the initial discovered state are eligible for reconciliation;
+    // shortlisted/applied/interviewed jobs remain owner-controlled records.
+    if (sourceResult.status === "completed" && sourceResult.fetchedCount > 0) {
+      const sourceRefs = await input.client
+        .schema("app")
+        .from("job_source_references")
+        .select("job_id")
+        .eq("source_id", sourceResult.sourceId)
+        .eq("source_status", "active");
+      if (sourceRefs.error) throw sourceRefs.error;
+      const referencedJobIds = (sourceRefs.data ?? [])
+        .map((row) => row.job_id)
+        .filter((id): id is string => typeof id === "string");
+      const staleCandidates = referencedJobIds.filter((id) => !currentSourceJobIds.has(id));
+      if (staleCandidates.length) {
+        const staleJobs = await input.client
+          .schema("app")
+          .from("jobs")
+          .select("id")
+          .eq("owner_id", input.ownerId)
+          .eq("status", "discovered")
+          .in("id", staleCandidates);
+        if (staleJobs.error) throw staleJobs.error;
+        const staleIds = (staleJobs.data ?? [])
+          .map((row) => row.id)
+          .filter((id): id is string => typeof id === "string");
+        if (staleIds.length) {
+          const expired = await input.client
+            .schema("app")
+            .from("jobs")
+            .update({ status: "expired" })
+            .eq("owner_id", input.ownerId)
+            .eq("status", "discovered")
+            .in("id", staleIds);
+          if (expired.error) throw expired.error;
+          const history = await input.client.schema("app").from("job_status_history").insert(
+            staleIds.map((jobId) => ({
+              job_id: jobId,
+              from_status: "discovered",
+              to_status: "expired",
+              actor_id: input.ownerId,
+              reason: "source_reconciliation_profile_filter"
+            }))
+          );
+          if (history.error) throw history.error;
+          expiredJobCount += staleIds.length;
+        }
+      }
     }
   }
   const runUpdate = await input.client
@@ -523,6 +617,7 @@ export async function executePersistedSearch(input: DurableSearchInput): Promise
         persisted: persistedJobIds.size,
         filtered: filteredJobsCount,
         review: reviewJobsCount,
+        expired: expiredJobCount,
         failedSources: result.sources.filter((source) => source.status === "failed").length
       },
       finished_at: new Date().toISOString(),

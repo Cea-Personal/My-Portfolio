@@ -78,7 +78,9 @@ interface SearchProfile {
 interface SearchRun {
   id: string;
   status: string;
-  created_at: string;
+  logical_date: string;
+  started_at?: string | null;
+  finished_at?: string | null;
   result_counts: Record<string, unknown>;
   error_summary?: string | null;
 }
@@ -91,6 +93,15 @@ interface JobSourceSummary {
   last_run_at?: string | null;
   last_discovered_count?: number;
   last_accepted_count?: number;
+}
+interface LiveJobCandidate {
+  title: string;
+  company: string;
+  location?: string;
+  canonicalUrl: string;
+  description?: string;
+  postedAt?: string;
+  sourceName?: string;
 }
 
 const transitions: Record<JobStatus, JobStatus[]> = {
@@ -134,6 +145,9 @@ function scoreText(score: JobScore | undefined): string {
   const value = Number(score.numeric_score);
   return Number.isFinite(value) ? `${String(Math.round(value * 100))}%` : "Unavailable";
 }
+function runTimestamp(run: SearchRun): string {
+  return run.started_at ?? run.finished_at ?? `${run.logical_date}T00:00:00.000Z`;
+}
 async function mutation(endpoint: string, method: "POST" | "PATCH", body: unknown) {
   const response = await fetch(endpoint, {
     method,
@@ -157,11 +171,16 @@ export function JobsWorkspace() {
   const [profiles, setProfiles] = useState<SearchProfile[]>([]);
   const [runs, setRuns] = useState<SearchRun[]>([]);
   const [sources, setSources] = useState<JobSourceSummary[]>([]);
+  const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>([]);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [message, setMessage] = useState("");
-  const [filter, setFilter] = useState<"all" | JobStatus>("all");
+  const [filter, setFilter] = useState<"active" | "all" | JobStatus>("active");
   const [compareIds, setCompareIds] = useState<string[]>([]);
   const [detail, setDetail] = useState<Job | null>(null);
+  const [liveProfileId, setLiveProfileId] = useState("");
+  const [liveJobs, setLiveJobs] = useState<LiveJobCandidate[]>([]);
+  const [liveSearching, setLiveSearching] = useState(false);
+  const [savedLiveUrls, setSavedLiveUrls] = useState<string[]>([]);
   const load = useCallback(async () => {
     try {
       const [jobsResponse, profilesResponse, runsResponse, sourcesResponse] = await Promise.all([
@@ -180,10 +199,19 @@ export function JobsWorkspace() {
       const sourcesPayload = (await sourcesResponse.json()) as {
         data?: { sources?: JobSourceSummary[] };
       };
+      const nextSources = sourcesPayload.data?.sources ?? [];
       setJobs(jobsPayload.data?.jobs ?? []);
       setProfiles(profilesPayload.data?.profiles ?? []);
+      setLiveProfileId(
+        (current) =>
+          current || profilesPayload.data?.profiles?.find((profile) => profile.enabled)?.id || ""
+      );
       setRuns(runsPayload.data?.runs ?? []);
-      setSources(sourcesPayload.data?.sources ?? []);
+      setSources(nextSources);
+      setSelectedSourceIds((current) => {
+        const enabled = nextSources.filter((source) => source.enabled).map((source) => source.id);
+        return current.length ? current.filter((id) => enabled.includes(id)) : enabled;
+      });
       setState("ready");
     } catch {
       setState("error");
@@ -191,7 +219,12 @@ export function JobsWorkspace() {
   }, []);
   useEffect(() => void load(), [load]);
   const visibleJobs = useMemo(
-    () => jobs.filter((job) => filter === "all" || job.status === filter),
+    () =>
+      jobs.filter((job) =>
+        filter === "active"
+          ? !["expired", "rejected", "withdrawn"].includes(job.status)
+          : filter === "all" || job.status === filter
+      ),
     [filter, jobs]
   );
   const compared = compareIds.flatMap((id) => jobs.find((job) => job.id === id) ?? []);
@@ -219,13 +252,118 @@ export function JobsWorkspace() {
     event.preventDefault();
     const profileId = new FormData(event.currentTarget).get("profileId");
     if (typeof profileId !== "string" || !profileId) return;
+    setLiveProfileId(profileId);
+    if (!selectedSourceIds.length) {
+      setMessage("Select at least one enabled source before starting a search.");
+      return;
+    }
     setMessage("Starting durable multi-source search…");
     try {
-      await mutation("/api/v1/job-search-runs", "POST", { profileId, triggerType: "manual" });
-      setMessage("Search queued. Refresh the run history to see source-level outcomes.");
+      const result = (await mutation("/api/v1/job-search-runs", "POST", {
+        profileId,
+        sourceIds: selectedSourceIds,
+        triggerType: "manual"
+      })) as { run?: { id?: string } };
+      setMessage(
+        `Search queued across ${String(selectedSourceIds.length)} source${selectedSourceIds.length === 1 ? "" : "s"}. Compiling results…`
+      );
       await load();
+      const runId = result.run?.id;
+      if (!runId) return;
+      let terminal = false;
+      for (let attempt = 0; attempt < 30; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        const response = await fetch(`/api/v1/job-search-runs/${runId}`, { cache: "no-store" });
+        if (!response.ok) break;
+        const payload = (await response.json()) as {
+          data?: {
+            run?: {
+              status?: string;
+              result_counts?: Record<string, unknown>;
+              error_summary?: string | null;
+            };
+          };
+        };
+        const run = payload.data?.run;
+        if (!run || !["completed", "partial", "failed"].includes(run.status ?? "")) continue;
+        terminal = true;
+        await load();
+        const persisted =
+          typeof run.result_counts?.persisted === "number" ? run.result_counts.persisted : 0;
+        const discovered =
+          typeof run.result_counts?.discovered === "number" ? run.result_counts.discovered : 0;
+        const filtered =
+          typeof run.result_counts?.filtered === "number" ? run.result_counts.filtered : 0;
+        const expired =
+          typeof run.result_counts?.expired === "number" ? run.result_counts.expired : 0;
+        const status = run.status ?? "completed";
+        setMessage(
+          `Search ${status}. ${String(discovered)} listing${discovered === 1 ? "" : "s"} discovered, ${String(persisted)} compiled into the opportunity pipeline${filtered ? `, ${String(filtered)} rejected by profile rules` : ""}${expired ? `, ${String(expired)} stale discovered job${expired === 1 ? "" : "s"} expired` : ""}.${run.error_summary ? ` ${run.error_summary}` : ""}`
+        );
+        break;
+      }
+      if (!terminal)
+        setMessage(
+          "Search is still queued. Keep the Inngest development runner running (`pnpm dev`) and check Recent durable runs again."
+        );
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not start search.");
+    }
+  }
+  async function liveSearch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!liveProfileId) {
+      setMessage("Select an enabled profile before searching the live web.");
+      return;
+    }
+    const form = new FormData(event.currentTarget);
+    const rawDomains = form.get("liveDomains");
+    const domains =
+      typeof rawDomains === "string"
+        ? rawDomains
+            .split(",")
+            .map((domain) => domain.trim())
+            .filter(Boolean)
+        : [];
+    setLiveSearching(true);
+    setMessage("Searching the live web with your configured orchestrator…");
+    try {
+      const result = (await mutation("/api/v1/jobs/live-search", "POST", {
+        profileId: liveProfileId,
+        allowedDomains: domains
+      })) as {
+        jobs?: LiveJobCandidate[];
+        elapsedMs?: number;
+        groundedEvidenceCount?: number;
+        discoveredCount?: number;
+        filteredCount?: number;
+        reviewCount?: number;
+      };
+      setLiveJobs(result.jobs ?? []);
+      setMessage(
+        `Live search found ${String(result.jobs?.length ?? 0)} eligible candidate${result.jobs?.length === 1 ? "" : "s"} from ${String(result.discoveredCount ?? result.jobs?.length ?? 0)} listing${result.discoveredCount === 1 ? "" : "s"}; ${String(result.filteredCount ?? 0)} filtered and ${String(result.reviewCount ?? 0)} kept for review by your profile. Grounded with ${String(result.groundedEvidenceCount ?? 0)} private evidence snippet${result.groundedEvidenceCount === 1 ? "" : "s"}. Review and save the ones you want.`
+      );
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Live web search failed.");
+    } finally {
+      setLiveSearching(false);
+    }
+  }
+  async function saveLiveJob(job: LiveJobCandidate) {
+    try {
+      await mutation("/api/v1/jobs", "POST", {
+        title: job.title,
+        company: job.company,
+        location: job.location,
+        description: job.description,
+        sourceUrl: job.canonicalUrl,
+        sourceProvider: "live_web"
+      });
+      setSavedLiveUrls((current) => [...current, job.canonicalUrl]);
+      setMessage(`${job.title} was added to the opportunity pipeline.`);
+      await load();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not save live result.");
     }
   }
   async function loadDetail(id: string) {
@@ -335,8 +473,33 @@ export function JobsWorkspace() {
                 ))}
             </select>
           </label>
+          <fieldset>
+            <legend>Sources to include</legend>
+            {sources.filter((source) => source.enabled).length ? (
+              sources
+                .filter((source) => source.enabled)
+                .map((source) => (
+                  <label key={source.id}>
+                    <input
+                      type="checkbox"
+                      checked={selectedSourceIds.includes(source.id)}
+                      onChange={(event) => {
+                        setSelectedSourceIds((current) =>
+                          event.target.checked
+                            ? [...current, source.id]
+                            : current.filter((id) => id !== source.id)
+                        );
+                      }}
+                    />{" "}
+                    {source.name} ({source.adapter_type})
+                  </label>
+                ))
+            ) : (
+              <p>No enabled sources are available.</p>
+            )}
+          </fieldset>
           <button type="submit" disabled={!profiles.some((profile) => profile.enabled)}>
-            Search enabled sources
+            Search selected sources
           </button>
         </form>
         {!profiles.some((profile) => profile.enabled) ? (
@@ -348,7 +511,7 @@ export function JobsWorkspace() {
             <ul className="workspace-list">
               {runs.slice(0, 10).map((run) => (
                 <li key={run.id}>
-                  <strong>{run.status}</strong> · {new Date(run.created_at).toLocaleString()}
+                  <strong>{run.status}</strong> · {new Date(runTimestamp(run)).toLocaleString()}
                   <pre>{JSON.stringify(run.result_counts, null, 2)}</pre>
                   {run.error_summary ? <p>{run.error_summary}</p> : null}
                 </li>
@@ -358,6 +521,78 @@ export function JobsWorkspace() {
             <p>No searches have run yet.</p>
           )}
         </details>
+      </section>
+      <section aria-labelledby="live-discovery-title">
+        <h2 id="live-discovery-title">Live web discovery</h2>
+        <p>
+          Ask the configured orchestrator to search current public listings outside your configured
+          feeds. Results are filtered to approved domains, retain their source URL, and are only
+          added to your private pipeline when you save them.
+        </p>
+        <form className="knowledge-entry-form" onSubmit={(event) => void liveSearch(event)}>
+          <label>
+            Search profile
+            <select
+              value={liveProfileId}
+              onChange={(event) => {
+                setLiveProfileId(event.target.value);
+              }}
+              required
+            >
+              <option value="" disabled>
+                Select a profile
+              </option>
+              {profiles
+                .filter((profile) => profile.enabled)
+                .map((profile) => (
+                  <option key={profile.id} value={profile.id}>
+                    {profile.name}
+                  </option>
+                ))}
+            </select>
+          </label>
+          <label>
+            Allowed domains (comma-separated, optional)
+            <input
+              name="liveDomains"
+              defaultValue="jobgether.com, remoteok.com, wellfound.com, greenhouse.io, lever.co, ashbyhq.com"
+            />
+          </label>
+          <button
+            type="submit"
+            disabled={liveSearching || !profiles.some((profile) => profile.enabled)}
+          >
+            {liveSearching ? "Searching live web…" : "Search live web"}
+          </button>
+        </form>
+        {liveJobs.length ? (
+          <ul className="workspace-list">
+            {liveJobs.map((job) => (
+              <li key={job.canonicalUrl}>
+                <h3>{job.title}</h3>
+                <p>
+                  {job.company} · {job.location || "Location not stated"}
+                  {job.sourceName ? ` · ${job.sourceName}` : ""}
+                </p>
+                {job.description ? <p>{job.description}</p> : null}
+                <p>
+                  <a href={job.canonicalUrl} target="_blank" rel="noreferrer">
+                    Open listing
+                  </a>
+                </p>
+                <button
+                  type="button"
+                  disabled={savedLiveUrls.includes(job.canonicalUrl)}
+                  onClick={() => void saveLiveJob(job)}
+                >
+                  {savedLiveUrls.includes(job.canonicalUrl)
+                    ? "Saved to pipeline"
+                    : "Save to pipeline"}
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
       </section>
       <section aria-labelledby="manual-job-title">
         <h2 id="manual-job-title">Add an opportunity manually</h2>
@@ -400,7 +635,8 @@ export function JobsWorkspace() {
               setFilter(event.target.value as "all" | JobStatus);
             }}
           >
-            <option value="all">All statuses</option>
+            <option value="active">Active opportunities</option>
+            <option value="all">All statuses (including history)</option>
             {Object.keys(transitions).map((status) => (
               <option key={status}>{status}</option>
             ))}
@@ -443,6 +679,13 @@ export function JobsWorkspace() {
                 Career match: {scoreText(scoreFor(job, "career_match"))} · Opportunity:{" "}
                 {scoreText(scoreFor(job, "opportunity"))}
               </p>
+              {job.job_source_references?.length ? (
+                <small>
+                  Compiled from {String(job.job_source_references.length)} source
+                  {job.job_source_references.length === 1 ? "" : "s"}; duplicate listings are
+                  merged.
+                </small>
+              ) : null}
               <div className="workspace-actions">
                 <button type="button" onClick={() => void loadDetail(job.id)}>
                   Inspect evidence and history

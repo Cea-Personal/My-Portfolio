@@ -8,12 +8,14 @@ import { durableDomainEvents } from "../../../inngest/durable-domain-events";
 import { outboxDrain } from "../../../inngest/outbox-drain";
 import { dataExport } from "../../../inngest/data-export";
 import { automationScheduler } from "../../../inngest/automation-scheduler";
+import { careerBrainRefresh } from "../../../inngest/career-brain-refresh";
 
 const handler = serve({
   client: inngest,
   functions: [
     driveSync,
     documentIngestion,
+    careerBrainRefresh,
     jobSearch,
     analyticsAggregation,
     ...durableDomainEvents,

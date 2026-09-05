@@ -3,8 +3,24 @@ import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
 interface PortfolioReport {
   totalEvents: number;
+  visitors: number | null;
   metrics: Record<string, { count: number | null }>;
+  breakdowns: {
+    sources: Record<string, { count: number | null }>;
+    countries: Record<string, { count: number | null }>;
+    pages: Record<string, { count: number | null }>;
+    sections: Record<string, { count: number | null }>;
+  };
+  engagement: {
+    pages: Record<string, EngagementMetric>;
+    sections: Record<string, EngagementMetric>;
+  };
   privacy: { message: string };
+}
+interface EngagementMetric {
+  samples: number | null;
+  totalSeconds: number | null;
+  averageSeconds: number | null;
 }
 interface ApplicationReport {
   funnel: Record<string, number>;
@@ -47,6 +63,68 @@ function MetricTable({ caption, values }: { caption: string; values: Record<stri
               <meter min="0" max={maximum} value={value}>
                 {value} of {maximum}
               </meter>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+function PrivateCountTable({
+  caption,
+  values
+}: {
+  caption: string;
+  values: Record<string, { count: number | null }>;
+}) {
+  return (
+    <table>
+      <caption>{caption}</caption>
+      <thead>
+        <tr>
+          <th scope="col">Group</th>
+          <th scope="col">Count</th>
+        </tr>
+      </thead>
+      <tbody>
+        {Object.entries(values).map(([name, metric]) => (
+          <tr key={name}>
+            <th scope="row">{name.replaceAll("_", " ")}</th>
+            <td>{metric.count ?? "Suppressed (fewer than 5)"}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+function EngagementTable({
+  caption,
+  values
+}: {
+  caption: string;
+  values: Record<string, EngagementMetric>;
+}) {
+  return (
+    <table>
+      <caption>{caption}</caption>
+      <thead>
+        <tr>
+          <th scope="col">Area</th>
+          <th scope="col">Samples</th>
+          <th scope="col">Average time</th>
+          <th scope="col">Total time</th>
+        </tr>
+      </thead>
+      <tbody>
+        {Object.entries(values).map(([name, metric]) => (
+          <tr key={name}>
+            <th scope="row">{name.replaceAll("_", " ")}</th>
+            <td>{metric.samples ?? "Suppressed"}</td>
+            <td>
+              {metric.averageSeconds === null ? "Suppressed" : `${String(metric.averageSeconds)}s`}
+            </td>
+            <td>
+              {metric.totalSeconds === null ? "Suppressed" : `${String(metric.totalSeconds)}s`}
             </td>
           </tr>
         ))}
@@ -197,24 +275,17 @@ export function AnalyticsWorkspace() {
         <section>
           <h2>Portfolio</h2>
           <p>{portfolio.privacy.message}</p>
-          <p>Total accepted events: {portfolio.totalEvents}</p>
-          <table>
-            <caption>Privacy-safe portfolio activity</caption>
-            <thead>
-              <tr>
-                <th>Event</th>
-                <th>Count</th>
-              </tr>
-            </thead>
-            <tbody>
-              {Object.entries(portfolio.metrics).map(([name, metric]) => (
-                <tr key={name}>
-                  <th scope="row">{name}</th>
-                  <td>{metric.count ?? "Suppressed (fewer than 5)"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <p>
+            Anonymous visitors: {portfolio.visitors ?? "Suppressed (fewer than 5)"} · Total accepted
+            events: {portfolio.totalEvents}
+          </p>
+          <PrivateCountTable caption="Privacy-safe portfolio activity" values={portfolio.metrics} />
+          <PrivateCountTable caption="Referral sources" values={portfolio.breakdowns.sources} />
+          <PrivateCountTable caption="Visitor countries" values={portfolio.breakdowns.countries} />
+          <PrivateCountTable caption="Pages viewed" values={portfolio.breakdowns.pages} />
+          <PrivateCountTable caption="Sections viewed" values={portfolio.breakdowns.sections} />
+          <EngagementTable caption="Time spent by page" values={portfolio.engagement.pages} />
+          <EngagementTable caption="Time spent by section" values={portfolio.engagement.sections} />
         </section>
       ) : null}
       {state === "ready" && applications ? (

@@ -13,6 +13,7 @@ import { EngineeringProcesses } from "../../components/portfolio/engineering-pro
 import type { CareerTimelineStage } from "../../components/portfolio/career-timeline";
 import { loadPublicBlogPostsWithStatus, loadPublicPortfolio } from "@/lib/api/public-data";
 import { PublicEvents } from "@/components/analytics/public-events";
+import { CredentialsAndSkills } from "@/components/portfolio/credentials-skills";
 
 export const dynamic = "force-dynamic";
 
@@ -74,6 +75,11 @@ export default async function PublicPortfolioPage() {
   const skillItems = items.filter(
     (item) => item.source_entity_type === "skill" || String(item.title).toLowerCase() === "skill"
   );
+  const certificationItems = items.filter(
+    (item) =>
+      ["education", "certification"].includes(String(item.source_entity_type)) ||
+      item.section === "credentials"
+  );
   const writingItems = items.filter(
     (item) => item.section === "blog" || item.source_entity_type === "post"
   );
@@ -83,33 +89,49 @@ export default async function PublicPortfolioPage() {
   const text = (value: unknown, fallback = "") => (typeof value === "string" ? value : fallback);
   const list = (value: unknown) =>
     Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+  const record = (value: unknown) =>
+    value && typeof value === "object" && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : {};
   const slugHref = (item: Record<string, unknown>) => {
     const slug = text(item.detail_slug);
     return slug ? `/projects/${encodeURIComponent(slug)}` : undefined;
   };
   const identities = (item: Record<string, unknown>) =>
     [text(item.career_stage), text(item.title)].filter(Boolean).map((value) => value.toLowerCase());
-  const stageKey = (item: Record<string, unknown>) => identities(item)[0] ?? "career stage";
+  const stageKey = (item: Record<string, unknown>) =>
+    [identities(item)[0] ?? "career stage", text(item.subtitle), text(item.period)]
+      .join("|")
+      .toLowerCase();
   const timelineStages: CareerTimelineStage[] = Array.from(
     new Map(careerItems.map((item) => [stageKey(item), item])).values()
   ).map((item) => {
-    const key = stageKey(item);
-    const stageProjects = projectItems
-      .filter((project) => identities(project).includes(key))
-      .map((project) => {
-        const href = slugHref(project);
-        return {
-          title: text(project.title, "Project"),
-          summary: text(project.public_summary),
-          ...(href ? { href } : {})
-        };
-      });
+    const key = identities(item)[0] ?? "career stage";
+    const structured = record(item.structured_content);
+    const embeddedProjects = list(structured.projects).map((project) => ({
+      title: project,
+      summary: project
+    }));
+    const stageProjects = [
+      ...embeddedProjects,
+      ...projectItems
+        .filter((project) => identities(project).includes(key))
+        .map((project) => {
+          const href = slugHref(project);
+          return {
+            title: text(project.title, "Project"),
+            summary: text(project.public_summary),
+            ...(href ? { href } : {})
+          };
+        })
+    ];
     const stageImpacts = impactItems
       .filter((impact) => identities(impact).includes(key))
       .flatMap((impact) => [text(impact.display_metric, text(impact.public_summary))])
       .filter(Boolean);
     const directImpact = text(item.display_metric);
     if (directImpact) stageImpacts.unshift(directImpact);
+    stageImpacts.unshift(...list(structured.achievements));
     const stageSkills = [
       ...skillItems
         .filter((skill) => identities(skill).includes(key))
@@ -119,7 +141,10 @@ export default async function PublicPortfolioPage() {
     const company = text(item.company_name, text(item.organization_name, text(item.subtitle)));
     const period = text(
       item.period,
-      [text(item.start_date), text(item.end_date)].filter(Boolean).join(" — ")
+      text(
+        structured.period,
+        [text(item.start_date), text(item.end_date)].filter(Boolean).join(" — ")
+      )
     );
     return {
       title: text(item.title, "Career stage"),
@@ -150,7 +175,13 @@ export default async function PublicPortfolioPage() {
   // Use the included local portrait when a deployment does not supply an external image URL.
   const profileImage =
     process.env.NEXT_PUBLIC_PROFILE_IMAGE_URL?.trim() || "/images/basil-ogbonna.jpg";
-  const bio = text(aboutItems[0]?.public_summary);
+  const portfolioSummary = text(
+    aboutItems.find((item) => item.source_entity_type === "portfolio_summary")?.public_summary
+  );
+  const bio = text(
+    aboutItems.find((item) => item.source_entity_type === "about")?.public_summary,
+    text(aboutItems[0]?.public_summary)
+  );
   const safeHref = (value: unknown) => {
     const href = text(value).trim();
     return /^(?:https?:\/\/|mailto:)/i.test(href) ? href : "";
@@ -227,13 +258,26 @@ export default async function PublicPortfolioPage() {
             name={displayName}
             {...(profileImage ? { photoSrc: profileImage } : {})}
             links={profileLinks}
-            {...(bio ? { statement: bio } : {})}
+            {...(portfolioSummary || bio ? { statement: portfolioSummary || bio } : {})}
           />
           <div className="portfolio-stream">
             <Hero name={displayName} headline={headline} />
             <About {...(bio ? { bio } : {})} />
             <EngineeringProcesses />
             <CareerTimeline stages={timelineStages} />
+            <CredentialsAndSkills
+              credentials={certificationItems.map((item) => ({
+                title: text(item.title, "Certification"),
+                ...(text(item.subtitle) ? { issuer: text(item.subtitle) } : {}),
+                ...(text(item.public_summary) ? { summary: text(item.public_summary) } : {})
+              }))}
+              skillGroups={skillItems
+                .filter((item) => !text(item.career_stage))
+                .map((item) => ({
+                  title: text(item.title, "Technical skills"),
+                  skills: list(item.display_technologies)
+                }))}
+            />
             <Projects
               items={renderedProjects}
               {...(portfolioSourceUrl ? { portfolioSourceUrl } : {})}

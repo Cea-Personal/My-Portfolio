@@ -13,6 +13,7 @@ export type WorkflowEvent = z.infer<typeof workflowEventSchema>;
 export const eventNames = [
   "career/drive.sync.requested.v1",
   "career/document.changed.v1",
+  "career/brain.refresh.requested.v1",
   "career/document.removed.v1",
   "career/document.parse.requested.v1",
   "career/facts.extract.requested.v1",
