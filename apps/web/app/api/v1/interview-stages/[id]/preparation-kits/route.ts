@@ -96,6 +96,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         question: `How have you approached ${topic}?`,
         probability: index < 3 ? "high" : index < 7 ? "medium" : "lower_confidence",
         rationale: `Derived from the ${stage.name} stage and owner-selected role context; not guaranteed.`,
+        answer: version?.statement
+          ? `Use this documented experience as the core of your answer: ${version.statement}`
+          : "No grounded answer is available yet. Add relevant CV or Career Brain information before using this response.",
         evidence: fact
           ? {
               factId: fact.id,

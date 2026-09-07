@@ -4,6 +4,8 @@ import { apiResponse } from "@/lib/api/response";
 import { withPrivateApi } from "@/lib/api/private";
 import { generateInterviewKitWithLlm } from "@/lib/server/interview-kit-llm";
 
+export const maxDuration = 300;
+
 type ProcessApplication = {
   job_id?: string | null;
   jobs?: {
@@ -64,6 +66,11 @@ function inferredStages(description: string): Array<{ name: string; stageType: s
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   return withPrivateApi(request, async ({ client, ownerId }) => {
     const { id: processId } = await params;
+    const parsedBody = await request.json().catch(() => ({}));
+    const requestedStageId =
+      parsedBody && typeof parsedBody === "object" && typeof parsedBody.stageId === "string"
+        ? parsedBody.stageId
+        : null;
     const supabaseUrl =
       globalThis.process.env.NEXT_PUBLIC_SUPABASE_URL ?? globalThis.process.env.SUPABASE_URL;
     const serviceRoleKey = globalThis.process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -134,6 +141,19 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         .eq("id", processId)
         .eq("owner_id", ownerId);
     }
+    if (requestedStageId) {
+      stages = (stages ?? []).filter((stage) => stage.id === requestedStageId);
+      if (!stages.length) {
+        return apiResponse(
+          {
+            code: "INTERVIEW_STAGE_NOT_FOUND",
+            detail: "The selected stage is not part of this interview process."
+          },
+          request,
+          404
+        );
+      }
+    }
 
     const { data: facts, error: factsError } = await client
       .schema("app")
@@ -178,14 +198,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       .schema("app")
       .from("documents")
       .select(
-        "id,name,evidence_sources(evidence_versions(evidence_chunks(id,content,visibility,deleted_at)))"
+        "id,name,document_kind,evidence_sources(evidence_versions(evidence_chunks(id,content,visibility,deleted_at)))"
       )
       .eq("owner_id", ownerId)
-      .is("removed_at", null);
+      .is("removed_at", null)
+      .is("duplicate_of_id", null);
     if (documentsError) throw documentsError;
     const documentContext = (documents ?? []).flatMap((document) => {
       const name = typeof document.name === "string" ? document.name : "Private document";
-      if (!/cv|resume|curriculum vitae/i.test(name)) return [];
+      if (document.document_kind !== "resume" && !/cv|resume|curriculum vitae/i.test(name)) {
+        return [];
+      }
       const source = one(
         document.evidence_sources as Record<string, unknown> | Record<string, unknown>[] | null
       );

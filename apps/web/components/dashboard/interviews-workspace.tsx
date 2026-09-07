@@ -103,11 +103,23 @@ export function InterviewsWorkspace() {
     );
     if (!pending.length) return;
     setAutoPreparedProcesses((current) => [...current, ...pending.map((process) => process.id)]);
-    void Promise.all(
+    void Promise.allSettled(
       pending.map((process) =>
-        write(`/api/v1/interview-processes/${process.id}/auto-prepare`, "POST", {}).catch(() => null)
+        write(`/api/v1/interview-processes/${process.id}/auto-prepare`, "POST", {})
       )
-    ).then(() => void load());
+    ).then((results) => {
+      const failure = results.find(
+        (result): result is PromiseRejectedResult => result.status === "rejected"
+      );
+      if (failure) {
+        setMessage(
+          `The automatic interview kit could not be generated: ${
+            failure.reason instanceof Error ? failure.reason.message : "check the orchestrator"
+          }`
+        );
+      }
+      void load();
+    });
   }, [autoPreparedProcesses, load, processes, state]);
   async function createProcess(application: Application) {
     try {
@@ -142,16 +154,28 @@ export function InterviewsWorkspace() {
     const formElement = event.currentTarget;
     const form = new FormData(formElement);
     try {
-      await write(`/api/v1/interview-processes/${processId}/stages`, "POST", {
+      const stage = (await write(`/api/v1/interview-processes/${processId}/stages`, "POST", {
         name: form.get("name"),
         stageType: form.get("stageType"),
         scheduledAt: form.get("scheduledAt"),
         notes: form.get("notes"),
         displayOrder: Number(form.get("displayOrder")),
         source: "manual"
-      });
+      })) as { id?: string };
+      if (!stage.id) throw new Error("Interview stage was not created.");
       formElement.reset();
-      setMessage("Interview stage added with history.");
+      try {
+        await write(`/api/v1/interview-processes/${processId}/auto-prepare`, "POST", {
+          stageId: stage.id
+        });
+        setMessage("Interview stage added. Likely questions and CV-grounded answers are ready.");
+      } catch (generationError) {
+        setMessage(
+          `Interview stage was saved, but its AI kit could not be generated: ${
+            generationError instanceof Error ? generationError.message : "check the orchestrator"
+          }`
+        );
+      }
       await load();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not add stage.");
@@ -362,12 +386,25 @@ export function InterviewsWorkspace() {
                                     typeof question.question === "string"
                                       ? question.question
                                       : "Question";
+                                  const answer =
+                                    typeof question.answer === "string"
+                                      ? question.answer
+                                      : "No grounded answer was generated for this question.";
                                   return (
                                     <li key={`${kit.id}-question-${String(index)}`}>
                                       <strong>{probabilityLabel}</strong> — {questionText}
                                       {question.evidence
-                                        ? ` · mapped to approved evidence`
-                                        : " · no matching evidence yet"}
+                                        ? ` · mapped to a private career source`
+                                        : " · no matching career source yet"}
+                                      <p>
+                                        <strong>Suggested answer:</strong> {answer}
+                                      </p>
+                                      {typeof question.rationale === "string" ? (
+                                        <details>
+                                          <summary>Why this question may be asked</summary>
+                                          <p>{question.rationale}</p>
+                                        </details>
+                                      ) : null}
                                     </li>
                                   );
                                 })}
@@ -529,36 +566,39 @@ export function InterviewsWorkspace() {
                   ))}
                   <details>
                     <summary>Record a post-interview debrief (optional)</summary>
-                    <p>This is only for reflection after the interview; it is not needed to create the AI kit.</p>
+                    <p>
+                      This is only for reflection after the interview; it is not needed to create
+                      the AI kit.
+                    </p>
                     <form
                       className="knowledge-entry-form"
                       onSubmit={(event) => void addDebrief(event, stage)}
                     >
                       <h3>Post-interview debrief</h3>
-                    <label>
-                      Original notes
-                      <textarea name="notes" required rows={6} />
-                    </label>
-                    <label>
-                      Questions asked
-                      <input name="questions" />
-                    </label>
-                    <label>
-                      Topics
-                      <input name="topics" />
-                    </label>
-                    <label>
-                      Successes
-                      <input name="successes" />
-                    </label>
-                    <label>
-                      Difficulties
-                      <input name="difficulties" />
-                    </label>
-                    <label>
-                      Follow-ups
-                      <input name="followUps" />
-                    </label>
+                      <label>
+                        Original notes
+                        <textarea name="notes" required rows={6} />
+                      </label>
+                      <label>
+                        Questions asked
+                        <input name="questions" />
+                      </label>
+                      <label>
+                        Topics
+                        <input name="topics" />
+                      </label>
+                      <label>
+                        Successes
+                        <input name="successes" />
+                      </label>
+                      <label>
+                        Difficulties
+                        <input name="difficulties" />
+                      </label>
+                      <label>
+                        Follow-ups
+                        <input name="followUps" />
+                      </label>
                       <button type="submit">Preserve debrief</button>
                     </form>
                   </details>
@@ -603,39 +643,39 @@ export function InterviewsWorkspace() {
               onSubmit={(event) => void addStage(event, process.id)}
             >
               <h3>Add stage</h3>
-            <label>
-              Name
-              <input name="name" required />
-            </label>
-            <label>
-              Type
-              <select name="stageType">
-                <option value="recruiter">Recruiter</option>
-                <option value="technical">Technical</option>
-                <option value="system_design">System design</option>
-                <option value="behavioral">Behavioral</option>
-                <option value="hiring_manager">Hiring manager</option>
-                <option value="leadership">Leadership</option>
-                <option value="unknown">Unknown</option>
-              </select>
-            </label>
-            <label>
-              Order
-              <input
-                name="displayOrder"
-                type="number"
-                min="0"
-                defaultValue={process.interview_stages?.length ?? 0}
-              />
-            </label>
-            <label>
-              Scheduled time
-              <input name="scheduledAt" type="datetime-local" />
-            </label>
-            <label>
-              Notes
-              <textarea name="notes" />
-            </label>
+              <label>
+                Name
+                <input name="name" required />
+              </label>
+              <label>
+                Type
+                <select name="stageType">
+                  <option value="recruiter">Recruiter</option>
+                  <option value="technical">Technical</option>
+                  <option value="system_design">System design</option>
+                  <option value="behavioral">Behavioral</option>
+                  <option value="hiring_manager">Hiring manager</option>
+                  <option value="leadership">Leadership</option>
+                  <option value="unknown">Unknown</option>
+                </select>
+              </label>
+              <label>
+                Order
+                <input
+                  name="displayOrder"
+                  type="number"
+                  min="0"
+                  defaultValue={process.interview_stages?.length ?? 0}
+                />
+              </label>
+              <label>
+                Scheduled time
+                <input name="scheduledAt" type="datetime-local" />
+              </label>
+              <label>
+                Notes
+                <textarea name="notes" />
+              </label>
               <button type="submit">Add stage</button>
             </form>
           </details>

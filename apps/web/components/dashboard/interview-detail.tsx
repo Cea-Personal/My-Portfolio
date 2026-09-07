@@ -147,6 +147,19 @@ export function InterviewDetail({ id }: { id: string }) {
                                 >
                                   <strong>{probabilityLabel}</strong> —{" "}
                                   {display(questionRow.question, "Question")}
+                                  <p>
+                                    <strong>Suggested answer:</strong>{" "}
+                                    {display(
+                                      questionRow.answer,
+                                      "No grounded answer was generated for this question."
+                                    )}
+                                  </p>
+                                  {typeof questionRow.rationale === "string" ? (
+                                    <details>
+                                      <summary>Why this question may be asked</summary>
+                                      <p>{questionRow.rationale}</p>
+                                    </details>
+                                  ) : null}
                                 </li>
                               );
                             })}

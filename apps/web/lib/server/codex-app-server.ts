@@ -158,7 +158,8 @@ const TASK_OUTPUT_SCHEMAS: Readonly<Record<string, JsonSchema>> = {
       question: textSchema(),
       probability: textSchema(),
       rationale: textSchema(),
-      evidenceFactId: nullableTextSchema()
+      answer: textSchema(),
+      evidenceId: nullableTextSchema()
     }),
     weakAreas: textListSchema(),
     companyResearch: textSchema(),

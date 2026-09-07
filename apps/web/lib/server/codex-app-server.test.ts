@@ -52,6 +52,14 @@ describe("native Codex orchestration", () => {
     }
   });
 
+  it("requires interview questions to include grounded suggested answers", () => {
+    const schema = codexOutputSchemaForTask("interview_preparation");
+    const questions = schema.properties?.questions;
+    expect(questions?.type).toBe("array");
+    expect(questions?.items?.required).toContain("answer");
+    expect(questions?.items?.required).toContain("evidenceId");
+  });
+
   it("reads nested app-server error messages", () => {
     expect(codexErrorMessage({ error: { message: "invalid output schema" } })).toBe(
       "invalid output schema"

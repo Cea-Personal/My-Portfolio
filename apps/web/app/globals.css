@@ -5262,11 +5262,13 @@ main.portfolio-main {
   padding: 0;
 }
 
-.owner-sign-in-page {
+main.owner-sign-in-page {
   position: relative;
   isolation: isolate;
   display: grid;
   width: 100%;
+  max-width: none;
+  margin: 0;
   min-height: 100vh;
   min-height: 100dvh;
   place-items: center;
@@ -5277,7 +5279,7 @@ main.portfolio-main {
   padding: 2rem;
 }
 
-.owner-sign-in-page::before {
+main.owner-sign-in-page::before {
   position: absolute;
   inset: 0;
   z-index: -1;
@@ -5289,10 +5291,11 @@ main.portfolio-main {
   mask-image: radial-gradient(circle at center, black, transparent 74%);
 }
 
-.owner-sign-in-page > section {
+main.owner-sign-in-page > section {
   position: relative;
   width: min(100%, 28rem);
   border: 1px solid #303743;
+  border-radius: 0;
   background: rgb(16 21 31 / 88%);
   box-shadow: 0 2rem 6rem rgb(0 0 0 / 38%);
   color: #eef4f8;
@@ -5300,7 +5303,7 @@ main.portfolio-main {
   padding: clamp(1.5rem, 5vw, 3rem);
 }
 
-.owner-sign-in-page > section::after {
+main.owner-sign-in-page > section::after {
   position: absolute;
   top: 0;
   right: 1.25rem;
@@ -5310,7 +5313,7 @@ main.portfolio-main {
   content: "";
 }
 
-.owner-sign-in-page > section > p {
+main.owner-sign-in-page > section > p {
   margin: 0;
   color: #8ae6d0;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -5338,14 +5341,14 @@ main.portfolio-main {
   color: #8ae6d0;
 }
 
-.owner-sign-in-page h1 {
+main.owner-sign-in-page h1 {
   margin: 1rem 0 0;
   font-size: clamp(2.2rem, 6vw, 4rem);
   letter-spacing: -0.06em;
   line-height: 0.95;
 }
 
-.owner-sign-in-page > section > span {
+main.owner-sign-in-page > section > span {
   display: block;
   margin-top: 1rem;
   color: #aeb9c8;
@@ -5421,7 +5424,7 @@ main.portfolio-main {
     font-size: 0.9rem;
   }
 
-  .owner-sign-in-page {
+  main.owner-sign-in-page {
     padding: 1.25rem;
   }
 }

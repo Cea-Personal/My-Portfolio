@@ -18,6 +18,9 @@ describe("bounded interview preparation", () => {
     });
     expect(kit.questions[0]?.probability).toBe("high");
     expect(kit.questions.some((question) => question.evidence?.factId === "fact-1")).toBe(true);
+    expect(
+      kit.questions.some((question) => question.answer.includes("Built reliable data platforms"))
+    ).toBe(true);
     expect(kit.limitations.join(" ")).toContain("not a guarantee");
   });
 
@@ -31,5 +34,8 @@ describe("bounded interview preparation", () => {
     });
     expect(kit.weakAreas.length).toBeGreaterThan(0);
     expect(kit.questions.every((question) => question.evidence === null)).toBe(true);
+    expect(kit.questions.every((question) => question.answer.includes("No grounded answer"))).toBe(
+      true
+    );
   });
 });

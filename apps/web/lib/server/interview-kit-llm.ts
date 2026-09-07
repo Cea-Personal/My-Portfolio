@@ -10,7 +10,8 @@ const SYSTEM_INSTRUCTION = `You prepare an evidence-grounded interview package f
 Return one JSON object only. Do not add experience, metrics, technologies, employer facts, or evidence IDs that are absent from the input.
 Use the job description, stage, CV excerpts, and approved evidence to produce practical preparation—not generic advice.
 Required keys: stagePurpose, roleRequirements, likelyTopics, questions, weakAreas, companyResearch, revisionTopics, behavioralPreparation, interviewerQuestions, compensationPreparation, personalNotes, storyDrafts.
-questions must be objects with question, probability (high, medium, or lower_confidence), rationale, and evidenceFactId (an approved evidence ID or null).
+questions must be objects with question, probability (high, medium, or lower_confidence), rationale, answer, and evidenceId (a supplied approved-fact or CV-excerpt ID, or null).
+Each answer must directly answer its question in the candidate's voice using the job description and only the supplied CV excerpts or approved evidence. Prefer a concise STAR structure where appropriate. Do not return generic coaching as the answer. If the source material cannot support an answer, state exactly what the candidate needs to verify instead of inventing content.
 storyDrafts must be objects with title, situation, task, action, result, and evidenceIds. A missing STAR element must explicitly say what the candidate needs to verify instead of inventing it.
 Question likelihood is a preparation signal, never a certainty.`;
 
@@ -88,7 +89,13 @@ function groundedKit(
         const probability = ["high", "medium", "lower_confidence"].includes(String(row.probability))
           ? (String(row.probability) as "high" | "medium" | "lower_confidence")
           : "lower_confidence";
-        const factId = typeof row.evidenceFactId === "string" ? row.evidenceFactId : null;
+        const evidenceId =
+          typeof row.evidenceId === "string"
+            ? row.evidenceId
+            : typeof row.evidenceFactId === "string"
+              ? row.evidenceFactId
+              : null;
+        const mappedEvidence = evidenceId ? (evidenceById.get(evidenceId) ?? null) : null;
         return [
           {
             question,
@@ -98,7 +105,14 @@ function groundedKit(
               "Suggested from the selected stage and job requirements; this is not a prediction guarantee.",
               1_500
             ),
-            evidence: factId ? (evidenceById.get(factId) ?? null) : null
+            answer: text(
+              row.answer,
+              mappedEvidence
+                ? `Use this documented experience as the core of your answer: ${mappedEvidence.statement}`
+                : "No grounded answer is available yet. Verify the relevant experience before answering.",
+              5_000
+            ),
+            evidence: mappedEvidence
           }
         ];
       })

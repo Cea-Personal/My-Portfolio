@@ -44,6 +44,7 @@ export interface GeneratedInterviewQuestion {
   question: string;
   probability: "high" | "medium" | "lower_confidence";
   rationale: string;
+  answer: string;
   evidence: {
     factId: string;
     statement: string;
@@ -224,6 +225,7 @@ export function generateInterviewKit(context: AutoPreparationContext): Generated
   const questions = topics.map((topic, index) => {
     const evidence = evidenceFor(topic, context.evidence);
     const probability = index < 3 ? "high" : index < 7 ? "medium" : "lower_confidence";
+    const mappedEvidence = evidence ? evidenceMapping(evidence) : null;
     return {
       question:
         topic.includes("motivation") || topic.includes("role fit")
@@ -231,7 +233,10 @@ export function generateInterviewKit(context: AutoPreparationContext): Generated
           : `How would you approach ${topic} in this role?`,
       probability,
       rationale: `This is a ${probability.replace("_", " ")} preparation signal derived from the interview stage and job-description language; it is not a prediction guarantee.`,
-      evidence: evidence ? evidenceMapping(evidence) : null
+      answer: mappedEvidence
+        ? `Use this documented experience as the core of your answer: ${mappedEvidence.statement}`
+        : "No grounded answer is available yet. Add relevant CV or Career Brain information before using this response.",
+      evidence: mappedEvidence
     } satisfies GeneratedInterviewQuestion;
   });
   const matchedIds = [

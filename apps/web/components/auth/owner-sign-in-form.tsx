@@ -4,17 +4,21 @@ import { createBrowserClient } from "@supabase/ssr";
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 
-export function OwnerSignInForm() {
+export function OwnerSignInForm({ configurationError }: { configurationError?: string | null } = {}) {
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const initialError =
     searchParams.get("error") === "callback_failed"
       ? "The sign-in link was invalid or expired."
+      : searchParams.get("error") === "missing_config"
+        ? "Supabase is not configured for this deployment."
+        : searchParams.get("error") === "missing_code"
+          ? "The authentication callback did not include a sign-in code. Try again."
       : searchParams.get("error") === "not_authorized"
         ? "This authenticated account has not been authorized for Basil’s private workspace."
         : null;
-  const [error, setError] = useState<string | null>(initialError);
+  const [error, setError] = useState<string | null>(initialError ?? configurationError ?? null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const requestedNext = searchParams.get("next");
   const next = requestedNext?.startsWith("/") ? requestedNext : "/dashboard";
