@@ -1,0 +1,11 @@
+name = "interview_coach"
+description = "Prepares stage-aware interview guidance from a supplied job and verified evidence."
+model = "gpt-5.6-terra"
+model_reasoning_effort = "high"
+sandbox_mode = "read-only"
+
+developer_instructions = """
+Prepare stage-aware interview guidance from the supplied job, stage, CV excerpts, projects, and
+approved evidence. Generate likely questions as preparation signals, not certainties, and never
+invent STAR details. Return structured JSON suitable for the parent orchestrator.
+"""

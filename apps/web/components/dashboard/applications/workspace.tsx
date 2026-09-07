@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
+import { WorkspaceToast } from "@/components/ui/workspace-toast";
 
 interface Application {
   id: string;
@@ -503,7 +504,12 @@ export function ApplicationsWorkspace() {
           ))}
         </ul>
       </section>
-      {message ? <p role="status">{message}</p> : null}
+        <WorkspaceToast
+          message={message}
+          onDismiss={() => {
+            setMessage("");
+          }}
+        />
     </main>
   );
 }

@@ -13,20 +13,28 @@ export async function POST(request: Request) {
     const capabilities = Array.isArray(body.capabilities)
       ? body.capabilities.filter((value: unknown): value is string => typeof value === "string")
       : [];
+    // Keep provider identity stable for embedding cache/retrieval even when a
+    // vendor does not publish a separate model version.
+    const modelVersion =
+      typeof body.modelVersion === "string" && body.modelVersion.trim()
+        ? body.modelVersion.trim().slice(0, 80)
+        : "unversioned";
+    const provider = typeof body.provider === "string" ? body.provider.trim() : "";
+    const model = typeof body.model === "string" ? body.model.trim() : "";
+    const secretRef = typeof body.secretRef === "string" ? body.secretRef.trim() : null;
     if (
-      typeof body.provider !== "string" ||
-      typeof body.model !== "string" ||
-      typeof body.modelVersion !== "string" ||
-      typeof body.secretRef !== "string" ||
-      !capabilities.length
+      !provider ||
+      !model ||
+      !capabilities.length ||
+      (provider !== "codex_app_server" && !secretRef)
     )
       return apiResponse({ code: "INVALID_PROVIDER_CONFIGURATION" }, request, 400);
     const { data, error } = await client.schema("app").rpc("register_ai_provider", {
-      requested_provider: body.provider,
-      requested_model: body.model,
-      requested_model_version: body.modelVersion,
+      requested_provider: provider,
+      requested_model: model,
+      requested_model_version: modelVersion,
       requested_capabilities: capabilities,
-      requested_secret_ref: body.secretRef
+      requested_secret_ref: secretRef
     });
     if (error) throw error;
     return apiResponse({ providerId: data }, request, 201);

@@ -129,9 +129,588 @@ body {
   padding: clamp(2rem, 5vw, 5rem) 0;
 }
 
+/* Analytics is intentionally composed as one dashboard rather than a stack of
+   unrelated report cards. The panels below share the workspace visual system
+   while allowing the data to read as a hierarchy: summary, trends, then detail. */
+.analytics-page {
+  width: min(100% - 2rem, 86rem);
+}
+
+.analytics-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 2rem;
+  max-width: none;
+}
+
+.analytics-live-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.analytics-live-label i {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 0 0.25rem rgb(34 197 94 / 14%);
+}
+
+.analytics-filter-bar {
+  gap: 1rem;
+}
+
+.analytics-filter-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 1rem;
+}
+
+.analytics-filter-heading h2 {
+  margin: 0.2rem 0 0;
+}
+
+.analytics-filter-heading p,
+.analytics-panel-heading p {
+  color: var(--muted);
+  margin: 0;
+}
+
+.analytics-filter-fields {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.analytics-filter-fields label {
+  display: grid;
+  gap: 0.35rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.analytics-filter-actions {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.analytics-filter-actions button[type="reset"] {
+  border-color: var(--border);
+  background: transparent;
+  color: var(--text);
+}
+
+.analytics-dashboard {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.analytics-panel,
+.analytics-hero-panel {
+  margin: 0;
+  padding: clamp(1.25rem, 3vw, 2rem);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.analytics-wide {
+  width: 100%;
+}
+
+.analytics-dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.analytics-panel-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.analytics-panel-heading h2 {
+  margin: 0.2rem 0 0;
+}
+
+.analytics-panel-note {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.analytics-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+
+.analytics-kpi {
+  min-width: 0;
+  padding: 1rem;
+  border-radius: var(--radius-md);
+  background: linear-gradient(145deg, var(--accent-soft), var(--surface-muted));
+}
+
+.analytics-kpi span,
+.analytics-kpi small {
+  display: block;
+  color: var(--muted);
+}
+
+.analytics-kpi strong {
+  display: block;
+  margin: 0.25rem 0;
+  color: var(--ink);
+  font-size: clamp(1.6rem, 3vw, 2.4rem);
+  line-height: 1.1;
+}
+
+.analytics-kpi small {
+  font-size: 0.75rem;
+}
+
+.analytics-chart-grid {
+  display: grid;
+  gap: 1.5rem;
+  margin-top: 1.25rem;
+}
+
+.analytics-chart-grid-two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.analytics-chart-grid-three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.analytics-chart-grid-four {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.analytics-bar-list h3 {
+  margin: 0 0 0.8rem;
+  font-size: 1rem;
+}
+
+.analytics-bar-list ul {
+  display: grid;
+  gap: 0.85rem;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.analytics-bar-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.85rem;
+}
+
+.analytics-bar-label span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-transform: capitalize;
+}
+
+.analytics-bar-label strong {
+  color: var(--ink);
+}
+
+.analytics-bar-track {
+  display: block;
+  height: 0.45rem;
+  margin-top: 0.35rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--surface-muted);
+}
+
+.analytics-bar-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent), var(--violet));
+}
+
+.analytics-empty {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.analytics-data-details {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.analytics-data-details summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.analytics-table-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.analytics-table-grid table {
+  width: 100%;
+}
+
+.analytics-score {
+  color: var(--accent);
+  font-size: 1.5rem;
+  text-align: right;
+}
+
+.analytics-score small {
+  display: block;
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 500;
+}
+
+.analytics-callout {
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  border-left: 3px solid var(--accent);
+  background: var(--accent-soft);
+  color: var(--muted);
+}
+
+.analytics-callout.is-warning {
+  border-color: #d97706;
+  background: #fff7ed;
+  color: #92400e;
+}
+
+.analytics-compact-list {
+  display: grid;
+  gap: 0.5rem;
+  padding-left: 1.1rem;
+  color: var(--muted);
+}
+
+.analytics-recommendations {
+  margin-top: 1rem;
+}
+
+.analytics-gap-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  margin-top: 1.25rem;
+}
+
+.analytics-gap-list article {
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-muted);
+}
+
+.analytics-gap-list article > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 0.75rem;
+}
+
+.analytics-gap-list h3 {
+  margin: 0;
+  text-transform: capitalize;
+}
+
+.analytics-gap-list article span {
+  color: var(--muted);
+  font-size: 0.75rem;
+  text-transform: capitalize;
+}
+
+.analytics-gap-list article strong {
+  display: block;
+  margin-top: 1rem;
+  font-size: 1.6rem;
+}
+
+.analytics-gap-list article strong small {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.analytics-gap-list article p {
+  margin: 0.6rem 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+@media (max-width: 70rem) {
+  .analytics-filter-fields,
+  .analytics-kpi-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .analytics-chart-grid-four,
+  .analytics-chart-grid-three,
+  .analytics-gap-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 50rem) {
+  .analytics-heading,
+  .analytics-filter-heading {
+    display: grid;
+  }
+
+  .analytics-filter-fields,
+  .analytics-kpi-grid,
+  .analytics-dashboard-grid,
+  .analytics-chart-grid-two,
+  .analytics-chart-grid-three,
+  .analytics-chart-grid-four,
+  .analytics-table-grid,
+  .analytics-gap-list {
+    grid-template-columns: 1fr;
+  }
+}
+
+.workspace-toast {
+  position: fixed;
+  z-index: 100;
+  top: max(1rem, env(safe-area-inset-top));
+  right: max(1rem, env(safe-area-inset-right));
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  max-width: min(28rem, calc(100vw - 2rem));
+  padding: 0.8rem 0.9rem 0.8rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--border) 78%, var(--accent));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface) 92%, var(--accent));
+  color: var(--ink);
+  box-shadow: 0 1rem 2.5rem color-mix(in srgb, var(--ink) 18%, transparent);
+  animation: workspace-toast-in 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.workspace-toast button {
+  display: grid;
+  width: 1.5rem;
+  height: 1.5rem;
+  flex: 0 0 auto;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--ink) 10%, transparent);
+  color: inherit;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.workspace-toast-text {
+  margin: 0;
+  display: block;
+}
+
+@keyframes workspace-toast-in {
+  from { opacity: 0; transform: translate3d(1.5rem, -0.5rem, 0) scale(0.96); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workspace-toast { animation: none; }
+}
+
 .workspace-heading {
   max-width: 52rem;
   margin-bottom: 2rem;
+}
+
+.workspace-note {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.automations-page {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.automations-page > .workspace-heading {
+  margin-bottom: 0.25rem;
+}
+
+.automations-page > .knowledge-entry-form,
+.automations-page > section {
+  margin: 0;
+}
+
+.automations-page > section > h2,
+.automations-page > .knowledge-entry-form > h2 {
+  margin-top: 0;
+}
+
+.automations-page .workspace-list {
+  margin: 1rem 0 0;
+}
+
+.automations-page .workspace-list > li {
+  padding: 1.25rem 0;
+}
+
+.automations-page .workspace-list > li:first-child {
+  padding-top: 0.25rem;
+  border-top: 0;
+}
+
+.automations-page .workspace-list > li button {
+  margin: 0.75rem 0.35rem 0 0;
+}
+
+.automations-page details {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.automations-page details .knowledge-entry-form {
+  margin: 1rem 0 0;
+  padding: 1rem;
+  border-color: var(--border);
+  background: var(--surface-muted);
+  box-shadow: none;
+}
+
+.career-brain {
+  width: min(100% - 2rem, 86rem);
+}
+
+.career-brain > .career-synthesis {
+  margin-top: clamp(2rem, 4vw, 3.5rem);
+}
+
+.career-synthesis-detail {
+  padding-top: 1rem;
+  padding-right: 1rem;
+}
+
+.career-synthesis-detail > section {
+  padding: 0.25rem 0 0.75rem;
+}
+
+.career-brain > .career-manual-source {
+  margin-top: clamp(2.5rem, 5vw, 4rem);
+}
+
+.job-search-form {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1.25rem;
+}
+
+.job-search-form > label {
+  max-width: 34rem;
+}
+
+.job-source-fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 1rem 0 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+}
+
+.job-source-fieldset legend {
+  padding: 0 0.5rem 0 0;
+  color: var(--text);
+  font-size: 1rem;
+  font-weight: 750;
+}
+
+.job-source-help {
+  margin: 0.25rem 0 0.8rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.job-source-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 0.75rem;
+}
+
+.job-source-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  min-width: 0;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-muted);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    transform 160ms ease;
+}
+
+.job-source-option:hover {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.job-source-option:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.job-source-option input[type="checkbox"] {
+  width: 1.05rem;
+  height: 1.05rem;
+  flex: 0 0 auto;
+  margin: 0.1rem 0 0;
+  accent-color: var(--accent);
+}
+
+.job-source-option span {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.job-source-option strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.job-source-option small {
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-transform: capitalize;
 }
 
 .knowledge-entry-form,
@@ -511,24 +1090,24 @@ label {
   outline-offset: 3px;
 }
 
-main {
+main:not(.workspace-page) {
   width: min(78rem, calc(100% - 2rem));
   margin-inline: auto;
   padding: 3.5rem 0 5rem;
 }
 
-main > section,
-main > div > section {
+main:not(.workspace-page) > section,
+main:not(.workspace-page) > div > section {
   margin-top: 1.25rem;
 }
 
-main > section:first-child,
-main > div > section:first-child {
+main:not(.workspace-page) > section:first-child,
+main:not(.workspace-page) > div > section:first-child {
   margin-top: 0;
 }
 
-main > section,
-main > div > section {
+main:not(.workspace-page) > section,
+main:not(.workspace-page) > div > section {
   background: rgb(255 255 255 / 84%);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
@@ -1903,7 +2482,7 @@ nav[aria-label="Portfolio sections"] a:not(.brand-link, .skip-link):hover::after
   margin-top: 1.25rem;
 }
 
-main > .intelligence-grid > .intelligence-card {
+main:not(.workspace-page) > .intelligence-grid > .intelligence-card {
   margin: 0;
   border: 0;
   padding: clamp(1.5rem, 4vw, 2.5rem);

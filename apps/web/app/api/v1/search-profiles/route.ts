@@ -1,6 +1,16 @@
 import { apiResponse } from "@/lib/api/response";
 import { withPrivateApi } from "@/lib/api/private";
 
+// Search profiles are driven by explicit criteria. Opportunity scores still
+// need a stable baseline for ranking, so the system owns these defaults rather
+// than asking the user to tune opaque factor weights.
+const DEFAULT_SCORING_WEIGHTS = {
+  alignment: 0.4,
+  growth: 0.25,
+  compensation: 0.2,
+  logistics: 0.15
+} as const;
+
 function strings(value: unknown): string[] {
   return Array.isArray(value)
     ? value
@@ -12,6 +22,7 @@ function strings(value: unknown): string[] {
 }
 
 function weights(value: unknown): Record<string, number> | null {
+  if (value === undefined) return { ...DEFAULT_SCORING_WEIGHTS };
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
   const entries = Object.entries(value).filter(
     (entry): entry is [string, number] =>
@@ -71,21 +82,14 @@ export async function POST(request: Request) {
         owner_id: ownerId,
         name,
         target_titles: strings(body.targetTitles),
-        preferred_titles: strings(body.preferredTitles),
-        excluded_titles: strings(body.excludedTitles),
         seniority_levels: strings(body.seniorityLevels),
         locations: strings(body.locations),
-        regions: strings(body.regions),
-        remote_restrictions: strings(body.remoteRestrictions),
         work_arrangements: strings(body.workArrangements),
         employment_types: strings(body.employmentTypes),
         required_technologies: strings(body.requiredTechnologies),
-        preferred_technologies: strings(body.preferredTechnologies),
         excluded_technologies: strings(body.excludedTechnologies),
-        nice_to_have_technologies: strings(body.niceToHaveTechnologies),
         industries: strings(body.industries),
         company_sizes: strings(body.companySizes),
-        preferred_companies: strings(body.preferredCompanies),
         excluded_companies: strings(body.excludedCompanies),
         visa_sponsorship:
           typeof body.visaSponsorship === "string" ? body.visaSponsorship.slice(0, 80) : null,

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createBrowserSupabaseClient } from "@career-os/database/browser";
+import { WorkspaceToast } from "@/components/ui/workspace-toast";
 
 export default function DocumentsPage() {
   const [documents, setDocuments] = useState<
@@ -397,7 +398,14 @@ export default function DocumentsPage() {
             </div>
           </div>
         ) : null}
-        {driveMessage && driveState !== "error" ? <p role="status">{driveMessage}</p> : null}
+        {driveMessage && driveState !== "error" ? (
+          <WorkspaceToast
+            message={driveMessage}
+            onDismiss={() => {
+              setDriveMessage(null);
+            }}
+          />
+        ) : null}
       </section>
       <form className="knowledge-entry-form" onSubmit={(event) => void uploadDocument(event)}>
         <label htmlFor="document-file">Upload a private source</label>
@@ -417,7 +425,12 @@ export default function DocumentsPage() {
           {saving ? "Uploading…" : "Upload source"}
         </button>
         {saveError ? <p role="alert">{saveError}</p> : null}
-        {saveMessage ? <p role="status">{saveMessage}</p> : null}
+        <WorkspaceToast
+          message={saveMessage}
+          onDismiss={() => {
+            setSaveMessage(null);
+          }}
+        />
       </form>
       {state === "loading" ? <p role="status">Loading documents…</p> : null}
       {state === "error" ? <p role="alert">{loadError ?? "Documents are unavailable."}</p> : null}

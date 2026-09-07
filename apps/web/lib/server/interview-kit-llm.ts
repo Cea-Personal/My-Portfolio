@@ -176,27 +176,32 @@ export async function generateInterviewKitWithLlm(
 }> {
   const baseline = generateInterviewKit(context);
   const providers = await resolveReasoningProviders(client, ownerId, "interview_preparation");
-  const generated = await generateReasoningJson(providers, SYSTEM_INSTRUCTION, {
-    job: {
-      title: context.jobTitle,
-      company: context.company,
-      description: context.description.slice(0, 20_000)
+  const generated = await generateReasoningJson(
+    providers,
+    SYSTEM_INSTRUCTION,
+    {
+      job: {
+        title: context.jobTitle,
+        company: context.company,
+        description: context.description.slice(0, 20_000)
+      },
+      stage: context.stage,
+      approvedEvidence: context.evidence.slice(0, 100).map((item) => ({
+        id: item.id,
+        factType: item.factType,
+        statement: item.statement.slice(0, 1_500),
+        structuredValue: item.structuredValue
+      })),
+      cvExcerpts: (context.documentContext ?? []).slice(0, 16).map((item) => ({
+        id: item.id,
+        name: item.name,
+        content: item.content.slice(0, 2_000)
+      })),
+      priorStories: (context.stories ?? []).slice(0, 12),
+      groundedDraft: baseline
     },
-    stage: context.stage,
-    approvedEvidence: context.evidence.slice(0, 100).map((item) => ({
-      id: item.id,
-      factType: item.factType,
-      statement: item.statement.slice(0, 1_500),
-      structuredValue: item.structuredValue
-    })),
-    cvExcerpts: (context.documentContext ?? []).slice(0, 16).map((item) => ({
-      id: item.id,
-      name: item.name,
-      content: item.content.slice(0, 2_000)
-    })),
-    priorStories: (context.stories ?? []).slice(0, 12),
-    groundedDraft: baseline
-  });
+    { task: "interview_preparation" }
+  );
   return {
     kit: groundedKit(generated.output, baseline, context, generated.provider),
     run: {

@@ -1,7 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { generateReasoningJson, type ResolvedReasoningProvider } from "./reasoning-provider";
 
-afterEach(() => vi.unstubAllGlobals());
+const runCodexOrchestratorMock = vi.hoisted(() => vi.fn());
+vi.mock("./codex-app-server", () => ({ runCodexOrchestrator: runCodexOrchestratorMock }));
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  runCodexOrchestratorMock.mockReset();
+});
 
 describe("reasoning provider", () => {
   it("uses the selected model and parses a JSON interview response", async () => {
@@ -39,5 +45,38 @@ describe("reasoning provider", () => {
       max_completion_tokens: 2000,
       response_format: { type: "json_object" }
     });
+  });
+
+  it("delegates native Codex App Server reasoning to the selected native agent", async () => {
+    runCodexOrchestratorMock.mockResolvedValue({
+      text: "{}",
+      model: "gpt-test",
+      threadId: "thread-test"
+    });
+    const provider: ResolvedReasoningProvider = {
+      id: "codex-provider",
+      provider: "codex_app_server",
+      model: "server-default",
+      model_version: "unversioned",
+      capabilities: ["reasoning"],
+      secret_ref: null,
+      apiKey: "",
+      endpoint: "codex://local",
+      creativity: 0.2,
+      maxTokens: 2_000,
+      timeoutMs: 30_000,
+      retryLimit: 0
+    };
+    await generateReasoningJson(
+      [provider],
+      "Return JSON",
+      { question: "test" },
+      { task: "document_composition" }
+    );
+    expect(runCodexOrchestratorMock).toHaveBeenCalledWith(
+      "document_composition",
+      { system: "Return JSON", input: { question: "test" } },
+      { timeoutMs: 30_000 }
+    );
   });
 });

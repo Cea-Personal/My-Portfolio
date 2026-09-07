@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { WorkspaceToast } from "@/components/ui/workspace-toast";
 
 function display(value: unknown, fallback: string): string {
   if (typeof value === "string" && value.trim()) return value;
@@ -86,7 +87,12 @@ export function InterviewDetail({ id }: { id: string }) {
       <button type="button" disabled={generating} onClick={() => void generatePackage()}>
         {generating ? "Generating with the configured LLM…" : "Generate / refresh LLM package"}
       </button>
-      {message ? <p role="status">{message}</p> : null}
+      <WorkspaceToast
+        message={message}
+        onDismiss={() => {
+          setMessage("");
+        }}
+      />
       {stages.length ? (
         <ol>
           {stages.map((stage, index) => {

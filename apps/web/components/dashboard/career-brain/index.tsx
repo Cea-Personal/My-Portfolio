@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { CAREER_FACT_TYPES } from "@/lib/career-fact-taxonomy";
 import type { CareerBrainContent, CareerBrainItem } from "@/lib/server/career-brain-synthesis";
+import { WorkspaceToast } from "@/components/ui/workspace-toast";
 import { PublicationControl } from "../publication-control";
 
 interface Snapshot {
@@ -189,7 +190,7 @@ export function CareerBrain() {
 
   const content = snapshot?.content;
   return (
-    <section className="workspace-page career-brain" aria-labelledby="career-brain-title">
+    <main className="workspace-page career-brain" aria-labelledby="career-brain-title">
       <header className="workspace-heading career-brain-heading">
         <p className="eyebrow">Private, evolving career intelligence</p>
         <h1 id="career-brain-title">Career Brain</h1>
@@ -212,7 +213,12 @@ export function CareerBrain() {
         ) : null}
       </header>
 
-      {notice ? <p role="status">{notice}</p> : null}
+      <WorkspaceToast
+        message={notice}
+        onDismiss={() => {
+          setNotice(null);
+        }}
+      />
       {state === "loading" ? <p role="status">Loading your private career profile…</p> : null}
       {state === "error" && !snapshot ? (
         <p role="alert">
@@ -476,6 +482,6 @@ export function CareerBrain() {
         </form>
       </details>
       <PublicationControl />
-    </section>
+    </main>
   );
 }

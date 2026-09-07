@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
+import { WorkspaceToast } from "@/components/ui/workspace-toast";
 interface Insight {
   id: string;
   text: string;
@@ -217,7 +218,12 @@ export function JournalWorkspace() {
           </section>
         );
       })}
-      {message ? <p role="status">{message}</p> : null}
+      <WorkspaceToast
+        message={message}
+        onDismiss={() => {
+          setMessage("");
+        }}
+      />
     </main>
   );
 }

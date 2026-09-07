@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import { WorkspaceToast } from "@/components/ui/workspace-toast";
 interface ExportRow {
   id: string;
   status: string;
@@ -89,7 +90,12 @@ export function DataSettingsWorkspace() {
       ) : (
         <p>No export requests yet.</p>
       )}
-      {message ? <p role="status">{message}</p> : null}
+      <WorkspaceToast
+        message={message}
+        onDismiss={() => {
+          setMessage("");
+        }}
+      />
     </main>
   );
 }

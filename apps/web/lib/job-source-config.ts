@@ -6,6 +6,13 @@ import {
   linkedinAuthorizedAdapter,
   jobgetherAdapter,
   remoteOkAdapter,
+  arbeitnowAdapter,
+  adzunaAdapter,
+  jsearchAdapter,
+  flybyApisAdapter,
+  serpApiAdapter,
+  theirStackAdapter,
+  jobsPipeAdapter,
   rssAdapter,
   workableAdapter,
   smartRecruitersAdapter,
@@ -25,6 +32,13 @@ const adapters: Readonly<Record<string, JobSourceAdapter>> = {
   "linkedin-authorized": linkedinAuthorizedAdapter,
   jobgether: jobgetherAdapter,
   remoteok: remoteOkAdapter,
+  arbeitnow: arbeitnowAdapter,
+  adzuna: adzunaAdapter,
+  jsearch: jsearchAdapter,
+  flybyapis: flybyApisAdapter,
+  serpapi: serpApiAdapter,
+  theirstack: theirStackAdapter,
+  jobspipe: jobsPipeAdapter,
   rss: rssAdapter,
   workable: workableAdapter,
   smartrecruiters: smartRecruitersAdapter,
@@ -35,6 +49,20 @@ const adapters: Readonly<Record<string, JobSourceAdapter>> = {
 };
 
 export const supportedJobSourceTypes = Object.keys(adapters);
+
+export function defaultJobSourceEndpoint(type: string): string | null {
+  return {
+    jobgether: "https://jobgether.com/api/v1/jobs",
+    remoteok: "https://remoteok.com/api",
+    arbeitnow: "https://www.arbeitnow.com/api/job-board-api",
+    adzuna: "https://api.adzuna.com/v1/api/jobs/gb/search/1",
+    jsearch: "https://jsearch.p.rapidapi.com/search",
+    flybyapis: "https://jobs-search-api.p.rapidapi.com/jobs/search",
+    serpapi: "https://serpapi.com/search.json",
+    theirstack: "https://api.theirstack.com/v1/jobs/search",
+    jobspipe: "https://api.jobspipe.dev/v1/jobs/search"
+  }[type] ?? null;
+}
 
 export function getJobSourceAdapter(type: string, version: string): JobSourceAdapter | null {
   const adapter = adapters[type];

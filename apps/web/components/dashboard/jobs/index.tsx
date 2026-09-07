@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
+import { WorkspaceToast } from "@/components/ui/workspace-toast";
 
 type JobStatus =
   | "discovered"
@@ -102,6 +103,8 @@ interface LiveJobCandidate {
   description?: string;
   postedAt?: string;
   sourceName?: string;
+  pipelineJobId?: string;
+  discoveryOutcome?: "PASS" | "REVIEW";
 }
 
 const transitions: Record<JobStatus, JobStatus[]> = {
@@ -179,8 +182,8 @@ export function JobsWorkspace() {
   const [detail, setDetail] = useState<Job | null>(null);
   const [liveProfileId, setLiveProfileId] = useState("");
   const [liveJobs, setLiveJobs] = useState<LiveJobCandidate[]>([]);
+  const [liveReviewQueue, setLiveReviewQueue] = useState<LiveJobCandidate[]>([]);
   const [liveSearching, setLiveSearching] = useState(false);
-  const [savedLiveUrls, setSavedLiveUrls] = useState<string[]>([]);
   const load = useCallback(async () => {
     try {
       const [jobsResponse, profilesResponse, runsResponse, sourcesResponse] = await Promise.all([
@@ -338,32 +341,17 @@ export function JobsWorkspace() {
         discoveredCount?: number;
         filteredCount?: number;
         reviewCount?: number;
+        reviewQueue?: LiveJobCandidate[];
       };
       setLiveJobs(result.jobs ?? []);
+      setLiveReviewQueue(result.reviewQueue ?? []);
       setMessage(
-        `Live search found ${String(result.jobs?.length ?? 0)} eligible candidate${result.jobs?.length === 1 ? "" : "s"} from ${String(result.discoveredCount ?? result.jobs?.length ?? 0)} listing${result.discoveredCount === 1 ? "" : "s"}; ${String(result.filteredCount ?? 0)} filtered and ${String(result.reviewCount ?? 0)} kept for review by your profile. Grounded with ${String(result.groundedEvidenceCount ?? 0)} private evidence snippet${result.groundedEvidenceCount === 1 ? "" : "s"}. Review and save the ones you want.`
+        `Live search found ${String(result.jobs?.length ?? 0)} eligible candidate${result.jobs?.length === 1 ? "" : "s"} from ${String(result.discoveredCount ?? result.jobs?.length ?? 0)} listing${result.discoveredCount === 1 ? "" : "s"}; ${String(result.filteredCount ?? 0)} filtered and ${String(result.reviewCount ?? 0)} placed in the review queue. Eligible jobs were added to your pipeline automatically. Grounded with ${String(result.groundedEvidenceCount ?? 0)} private evidence snippet${result.groundedEvidenceCount === 1 ? "" : "s"}.`
       );
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Live web search failed.");
     } finally {
       setLiveSearching(false);
-    }
-  }
-  async function saveLiveJob(job: LiveJobCandidate) {
-    try {
-      await mutation("/api/v1/jobs", "POST", {
-        title: job.title,
-        company: job.company,
-        location: job.location,
-        description: job.description,
-        sourceUrl: job.canonicalUrl,
-        sourceProvider: "live_web"
-      });
-      setSavedLiveUrls((current) => [...current, job.canonicalUrl]);
-      setMessage(`${job.title} was added to the opportunity pipeline.`);
-      await load();
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not save live result.");
     }
   }
   async function loadDetail(id: string) {
@@ -415,7 +403,7 @@ export function JobsWorkspace() {
   }
 
   return (
-    <main className="workspace-page">
+    <main className="workspace-page jobs-page">
       <header className="workspace-heading">
         <p className="eyebrow">Opportunity intelligence</p>
         <h1>Jobs</h1>
@@ -457,7 +445,7 @@ export function JobsWorkspace() {
       </section>
       <section aria-labelledby="search-jobs-title">
         <h2 id="search-jobs-title">Run a search</h2>
-        <form className="workspace-actions" onSubmit={(event) => void startSearch(event)}>
+        <form className="job-search-form" onSubmit={(event) => void startSearch(event)}>
           <label>
             Enabled profile
             <select name="profileId" required defaultValue="">
@@ -473,32 +461,43 @@ export function JobsWorkspace() {
                 ))}
             </select>
           </label>
-          <fieldset>
+          <fieldset className="job-source-fieldset">
             <legend>Sources to include</legend>
+            <p className="job-source-help">Choose the enabled feeds to query for this run.</p>
             {sources.filter((source) => source.enabled).length ? (
-              sources
-                .filter((source) => source.enabled)
-                .map((source) => (
-                  <label key={source.id}>
-                    <input
-                      type="checkbox"
-                      checked={selectedSourceIds.includes(source.id)}
-                      onChange={(event) => {
-                        setSelectedSourceIds((current) =>
-                          event.target.checked
-                            ? [...current, source.id]
-                            : current.filter((id) => id !== source.id)
-                        );
-                      }}
-                    />{" "}
-                    {source.name} ({source.adapter_type})
-                  </label>
-                ))
+              <div className="job-source-options">
+                {sources
+                  .filter((source) => source.enabled)
+                  .map((source) => (
+                    <label className="job-source-option" key={source.id}>
+                      <input
+                        type="checkbox"
+                        checked={selectedSourceIds.includes(source.id)}
+                        onChange={(event) => {
+                          setSelectedSourceIds((current) =>
+                            event.target.checked
+                              ? [...current, source.id]
+                              : current.filter((id) => id !== source.id)
+                          );
+                        }}
+                      />
+                      <span>
+                        <strong>{source.name}</strong>
+                        <small>
+                          {source.adapter_type} · {source.health_status}
+                        </small>
+                      </span>
+                    </label>
+                  ))}
+              </div>
             ) : (
               <p>No enabled sources are available.</p>
             )}
           </fieldset>
-          <button type="submit" disabled={!profiles.some((profile) => profile.enabled)}>
+          <button
+            type="submit"
+            disabled={!profiles.some((profile) => profile.enabled) || !selectedSourceIds.length}
+          >
             Search selected sources
           </button>
         </form>
@@ -526,8 +525,9 @@ export function JobsWorkspace() {
         <h2 id="live-discovery-title">Live web discovery</h2>
         <p>
           Ask the configured orchestrator to search current public listings outside your configured
-          feeds. Results are filtered to approved domains, retain their source URL, and are only
-          added to your private pipeline when you save them.
+          feeds. Results are filtered to approved domains, retain their source URL, and eligible
+          results are added to your private pipeline automatically. Listings that need more evidence
+          remain in the review queue.
         </p>
         <form className="knowledge-entry-form" onSubmit={(event) => void liveSearch(event)}>
           <label>
@@ -566,32 +566,54 @@ export function JobsWorkspace() {
           </button>
         </form>
         {liveJobs.length ? (
-          <ul className="workspace-list">
-            {liveJobs.map((job) => (
-              <li key={job.canonicalUrl}>
-                <h3>{job.title}</h3>
-                <p>
-                  {job.company} · {job.location || "Location not stated"}
-                  {job.sourceName ? ` · ${job.sourceName}` : ""}
-                </p>
-                {job.description ? <p>{job.description}</p> : null}
-                <p>
-                  <a href={job.canonicalUrl} target="_blank" rel="noreferrer">
-                    Open listing
-                  </a>
-                </p>
-                <button
-                  type="button"
-                  disabled={savedLiveUrls.includes(job.canonicalUrl)}
-                  onClick={() => void saveLiveJob(job)}
-                >
-                  {savedLiveUrls.includes(job.canonicalUrl)
-                    ? "Saved to pipeline"
-                    : "Save to pipeline"}
-                </button>
-              </li>
-            ))}
-          </ul>
+          <>
+            <h3>Added to the opportunity pipeline</h3>
+            <ul className="workspace-list">
+              {liveJobs.map((job) => (
+                <li key={job.canonicalUrl}>
+                  <h3>{job.title}</h3>
+                  <p>
+                    {job.company} · {job.location || "Location not stated"}
+                    {job.sourceName ? ` · ${job.sourceName}` : ""}
+                  </p>
+                  {job.description ? <p>{job.description}</p> : null}
+                  <p>
+                    <a href={job.canonicalUrl} target="_blank" rel="noreferrer">
+                      Open listing
+                    </a>
+                  </p>
+                  <p>
+                    {job.pipelineJobId
+                      ? "Added to your private opportunity pipeline automatically."
+                      : "Needs review before it can enter the opportunity pipeline."}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </>
+        ) : null}
+        {liveReviewQueue.length ? (
+          <>
+            <h3>Review queue</h3>
+            <p>These listings need more evidence before they can be added automatically.</p>
+            <ul className="workspace-list">
+              {liveReviewQueue.map((job) => (
+                <li key={job.canonicalUrl}>
+                  <h3>{job.title}</h3>
+                  <p>
+                    {job.company} · {job.location || "Location not stated"}
+                    {job.sourceName ? ` · ${job.sourceName}` : ""}
+                  </p>
+                  {job.description ? <p>{job.description}</p> : null}
+                  <p>
+                    <a href={job.canonicalUrl} target="_blank" rel="noreferrer">
+                      Open listing
+                    </a>
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </>
         ) : null}
       </section>
       <section aria-labelledby="manual-job-title">
@@ -849,7 +871,12 @@ export function JobsWorkspace() {
           </button>
         </section>
       ) : null}
-      {message ? <p role="status">{message}</p> : null}
+      <WorkspaceToast
+        message={message}
+        onDismiss={() => {
+          setMessage("");
+        }}
+      />
     </main>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { WorkspaceToast } from "@/components/ui/workspace-toast";
 
 interface Publication {
   id: string;
@@ -69,7 +70,12 @@ export function PublicationControl() {
       <button disabled={busy} type="button" onClick={() => void mutate("stage")}>
         {busy ? "Working…" : "Build staged snapshot"}
       </button>
-      {notice ? <p role="status">{notice}</p> : null}
+      <WorkspaceToast
+        message={notice}
+        onDismiss={() => {
+          setNotice(null);
+        }}
+      />
       {state === "loading" ? <p role="status">Loading publication history…</p> : null}
       {state === "error" ? <p role="alert">Publication history is unavailable.</p> : null}
       {state === "ready" && publications.length ? (

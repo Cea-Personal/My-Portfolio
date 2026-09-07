@@ -1,6 +1,7 @@
 "use client";
 
 import { ArticleBody } from "@/components/portfolio/article-body";
+import { WorkspaceToast } from "@/components/ui/workspace-toast";
 import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
 
@@ -320,7 +321,12 @@ export function BlogEditor() {
           <p>Review and deliberately copy any useful material into the editor.</p>
         </section>
       ) : null}
-      {message ? <p role="status">{message}</p> : null}
+      <WorkspaceToast
+        message={message}
+        onDismiss={() => {
+          setMessage("");
+        }}
+      />
     </main>
   );
 }

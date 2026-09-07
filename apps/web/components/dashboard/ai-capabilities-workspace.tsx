@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
+import { WorkspaceToast } from "@/components/ui/workspace-toast";
 const subagents = [
   ["Portfolio assistant", "public_qa"],
   ["Role-fit analyst", "role_fit"],
@@ -153,19 +154,21 @@ export function AiCapabilitiesWorkspace({ view = "agents" }: { view?: "agents" |
           </label>
           <label>
             Model
-            <input name="model" required placeholder="text-embedding-3-small" />
+            <input name="model" required placeholder="text-embedding-3-small or server-default" />
           </label>
           <label>
-            Model version
-            <input name="modelVersion" required />
+            Model version (optional)
+            <input
+              name="modelVersion"
+              placeholder="Leave blank if the provider does not publish one"
+            />
           </label>
           <label>
             Server secret environment variable
             <input
               name="secretRef"
-              required
               pattern="[A-Z][A-Z0-9_]{2,80}"
-              placeholder="OPENAI_API_KEY"
+              placeholder="OPENAI_API_KEY (leave blank for local Codex App Server)"
             />
           </label>
           <label>
@@ -180,7 +183,14 @@ export function AiCapabilitiesWorkspace({ view = "agents" }: { view?: "agents" |
             For non-OpenAI providers, set a server variable named like
             <code> PROVIDER_EMBEDDINGS_URL</code> for embeddings and
             <code> PROVIDER_CHAT_COMPLETIONS_URL</code> for reasoning tasks. Endpoints must accept
-            the corresponding OpenAI-compatible request shape.
+            the corresponding OpenAI-compatible request shape. For the native Codex App Server
+            adapter, use provider <code>codex_app_server</code>, model <code>server-default</code>,
+            and leave the secret reference blank. The server runs{" "}
+            <code>codex app-server --stdio</code>
+            using the configured Codex login. Native roles are loaded from the repository&apos;s{" "}
+            <code>.codex/agents</code> directory. Set <code>CODEX_APP_SERVER_COMMAND</code> or{" "}
+            <code>CODEX_PROJECT_ROOT</code> only when using a custom installation or launch
+            directory.
           </p>
           {providers.length ? (
             <ul className="workspace-list">
@@ -190,7 +200,10 @@ export function AiCapabilitiesWorkspace({ view = "agents" }: { view?: "agents" |
                     {provider.provider} · {provider.model}
                   </strong>
                   <p>
-                    Version {provider.model_version} · {provider.capabilities.join(", ")}
+                    {provider.model_version === "unversioned"
+                      ? "No published version"
+                      : `Version ${provider.model_version}`}{" "}
+                    · {provider.capabilities.join(", ")}
                   </p>
                 </li>
               ))}
@@ -199,7 +212,12 @@ export function AiCapabilitiesWorkspace({ view = "agents" }: { view?: "agents" |
             <p>No provider has been registered.</p>
           )}
         </section>
-        {message ? <p role="status">{message}</p> : null}
+        <WorkspaceToast
+          message={message}
+          onDismiss={() => {
+            setMessage("");
+          }}
+        />
       </main>
     );
   }
@@ -357,7 +375,12 @@ export function AiCapabilitiesWorkspace({ view = "agents" }: { view?: "agents" |
           <p>No AI execution has been recorded.</p>
         )}
       </section>
-      {message ? <p role="status">{message}</p> : null}
+      <WorkspaceToast
+        message={message}
+        onDismiss={() => {
+          setMessage("");
+        }}
+      />
     </main>
   );
 }

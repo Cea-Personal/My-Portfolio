@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
+import { WorkspaceToast } from "@/components/ui/workspace-toast";
 
 interface SourceConfig {
   endpoint?: string;
@@ -34,21 +35,14 @@ interface SearchProfile {
   name: string;
   enabled: boolean;
   target_titles: string[];
-  preferred_titles: string[];
-  excluded_titles: string[];
   seniority_levels: string[];
   locations: string[];
-  regions: string[];
-  remote_restrictions: string[];
   work_arrangements: string[];
   employment_types: string[];
   required_technologies: string[];
-  preferred_technologies: string[];
   excluded_technologies: string[];
-  nice_to_have_technologies: string[];
   industries: string[];
   company_sizes: string[];
-  preferred_companies: string[];
   excluded_companies: string[];
   visa_sponsorship?: string | null;
   relocation_support?: string | null;
@@ -57,7 +51,6 @@ interface SearchProfile {
   preferred_salary?: number | null;
   salary_currency?: string | null;
   max_job_age_days: number;
-  scoring_weights: Record<string, number>;
   timezone: string;
 }
 
@@ -91,21 +84,14 @@ function extractionConfig(form: FormData): Record<string, string> {
 function profileCriteria(form: FormData) {
   return {
     targetTitles: list(form.get("targetTitles")),
-    preferredTitles: list(form.get("preferredTitles")),
-    excludedTitles: list(form.get("excludedTitles")),
     seniorityLevels: list(form.get("seniorityLevels")),
     locations: list(form.get("locations")),
-    regions: list(form.get("regions")),
-    remoteRestrictions: list(form.get("remoteRestrictions")),
     workArrangements: list(form.get("workArrangements")),
     employmentTypes: list(form.get("employmentTypes")),
     requiredTechnologies: list(form.get("requiredTechnologies")),
-    preferredTechnologies: list(form.get("preferredTechnologies")),
-    niceToHaveTechnologies: list(form.get("niceToHaveTechnologies")),
     excludedTechnologies: list(form.get("excludedTechnologies")),
     industries: list(form.get("industries")),
     companySizes: list(form.get("companySizes")),
-    preferredCompanies: list(form.get("preferredCompanies")),
     excludedCompanies: list(form.get("excludedCompanies")),
     visaSponsorship: form.get("visaSponsorship"),
     relocationSupport: form.get("relocationSupport"),
@@ -283,6 +269,13 @@ export function JobSourcesWorkspace() {
               <option value="recruitee">Recruitee</option>
               <option value="jobgether">Jobgether (public API)</option>
               <option value="remoteok">Remote OK (public JSON feed)</option>
+              <option value="arbeitnow">Arbeitnow (public API)</option>
+              <option value="adzuna">Adzuna API</option>
+              <option value="jsearch">JSearch (RapidAPI)</option>
+              <option value="flybyapis">FlyByAPIs Jobs (RapidAPI)</option>
+              <option value="serpapi">SerpApi Google Jobs</option>
+              <option value="theirstack">TheirStack Jobs API</option>
+              <option value="jobspipe">JobsPipe API</option>
               <option value="structured">Structured data (JSON-LD)</option>
               <option value="linkedin-authorized">LinkedIn (authorized feed)</option>
               <option value="rss">RSS</option>
@@ -294,14 +287,13 @@ export function JobSourcesWorkspace() {
             <input
               name="endpoint"
               type="url"
-              required
               placeholder="https://boards-api.greenhouse.io/v1/boards/company/jobs"
             />
           </label>
           <p>
-            No-key presets: Jobgether uses <code>https://jobgether.com/astroapi/ai/jobs.json</code>;
-            Remote OK uses <code>https://remoteok.com/api</code>. Both are fetched server-side and
-            preserve the source listing URL.
+            No-key presets: Jobgether, Remote OK, and Arbeitnow. Keyed providers read only the
+            environment-variable name entered below; the secret itself never enters the database.
+            Defaults are available for Adzuna, JSearch, FlyByAPIs, SerpApi, TheirStack, and JobsPipe.
           </p>
           <p>
             LinkedIn is supported through an authorized/licensed feed or partner endpoint only. For
@@ -315,7 +307,11 @@ export function JobSourcesWorkspace() {
               pattern="[A-Z][A-Z0-9_]{2,79}"
               placeholder="JOB_SOURCE_API_TOKEN"
             />
-            <small>Enter a variable name, never an API key.</small>
+            <small>
+              Enter a variable name, never an API key. Suggested names: ADZUNA_APP_KEY,
+              JSEARCH_RAPIDAPI_KEY, FLYBYAPIS_RAPIDAPI_KEY, SERPAPI_API_KEY, THEIRSTACK_API_KEY, or
+              JOBSPIPE_API_KEY.
+            </small>
           </label>
           <label>
             Rate limit per minute
@@ -525,7 +521,12 @@ export function JobSourcesWorkspace() {
           })}
         </ul>
       </section>
-      {message ? <p role="status">{message}</p> : null}
+      <WorkspaceToast
+        message={message}
+        onDismiss={() => {
+          setMessage("");
+        }}
+      />
     </main>
   );
 }
@@ -557,13 +558,7 @@ export function SearchProfilesWorkspace() {
         name: form.get("name"),
         ...profileCriteria(form),
         timezone: form.get("timezone"),
-        enabled: form.get("enabled") === "on",
-        scoringWeights: {
-          alignment: Number(form.get("alignment")),
-          growth: Number(form.get("growth")),
-          compensation: Number(form.get("compensation")),
-          logistics: Number(form.get("logistics"))
-        }
+        enabled: form.get("enabled") === "on"
       });
       target.reset();
       setMessage("Search profile saved.");
@@ -592,13 +587,7 @@ export function SearchProfilesWorkspace() {
       await request(`/api/v1/search-profiles/${profile.id}`, "PATCH", {
         name: form.get("name"),
         ...profileCriteria(form),
-        timezone: form.get("timezone"),
-        scoringWeights: {
-          alignment: Number(form.get("alignment")),
-          growth: Number(form.get("growth")),
-          compensation: Number(form.get("compensation")),
-          logistics: Number(form.get("logistics"))
-        }
+        timezone: form.get("timezone")
       });
       setMessage(`${profile.name} was updated.`);
       await load();
@@ -627,6 +616,10 @@ export function SearchProfilesWorkspace() {
           Describe the roles, locations, working arrangements, and technologies that define a useful
           opportunity.
         </p>
+        <p className="workspace-note">
+          Matching and opportunity ranking are calculated automatically from these criteria; there
+          are no manual score factors to maintain.
+        </p>
       </header>
       <section>
         <h2>New profile</h2>
@@ -644,31 +637,12 @@ export function SearchProfilesWorkspace() {
             />
           </label>
           <label>
-            Preferred / related titles
-            <input
-              name="preferredTitles"
-              placeholder="Analytics Engineer, Data Infrastructure Engineer"
-            />
-          </label>
-          <label>
-            Excluded titles
-            <input name="excludedTitles" placeholder="Intern, Junior" />
-          </label>
-          <label>
             Seniority levels
             <input name="seniorityLevels" placeholder="senior, staff, lead" />
           </label>
           <label>
             Locations
             <input name="locations" placeholder="Remote, Kigali, London" />
-          </label>
-          <label>
-            Regions
-            <input name="regions" placeholder="EMEA, UK, EU" />
-          </label>
-          <label>
-            Remote restrictions
-            <input name="remoteRestrictions" placeholder="EMEA only, UTC ±3" />
           </label>
           <label>
             Work arrangements
@@ -679,16 +653,8 @@ export function SearchProfilesWorkspace() {
             <input name="employmentTypes" placeholder="permanent, contract" />
           </label>
           <label>
-            Required technologies
-            <input name="requiredTechnologies" placeholder="Python, SQL" />
-          </label>
-          <label>
-            Preferred technologies
-            <input name="preferredTechnologies" placeholder="dbt, Airflow" />
-          </label>
-          <label>
-            Nice-to-have technologies
-            <input name="niceToHaveTechnologies" placeholder="Kafka, Snowflake" />
+            Technologies
+            <input name="requiredTechnologies" placeholder="Python, SQL, dbt, Airflow, Kafka" />
           </label>
           <label>
             Excluded technologies
@@ -701,10 +667,6 @@ export function SearchProfilesWorkspace() {
           <label>
             Company sizes
             <input name="companySizes" placeholder="startup, scale-up, enterprise" />
-          </label>
-          <label>
-            Preferred companies
-            <input name="preferredCompanies" />
           </label>
           <label>
             Excluded companies
@@ -752,39 +714,6 @@ export function SearchProfilesWorkspace() {
             Timezone
             <input name="timezone" defaultValue="Africa/Kigali" required />
           </label>
-          <fieldset>
-            <legend>Score factors (0–1)</legend>
-            <label>
-              Alignment
-              <input name="alignment" type="number" min="0" max="1" step="0.1" defaultValue="0.4" />
-            </label>
-            <label>
-              Growth
-              <input name="growth" type="number" min="0" max="1" step="0.1" defaultValue="0.25" />
-            </label>
-            <label>
-              Compensation
-              <input
-                name="compensation"
-                type="number"
-                min="0"
-                max="1"
-                step="0.1"
-                defaultValue="0.2"
-              />
-            </label>
-            <label>
-              Logistics
-              <input
-                name="logistics"
-                type="number"
-                min="0"
-                max="1"
-                step="0.1"
-                defaultValue="0.15"
-              />
-            </label>
-          </fieldset>
           <label>
             <input name="enabled" type="checkbox" /> Enable profile
           </label>
@@ -823,20 +752,6 @@ export function SearchProfilesWorkspace() {
                     <input name="targetTitles" defaultValue={profile.target_titles.join(", ")} />
                   </label>
                   <label>
-                    Preferred / related titles
-                    <input
-                      name="preferredTitles"
-                      defaultValue={profile.preferred_titles.join(", ")}
-                    />
-                  </label>
-                  <label>
-                    Excluded titles
-                    <input
-                      name="excludedTitles"
-                      defaultValue={profile.excluded_titles.join(", ")}
-                    />
-                  </label>
-                  <label>
                     Seniority levels
                     <input
                       name="seniorityLevels"
@@ -846,17 +761,6 @@ export function SearchProfilesWorkspace() {
                   <label>
                     Locations
                     <input name="locations" defaultValue={profile.locations.join(", ")} />
-                  </label>
-                  <label>
-                    Regions
-                    <input name="regions" defaultValue={profile.regions.join(", ")} />
-                  </label>
-                  <label>
-                    Remote restrictions
-                    <input
-                      name="remoteRestrictions"
-                      defaultValue={profile.remote_restrictions.join(", ")}
-                    />
                   </label>
                   <label>
                     Work arrangements
@@ -873,24 +777,10 @@ export function SearchProfilesWorkspace() {
                     />
                   </label>
                   <label>
-                    Required technologies
+                    Technologies
                     <input
                       name="requiredTechnologies"
                       defaultValue={profile.required_technologies.join(", ")}
-                    />
-                  </label>
-                  <label>
-                    Preferred technologies
-                    <input
-                      name="preferredTechnologies"
-                      defaultValue={profile.preferred_technologies.join(", ")}
-                    />
-                  </label>
-                  <label>
-                    Nice-to-have technologies
-                    <input
-                      name="niceToHaveTechnologies"
-                      defaultValue={profile.nice_to_have_technologies.join(", ")}
                     />
                   </label>
                   <label>
@@ -907,13 +797,6 @@ export function SearchProfilesWorkspace() {
                   <label>
                     Company sizes
                     <input name="companySizes" defaultValue={profile.company_sizes.join(", ")} />
-                  </label>
-                  <label>
-                    Preferred companies
-                    <input
-                      name="preferredCompanies"
-                      defaultValue={profile.preferred_companies.join(", ")}
-                    />
                   </label>
                   <label>
                     Excluded companies
@@ -984,53 +867,6 @@ export function SearchProfilesWorkspace() {
                     Timezone
                     <input name="timezone" defaultValue={profile.timezone} required />
                   </label>
-                  <fieldset>
-                    <legend>Score factors (0–1)</legend>
-                    <label>
-                      Alignment
-                      <input
-                        name="alignment"
-                        type="number"
-                        min="0"
-                        max="1"
-                        step="0.1"
-                        defaultValue={profile.scoring_weights.alignment ?? 0.4}
-                      />
-                    </label>
-                    <label>
-                      Growth
-                      <input
-                        name="growth"
-                        type="number"
-                        min="0"
-                        max="1"
-                        step="0.1"
-                        defaultValue={profile.scoring_weights.growth ?? 0.25}
-                      />
-                    </label>
-                    <label>
-                      Compensation
-                      <input
-                        name="compensation"
-                        type="number"
-                        min="0"
-                        max="1"
-                        step="0.1"
-                        defaultValue={profile.scoring_weights.compensation ?? 0.2}
-                      />
-                    </label>
-                    <label>
-                      Logistics
-                      <input
-                        name="logistics"
-                        type="number"
-                        min="0"
-                        max="1"
-                        step="0.1"
-                        defaultValue={profile.scoring_weights.logistics ?? 0.15}
-                      />
-                    </label>
-                  </fieldset>
                   <button type="submit">Update profile</button>
                 </form>
               </details>
@@ -1046,7 +882,12 @@ export function SearchProfilesWorkspace() {
           ))}
         </ul>
       </section>
-      {message ? <p role="status">{message}</p> : null}
+      <WorkspaceToast
+        message={message}
+        onDismiss={() => {
+          setMessage("");
+        }}
+      />
     </main>
   );
 }

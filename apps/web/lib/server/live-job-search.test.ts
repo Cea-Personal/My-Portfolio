@@ -26,10 +26,8 @@ describe("live web job search", () => {
       provider,
       {
         targetTitles: ["Data Engineer"],
-        preferredTitles: [],
         locations: ["Remote"],
         requiredTechnologies: [],
-        preferredTechnologies: [],
         workArrangements: [],
         employmentTypes: []
       },

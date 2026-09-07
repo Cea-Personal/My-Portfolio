@@ -235,7 +235,8 @@ export async function synthesizeCareerBrain(
       extractedPrivateFacts: source.extracted,
       journalEvidence: source.journals,
       recentApplicationFocus: source.recentApplications
-    }
+    },
+    { task: "evidence_extraction" }
   );
   const content = normalizeCareerBrainContent(generation.output);
   const insert = await client

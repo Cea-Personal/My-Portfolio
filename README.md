@@ -113,11 +113,22 @@ interview process automatically asks the interview subagent to prepare stage-spe
 questions, CV alignment, evidence-grounded answer stories, revision areas, and questions to ask the
 interviewer. There is no manual STAR-story form in the normal workflow.
 
-The web application exposes this orchestration boundary in `/api/v1/orchestrator/tasks`. The Codex
-app server can be used as the surrounding agent harness when you run the application through Codex,
-but it is not a credential or runtime dependency of the deployed Next.js server. The server remains
-portable and calls the configured OpenAI-compatible endpoint directly; no code claims access to a
-user's Codex session or account.
+The web application exposes this orchestration boundary in `/api/v1/orchestrator/tasks`. Native Codex
+custom agents live in `.codex/agents/*.toml`, with shared native settings in `.codex/config.toml`.
+When the registered provider is `codex_app_server`, the Next.js server starts one ephemeral
+`codex app-server --stdio` orchestrator thread for each bounded reasoning turn. The parent explicitly
+delegates exactly one request through native `spawn_agent`; the web adapter requires a child-agent
+event before accepting the result. This uses the local Codex login; it does not reuse the browser's
+Supabase session as a Codex credential. Configure `CODEX_APP_SERVER_COMMAND`,
+`CODEX_APP_SERVER_ARGS`, or (when launched outside the repository) `CODEX_PROJECT_ROOT` only when
+the defaults need to change. Embeddings remain a separate provider, and the existing OpenAI/provider
+path remains the fallback when the Codex runtime is unavailable.
+
+The orchestrator defaults to `gpt-5.6-sol` with high reasoning. Career synthesis, interview coaching,
+and application writing explicitly use `gpt-5.6-terra` with high reasoning. Job matching and career-gap
+analysis use `gpt-5.6-terra` with medium reasoning, while writing and portfolio assistance use
+`gpt-5.6-luna` with low reasoning. Other native agents inherit the orchestrator/default model unless
+their agent file overrides it.
 
 Local development uses a parser-only default secret when none is configured. Deployed environments
 must set the same strong `CAREER_WORKER_SHARED_SECRET` on the Web/Inngest runtime and worker runtime;
@@ -148,8 +159,15 @@ authorized or licensed provider endpoint and a terms/access note.
 
 For no-key remote-job discovery, configure these presets under **Settings → Job sources**:
 
-- **Jobgether (public API)** — \`https://jobgether.com/astroapi/ai/jobs.json\`
+- **Jobgether (public API)** — \`https://jobgether.com/api/v1/jobs\`
 - **Remote OK (public JSON feed)** — \`https://remoteok.com/api\`
+- **Arbeitnow (public API)** — \`https://www.arbeitnow.com/api/job-board-api\`
+- **Adzuna** — \`https://api.adzuna.com/v1/api/jobs/gb/search/1\` (set \`ADZUNA_APP_ID\` and \`ADZUNA_APP_KEY\`)
+- **JSearch** — RapidAPI (set \`JSEARCH_RAPIDAPI_KEY\`)
+- **FlyByAPIs Jobs Search** — RapidAPI (set \`FLYBYAPIS_RAPIDAPI_KEY\`)
+- **SerpApi Google Jobs** — \`https://serpapi.com/search.json\` (set \`SERPAPI_API_KEY\`)
+- **TheirStack** — \`https://api.theirstack.com/v1/jobs/search\` (set \`THEIRSTACK_API_KEY\`)
+- **JobsPipe** — \`https://api.jobspipe.dev/v1/jobs/search\` (set \`JOBSPIPE_API_KEY\`)
 
 The adapters translate the active search profile into each provider's query shape, discard malformed
 metadata records, preserve the provider listing URL, and feed the normal raw-job, eligibility,
@@ -158,22 +176,44 @@ before canonical jobs are created; required technologies are rejected when the l
 searchable description text, while description-less listings remain reviewable. These feeds do not
 require a paid API key, but they do require
 reasonable request volume and source attribution. Jobgether's returned URL is its listing page, not
-necessarily the employer's application URL.
+necessarily the employer's application URL. Jobgether's list response does not include a full job
+description; when it supplies an optional description-like field the adapter preserves it, otherwise
+the listing URL remains the source of the full description.
 
-For Jobgether, the adapter maps profile titles, technologies, preferred companies, locations/regions,
-industries, seniority, employment type, work arrangement, minimum salary, currency, and language into
-the documented `keyword`, `locations`, `industries`, `experience`, `contractType`, `remoteType`,
-`includeHybrid`, `salaryMin`, and `currency` parameters. Unsupported or unknown provider values are
-retried without the structured filter and remain subject to local profile eligibility.
+RapidAPI providers use the server-side secret reference configured for the source. The application
+never stores provider keys in Supabase. Scheduled job-search automations run on weekdays and cap
+new canonical jobs at ten per owner/day; existing fingerprints are updated rather than duplicated.
+
+For Jobgether, the adapter maps target and preferred titles to slugified `jobReferences` (for example,
+`frontend developer` becomes `frontend-developer`), locations/regions to comma-separated `locations`,
+industries to `industries`, seniority to `experience`, employment type to `contractType`, work
+arrangements to `remoteType`/`includeHybrid`, and salary bounds to `salaryMin`/`salaryMax` with
+`currency`. Requests use `sort=relevance`, `limit=25`, and iterate pages 1–10. Results older than the
+profile's `maxJobAgeDays` cutoff are discarded locally because the provider does not expose a posted-date
+filter. Unsupported or unknown provider values are retried without the structured filter and remain
+subject to local profile eligibility.
 
 The Jobs workspace also has an opt-in **Live web discovery** action. It uses the configured OpenAI
 orchestrator with the Responses API web-search tool, restricts retrieval to the domains entered in the
-form, optionally grounds the query with indexed private Career Brain evidence, validates every returned
-HTTPS listing URL, and shows candidates for owner review before they are saved to the private
-opportunity pipeline. Configure and enable the orchestrator in **Settings → AI providers / Agents**
-first; no separate search key is required. Set `OPENAI_RESPONSES_URL` only when using an
-OpenAI-compatible proxy. Live discovery never logs in to or scrapes LinkedIn, never publishes results,
-and never submits an application.
+form, optionally grounds the query with indexed private Career Brain evidence, and validates every
+returned HTTPS listing URL. Profile-eligible (PASS) listings are attached to the private opportunity
+pipeline automatically with their search profile, run, source, discovery time, and match reasons.
+Existing opportunities are deduplicated by canonical URL/fingerprint. Listings whose requirements
+cannot be proven from the result are persisted as REVIEW events and shown in the review queue; FAIL
+listings are retained only as rejected discovery events. Configure and enable the orchestrator in
+**Settings → AI providers / Agents** first; no separate search key is required. Set
+`OPENAI_RESPONSES_URL` only when using an OpenAI-compatible proxy. Live discovery never logs in to or
+scrapes LinkedIn, never publishes results, and never submits an application.
+
+When an application form or employer question is captured, the Application Kit automatically asks the
+configured orchestrator to answer those exact fields. It receives the selected job description and
+company, selected application profile, attached/generated CV and cover-letter materials, Career Brain
+facts, and retrieved private evidence. Motivation and experience answers are tailored to the role;
+salary answers use configured search-profile/job salary data when available. Authorization,
+sponsorship, availability, and demographic fields are never guessed and remain marked for explicit
+owner input when the profile does not supply a value. Each generated answer stores its evidence IDs,
+generation context, model version, and a new version number. Answers are editable and can be
+regenerated after new evidence is indexed; final approval remains an owner decision.
 
 The ATS adapters have different credential rules. Greenhouse public job-board endpoints, Lever's
 public postings feed, and Ashby's public job-posting API generally need no key when you are reading

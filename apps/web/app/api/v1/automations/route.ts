@@ -54,6 +54,22 @@ export async function POST(request: Request) {
       );
     const timezone = typeof body.timezone === "string" ? body.timezone : "Africa/Kigali";
     if (!isValidTimeZone(timezone)) return apiResponse({ code: "INVALID_TIMEZONE" }, request, 400);
+    let profileId: string | null = null;
+    if (body.purpose === "job_search") {
+      if (typeof body.profileId !== "string")
+        return apiResponse({ code: "PROFILE_REQUIRED" }, request, 400);
+      const profile = await client
+        .schema("app")
+        .from("job_search_profiles")
+        .select("id")
+        .eq("id", body.profileId)
+        .eq("owner_id", ownerId)
+        .is("archived_at", null)
+        .maybeSingle();
+      if (profile.error) throw profile.error;
+      if (!profile.data) return apiResponse({ code: "PROFILE_NOT_FOUND" }, request, 404);
+      profileId = profile.data.id;
+    }
     const nextRunAt = nextCronOccurrence(body.cronExpression, timezone);
     if (!nextRunAt) return apiResponse({ code: "INVALID_CRON_SCHEDULE" }, request, 400);
     const { data, error } = await client
@@ -62,6 +78,7 @@ export async function POST(request: Request) {
       .insert({
         owner_id: ownerId,
         purpose: body.purpose.slice(0, 120),
+        profile_id: profileId,
         recurrence: "cron",
         cron_expression: body.cronExpression.trim().slice(0, 120),
         timezone,

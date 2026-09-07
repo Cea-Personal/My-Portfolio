@@ -22,6 +22,7 @@ export const jobSearch = inngest.createFunction(
         runId: String(event.data.runId),
         profileId: String(event.data.profileId),
         operationKey: String(event.data.operationKey),
+        dailyNewJobLimit: 10,
         sourceIds: Array.isArray(event.data.sourceIds)
           ? event.data.sourceIds.filter((source): source is string => typeof source === "string")
           : []

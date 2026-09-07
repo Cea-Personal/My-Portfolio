@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import { WorkspaceToast } from "@/components/ui/workspace-toast";
 interface Version {
   id: string;
   version: number;
@@ -105,7 +106,12 @@ export function ArtifactLibrary({
           remains bound to its job description and evidence.
         </p>
       )}
-      {message ? <p role="status">{message}</p> : null}
+      <WorkspaceToast
+        message={message}
+        onDismiss={() => {
+          setMessage("");
+        }}
+      />
     </main>
   );
 }

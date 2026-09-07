@@ -7,13 +7,9 @@ export interface EligibilityReason {
 
 export interface EligibilityProfile {
   targetTitles?: readonly string[];
-  preferredTitles?: readonly string[];
-  excludedTitles?: readonly string[];
   locations?: readonly string[];
-  regions?: readonly string[];
   requiredTechnologies?: readonly string[];
   excludedTechnologies?: readonly string[];
-  preferredCompanies?: readonly string[];
   excludedCompanies?: readonly string[];
 }
 
@@ -46,8 +42,6 @@ export function evaluateJobEligibility(
   const failures: EligibilityReason[] = [];
   const reviews: EligibilityReason[] = [];
 
-  if (includesAny(title, profile.excludedTitles))
-    failures.push({ code: "EXCLUDED_TITLE", message: "The title matches an explicit exclusion." });
   if (includesAny(company, profile.excludedCompanies))
     failures.push({
       code: "EXCLUDED_COMPANY",
@@ -60,13 +54,13 @@ export function evaluateJobEligibility(
     });
   if (failures.length) return { outcome: "FAIL", reasons: failures };
 
-  const titles = [...(profile.targetTitles ?? []), ...(profile.preferredTitles ?? [])];
+  const titles = profile.targetTitles ?? [];
   if (titles.length && !includesAny(title, titles))
     failures.push({
       code: "TITLE_NOT_MATCHED",
       message: "The title does not match any configured target or preferred title."
     });
-  const geographies = [...(profile.locations ?? []), ...(profile.regions ?? [])];
+  const geographies = profile.locations ?? [];
   const remoteAllowed = geographies.some((geography) => normalized(geography).includes("remote"));
   if (
     geographies.length &&
@@ -92,11 +86,5 @@ export function evaluateJobEligibility(
     else reviews.push(reason);
   }
   if (failures.length) return { outcome: "FAIL", reasons: failures };
-  if (profile.preferredCompanies?.length && !includesAny(company, profile.preferredCompanies))
-    reviews.push({
-      code: "COMPANY_PREFERENCE_UNCONFIRMED",
-      message: "The company is outside the preferred-company list."
-    });
-
   return { outcome: reviews.length ? "REVIEW" : "PASS", reasons: reviews };
 }

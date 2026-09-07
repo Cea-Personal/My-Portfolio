@@ -1,6 +1,7 @@
 import { apiResponse } from "@/lib/api/response";
 import { withPrivateApi } from "@/lib/api/private";
 import { requestCareerBrainRefresh } from "@/inngest/career-brain-events";
+import { generateApplicationAnswers } from "@/lib/server/application-answer-generation";
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   return withPrivateApi(request, async ({ client, ownerId }) => {
     const { id: jobId } = await params;
@@ -105,6 +106,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       .eq("owner_id", ownerId)
       .in("status", ["interested", "shortlisted", "ready_to_apply"]);
     await requestCareerBrainRefresh(ownerId, "application", data.id).catch(() => undefined);
+    // Existing/imported form fields are generated immediately; an empty new
+    // application simply returns an empty generation result and will be
+    // regenerated automatically when its fields are captured.
+    await generateApplicationAnswers(client, ownerId, data.id).catch(() => undefined);
     return apiResponse(data, request, 201);
   });
 }

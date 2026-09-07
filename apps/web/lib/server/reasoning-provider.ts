@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { runCodexOrchestrator } from "./codex-app-server";
 
 interface ProviderRow {
   id: string;
@@ -29,11 +30,18 @@ export interface ResolvedReasoningProvider extends ProviderRow {
 }
 
 function endpointFor(provider: ProviderRow): string {
+  if (provider.provider === "codex_app_server") {
+    // Native mode starts the local `codex app-server --stdio` process; no URL
+    // is required.
+    return "codex://local";
+  }
   const prefix = provider.provider.toUpperCase().replace(/[^A-Z0-9]/g, "_");
   const configured = process.env[`${prefix}_CHAT_COMPLETIONS_URL`]?.trim();
   if (configured) return configured;
   if (provider.provider === "openai") return "https://api.openai.com/v1/chat/completions";
-  throw new Error(`AI_PROVIDER_ENDPOINT_MISSING:${prefix}_CHAT_COMPLETIONS_URL`);
+  throw new Error(
+    `AI_PROVIDER_ENDPOINT_MISSING:${provider.provider === "codex_app_server" ? "CODEX_APP_SERVER_URL" : `${prefix}_CHAT_COMPLETIONS_URL`}`
+  );
 }
 
 export async function resolveReasoningProviders(
@@ -72,10 +80,9 @@ export async function resolveReasoningProviders(
     capability = legacyResult.data as CapabilityRow | null;
   }
   if (!capability) throw new Error(`AI_CAPABILITY_NOT_CONFIGURED:${task}`);
-  const ids = [
-    capability.provider_config_id,
-    ...(configuredTask === "orchestrator" ? [] : [capability.fallback_provider_config_id])
-  ].filter((id): id is string => typeof id === "string");
+  const ids = [capability.provider_config_id, capability.fallback_provider_config_id].filter(
+    (id): id is string => typeof id === "string"
+  );
   const providerResult = await client
     .schema("app")
     .from("ai_provider_configs")
@@ -94,11 +101,13 @@ export async function resolveReasoningProviders(
         (configuredTask === "orchestrator" && name !== "embeddings")
     );
     if (!row || !supportsTask) return [];
-    if (!row.secret_ref) throw new Error("AI_PROVIDER_SECRET_REFERENCE_MISSING");
-    const apiKey = process.env[row.secret_ref]?.trim();
-    if (!apiKey) throw new Error(`AI_PROVIDER_SECRET_MISSING:${row.secret_ref}`);
-    if (/^secret:\/\//i.test(apiKey))
-      throw new Error(`AI_PROVIDER_SECRET_UNRESOLVED:${row.secret_ref}`);
+    const apiKey = row.secret_ref ? (process.env[row.secret_ref]?.trim() ?? "") : "";
+    if (row.provider !== "codex_app_server") {
+      if (!row.secret_ref) throw new Error("AI_PROVIDER_SECRET_REFERENCE_MISSING");
+      if (!apiKey) throw new Error(`AI_PROVIDER_SECRET_MISSING:${row.secret_ref}`);
+      if (/^secret:\/\//i.test(apiKey))
+        throw new Error(`AI_PROVIDER_SECRET_UNRESOLVED:${row.secret_ref}`);
+    }
     return [
       {
         ...row,
@@ -129,7 +138,8 @@ function parseJsonObject(content: string): Record<string, unknown> {
 export async function generateReasoningJson(
   providers: ResolvedReasoningProvider[],
   system: string,
-  input: Record<string, unknown>
+  input: Record<string, unknown>,
+  options: { task?: string } = {}
 ): Promise<{
   output: Record<string, unknown>;
   provider: ResolvedReasoningProvider;
@@ -144,6 +154,30 @@ export async function generateReasoningJson(
     const started = performance.now();
     for (let attempt = 0; attempt <= provider.retryLimit; attempt += 1) {
       try {
+        if (provider.provider === "codex_app_server") {
+          const task = options.task ?? "writing_assistance";
+          const generated = await runCodexOrchestrator(
+            task,
+            { system, input },
+            { timeoutMs: provider.timeoutMs }
+          );
+          const output = parseJsonObject(generated.text);
+          return {
+            output,
+            provider: { ...provider, model: generated.model },
+            inputHash,
+            outputHash: createHash("sha256").update(JSON.stringify(output)).digest("hex"),
+            elapsedMs: Math.round(performance.now() - started)
+          };
+        }
+        // A Codex App Server gateway may own model routing. For that adapter,
+        // `server-default` means the gateway chooses the model according to its
+        // server-side policy; ordinary providers always receive their model.
+        const routedModel =
+          provider.provider === "codex_app_server"
+            ? process.env.CODEX_APP_SERVER_MODEL?.trim() ||
+              (provider.model === "server-default" ? undefined : provider.model)
+            : provider.model;
         const response = await fetch(provider.endpoint, {
           method: "POST",
           headers: {
@@ -151,7 +185,7 @@ export async function generateReasoningJson(
             "content-type": "application/json"
           },
           body: JSON.stringify({
-            model: provider.model,
+            ...(routedModel ? { model: routedModel } : {}),
             temperature: provider.creativity,
             ...(provider.provider === "openai"
               ? { max_completion_tokens: provider.maxTokens }

@@ -8,12 +8,28 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const { data: current, error: currentError } = await client
       .schema("app")
       .from("automation_schedules")
-      .select("id,cron_expression,timezone,next_run_at")
+      .select("id,purpose,profile_id,cron_expression,timezone,next_run_at")
       .eq("id", id)
       .eq("owner_id", ownerId)
       .maybeSingle();
     if (currentError) throw currentError;
     if (!current) return apiResponse(null, request, 404);
+    let profileId: string | null | undefined;
+    if (body.profileId !== undefined) {
+      if (current.purpose !== "job_search" || typeof body.profileId !== "string")
+        return apiResponse({ code: "INVALID_PROFILE" }, request, 400);
+      const profile = await client
+        .schema("app")
+        .from("job_search_profiles")
+        .select("id")
+        .eq("id", body.profileId)
+        .eq("owner_id", ownerId)
+        .is("archived_at", null)
+        .maybeSingle();
+      if (profile.error) throw profile.error;
+      if (!profile.data) return apiResponse({ code: "PROFILE_NOT_FOUND" }, request, 404);
+      profileId = profile.data.id;
+    }
     const cronExpression =
       typeof body.cronExpression === "string"
         ? body.cronExpression.trim()
@@ -31,6 +47,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       .schema("app")
       .from("automation_schedules")
       .update({
+        ...(profileId !== undefined ? { profile_id: profileId } : {}),
         enabled: typeof body.enabled === "boolean" ? body.enabled : undefined,
         recurrence: "cron",
         cron_expression:
@@ -51,5 +68,21 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       .maybeSingle();
     if (error) throw error;
     return apiResponse(data, request, data ? 200 : 404);
+  });
+}
+
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  return withPrivateApi(request, async ({ client, ownerId }) => {
+    const { id } = await params;
+    const { data, error } = await client
+      .schema("app")
+      .from("automation_schedules")
+      .delete()
+      .eq("id", id)
+      .eq("owner_id", ownerId)
+      .select("id")
+      .maybeSingle();
+    if (error) throw error;
+    return apiResponse({ deleted: Boolean(data), id }, request, data ? 200 : 404);
   });
 }

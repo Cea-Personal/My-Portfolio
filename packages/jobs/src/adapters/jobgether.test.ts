@@ -26,7 +26,7 @@ describe("Jobgether adapter", () => {
         );
       }
     });
-    expect(requested).toContain("keyword=Data+Engineer");
+    expect(requested).toContain("jobReferences=data-engineer");
     expect(requested).toContain("locations=worldwide");
     expect(records).toEqual([
       expect.objectContaining({
@@ -73,7 +73,8 @@ describe("Jobgether adapter", () => {
         );
       }
     });
-    expect(requested).toContain("keyword=Data+Engineer+Analytics+Engineer+Python%2CSQL+dbt+Example+English");
+    expect(requested).toContain("keyword=Python%2CSQL+dbt+Example+English");
+    expect(requested).toContain("jobReferences=data-engineer%2Canalytics-engineer");
     expect(requested).toContain("locations=nigeria");
     expect(requested).toContain("industries=fintech");
     expect(requested).toContain("contractType=full-time");
@@ -81,6 +82,7 @@ describe("Jobgether adapter", () => {
     expect(requested).toContain("remoteType=full-remote");
     expect(requested).toContain("salaryMin=60000");
     expect(requested).toContain("currency=USD");
+    expect(requested).toContain("sort=relevance");
   });
 
   it("normalizes the www host to the documented API host", async () => {
@@ -94,7 +96,7 @@ describe("Jobgether adapter", () => {
         });
       }
     });
-    expect(requested).toContain("https://jobgether.com/astroapi/ai/jobs.json");
+    expect(requested).toContain("https://jobgether.com/api/v1/jobs");
     expect(requested).not.toContain("https://www.jobgether.com/api/v1/jobs");
   });
 
@@ -109,13 +111,13 @@ describe("Jobgether adapter", () => {
         });
       }
     });
-    expect(requested).toContain("https://jobgether.com/astroapi/ai/jobs.json");
+    expect(requested).toContain("https://jobgether.com/api/v1/jobs");
   });
 
   it("falls back to provider-side keyword search when a location slug is rejected", async () => {
     const requests: string[] = [];
     const records = await jobgetherAdapter.collect({
-      endpoint: "https://jobgether.com/astroapi/ai/jobs.json",
+      endpoint: "https://jobgether.com/api/v1/jobs",
       query: { title: "Data Engineer", location: "Kigali" },
       fetcher: async (input) => {
         requests.push(String(input));
@@ -144,7 +146,7 @@ describe("Jobgether adapter", () => {
   it("falls back to a broad page when valid filters produce no jobs", async () => {
     const requests: string[] = [];
     const records = await jobgetherAdapter.collect({
-      endpoint: "https://jobgether.com/astroapi/ai/jobs.json",
+      endpoint: "https://jobgether.com/api/v1/jobs",
       query: { title: "Data Engineer", location: "Remote" },
       fetcher: async (input) => {
         requests.push(String(input));
@@ -168,9 +170,61 @@ describe("Jobgether adapter", () => {
       }
     });
     expect(requests).toHaveLength(2);
-    expect(requests[0]).toContain("keyword=Data+Engineer");
+    expect(requests[0]).toContain("jobReferences=data-engineer");
     expect(requests[0]).not.toContain("locations=");
-    expect(requests[1]).not.toContain("keyword=");
+    expect(requests[1]).toContain("keyword=Data+Engineer");
     expect(records).toHaveLength(1);
+  });
+
+  it("iterates provider pages and removes listings older than max job age", async () => {
+    const requests: string[] = [];
+    const recent = new Date(Date.now() - 2 * 24 * 60 * 60 * 1_000).toISOString();
+    const old = new Date(Date.now() - 45 * 24 * 60 * 60 * 1_000).toISOString();
+    const records = await jobgetherAdapter.collect({
+      endpoint: "https://jobgether.com/api/v1/jobs",
+      query: { title: "Data Engineer", maxJobAgeDays: 30 },
+      fetcher: async (input) => {
+        const url = new URL(String(input));
+        requests.push(url.toString());
+        const page = Number(url.searchParams.get("page"));
+        return new Response(
+          JSON.stringify(
+            page === 1
+              ? {
+                  jobs: [
+                    {
+                      id: "recent-job",
+                      title: "Data Engineer",
+                      company: "Recent Co",
+                      url: "https://jobgether.com/offer/recent",
+                      postedAt: recent
+                    }
+                  ],
+                  pagination: { page: 1, limit: 25, hasMore: true }
+                }
+              : {
+                  jobs: [
+                    {
+                      id: "old-job",
+                      title: "Data Engineer",
+                      company: "Old Co",
+                      url: "https://jobgether.com/offer/old",
+                      postedAt: old
+                    }
+                  ],
+                  pagination: { page: 2, limit: 25, hasMore: false }
+                }
+          ),
+          { headers: { "content-type": "application/json" } }
+        );
+      }
+    });
+    expect(requests).toHaveLength(2);
+    expect(requests[0]).toContain("page=1");
+    expect(requests[0]).toContain("limit=25");
+    expect(requests[0]).toContain("sort=relevance");
+    expect(requests[1]).toContain("page=2");
+    expect(records).toHaveLength(1);
+    expect(records[0]).toMatchObject({ externalId: "recent-job" });
   });
 });

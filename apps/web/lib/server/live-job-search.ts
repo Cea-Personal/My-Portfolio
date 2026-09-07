@@ -2,10 +2,8 @@ import type { ResolvedReasoningProvider } from "./reasoning-provider";
 
 export interface LiveJobProfile {
   targetTitles: readonly string[];
-  preferredTitles: readonly string[];
   locations: readonly string[];
   requiredTechnologies: readonly string[];
-  preferredTechnologies: readonly string[];
   workArrangements: readonly string[];
   employmentTypes: readonly string[];
   privateEvidence?: readonly {
@@ -127,10 +125,8 @@ export async function searchLiveJobs(
   const prompt = [
     "Find current job listings that match this owner's search profile.",
     `Target titles: ${values(profile.targetTitles)}`,
-    `Preferred titles: ${values(profile.preferredTitles)}`,
-    `Locations or regions: ${values(profile.locations)}`,
-    `Required technologies: ${values(profile.requiredTechnologies)}`,
-    `Preferred technologies: ${values(profile.preferredTechnologies)}`,
+    `Locations: ${values(profile.locations)}`,
+    `Technologies: ${values(profile.requiredTechnologies)}`,
     `Work arrangements: ${values(profile.workArrangements)}`,
     `Employment types: ${values(profile.employmentTypes)}`,
     ...(profile.privateEvidence?.length

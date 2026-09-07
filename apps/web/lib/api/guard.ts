@@ -36,9 +36,54 @@ export function requireIdempotencyKey(request: Request, required = true): string
   return key;
 }
 
-export function assertSameOrigin(request: Request, expectedOrigin: string): void {
+function originFromForwardedHeaders(request: Request): string | undefined {
+  const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+  if (!host) return undefined;
+  const protocol =
+    request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim() ??
+    new URL(request.url).protocol.replace(":", "");
+  try {
+    return new URL(`${protocol}://${host}`).origin;
+  } catch {
+    return undefined;
+  }
+}
+
+function localAlias(origin: URL, candidate: URL): boolean {
+  if (origin.protocol !== candidate.protocol || origin.port !== candidate.port) return false;
+  const localHosts = new Set(["localhost", "127.0.0.1", "[::1]"]);
+  return localHosts.has(origin.hostname) && localHosts.has(candidate.hostname);
+}
+
+export function isAllowedSameOrigin(request: Request, expectedOrigin: string): boolean {
   const origin = request.headers.get("origin");
-  if (origin && origin !== expectedOrigin)
+  if (!origin) return true;
+  let supplied: URL;
+  let expected: URL;
+  try {
+    supplied = new URL(origin);
+    expected = new URL(expectedOrigin);
+  } catch {
+    return false;
+  }
+  if (supplied.origin === expected.origin || localAlias(supplied, expected)) return true;
+
+  const forwardedOrigin = originFromForwardedHeaders(request);
+  if (forwardedOrigin === supplied.origin) return true;
+
+  const configuredOrigin = process.env.NEXT_PUBLIC_APP_URL;
+  if (configuredOrigin) {
+    try {
+      if (new URL(configuredOrigin).origin === supplied.origin) return true;
+    } catch {
+      // Ignore malformed optional configuration and retain the strict check.
+    }
+  }
+  return false;
+}
+
+export function assertSameOrigin(request: Request, expectedOrigin: string): void {
+  if (!isAllowedSameOrigin(request, expectedOrigin))
     throw new ProblemError(
       problem(
         "CSRF_ORIGIN_MISMATCH",

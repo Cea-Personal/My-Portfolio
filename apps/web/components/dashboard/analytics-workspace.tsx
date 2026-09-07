@@ -42,34 +42,6 @@ interface GapReport {
   gaps: Array<{ skill: string; demandCount: number; status: string; actions: string[] }>;
   sampledRequirements: number;
 }
-function MetricTable({ caption, values }: { caption: string; values: Record<string, number> }) {
-  const maximum = Math.max(1, ...Object.values(values));
-  return (
-    <table>
-      <caption>{caption}</caption>
-      <thead>
-        <tr>
-          <th scope="col">Metric</th>
-          <th scope="col">Count</th>
-          <th scope="col">Relative volume</th>
-        </tr>
-      </thead>
-      <tbody>
-        {Object.entries(values).map(([name, value]) => (
-          <tr key={name}>
-            <th scope="row">{name.replaceAll("_", " ")}</th>
-            <td>{value}</td>
-            <td>
-              <meter min="0" max={maximum} value={value}>
-                {value} of {maximum}
-              </meter>
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
-}
 function PrivateCountTable({
   caption,
   values
@@ -130,6 +102,63 @@ function EngagementTable({
         ))}
       </tbody>
     </table>
+  );
+}
+function displayName(value: string): string {
+  return value.replaceAll("_", " ");
+}
+function numericCounts(values: Record<string, { count: number | null }>): Record<string, number> {
+  return Object.fromEntries(
+    Object.entries(values).flatMap(([name, metric]) =>
+      typeof metric.count === "number" ? [[name, metric.count]] : []
+    )
+  );
+}
+function BarList({
+  title,
+  values,
+  suffix = "",
+  empty = "Not enough privacy-safe volume yet."
+}: {
+  title: string;
+  values: Record<string, number>;
+  suffix?: string;
+  empty?: string;
+}) {
+  const rows = Object.entries(values)
+    .sort(([, left], [, right]) => right - left)
+    .slice(0, 7);
+  const maximum = Math.max(1, ...rows.map(([, value]) => value));
+  return (
+    <div className="analytics-bar-list">
+      <h3>{title}</h3>
+      {rows.length ? (
+        <ul>
+          {rows.map(([name, value]) => (
+            <li key={name}>
+              <div className="analytics-bar-label">
+                <span>{displayName(name)}</span>
+                <strong>{`${String(value)}${suffix}`}</strong>
+              </div>
+              <span className="analytics-bar-track" aria-hidden="true">
+                <span style={{ width: `${String(Math.max(5, (value / maximum) * 100))}%` }} />
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="analytics-empty">{empty}</p>
+      )}
+    </div>
+  );
+}
+function Kpi({ label, value, detail }: { label: string; value: string; detail?: string }) {
+  return (
+    <article className="analytics-kpi">
+      <span>{label}</span>
+      <strong>{value}</strong>
+      {detail ? <small>{detail}</small> : null}
+    </article>
   );
 }
 function paramsFrom(form: FormData) {
@@ -207,164 +236,159 @@ export function AnalyticsWorkspace() {
     event.preventDefault();
     setQuery(paramsFrom(new FormData(event.currentTarget)).toString());
   }
+  const portfolioMetrics = portfolio ? numericCounts(portfolio.metrics) : {};
+  const sourceMetrics = portfolio ? numericCounts(portfolio.breakdowns.sources) : {};
+  const countryMetrics = portfolio ? numericCounts(portfolio.breakdowns.countries) : {};
+  const pageMetrics = portfolio ? numericCounts(portfolio.breakdowns.pages) : {};
+  const sectionMetrics = portfolio ? numericCounts(portfolio.breakdowns.sections) : {};
+  const pageEngagement = portfolio
+    ? Object.fromEntries(
+        Object.entries(portfolio.engagement.pages).flatMap(([name, metric]) =>
+          typeof metric.averageSeconds === "number" ? [[name, metric.averageSeconds]] : []
+        )
+      )
+    : {};
+  const sectionEngagement = portfolio
+    ? Object.fromEntries(
+        Object.entries(portfolio.engagement.sections).flatMap(([name, metric]) =>
+          typeof metric.averageSeconds === "number" ? [[name, metric.averageSeconds]] : []
+        )
+      )
+    : {};
+  const sectionTimeSpent = portfolio
+    ? Object.fromEntries(
+        Object.entries(portfolio.engagement.sections).flatMap(([name, metric]) =>
+          typeof metric.totalSeconds === "number" ? [[name, metric.totalSeconds]] : []
+        )
+      )
+    : {};
   return (
-    <main className="workspace-page">
-      <header className="workspace-heading">
-        <p className="eyebrow">Decision support</p>
-        <h1>Analytics</h1>
-        <p>
-          Private, source-aware metrics with low-volume privacy protection and actionable gap
-          recommendations.
-        </p>
+    <main className="workspace-page analytics-page">
+      <header className="workspace-heading analytics-heading">
+        <div>
+          <p className="eyebrow">Decision support</p>
+          <h1>Analytics</h1>
+          <p>One view of portfolio reach, application momentum, interview signals, and career gaps.</p>
+        </div>
+        <span className="analytics-live-label"><i /> Private workspace</span>
       </header>
-      <form className="knowledge-entry-form" onSubmit={filter}>
-        <h2>Allowlisted filters</h2>
-        <label>
-          Role
-          <input name="role" />
-        </label>
-        <label>
-          Country
-          <input name="country" />
-        </label>
-        <label>
-          Source ID
-          <input name="source" />
-        </label>
-        <label>
-          Work model
-          <input name="workModel" />
-        </label>
-        <label>
-          Minimum match score
-          <input name="minMatch" type="number" />
-        </label>
-        <label>
-          Minimum opportunity score
-          <input name="minOpportunity" type="number" />
-        </label>
-        <label>
-          Minimum compensation
-          <input name="minComp" type="number" />
-        </label>
-        <label>
-          Maximum compensation
-          <input name="maxComp" type="number" />
-        </label>
-        <label>
-          From
-          <input name="from" type="date" />
-        </label>
-        <label>
-          To
-          <input name="to" type="date" />
-        </label>
-        <button type="submit">Apply filters</button>
-        <button
-          type="reset"
-          onClick={() => {
-            setQuery("");
-          }}
-        >
-          Clear
-        </button>
+      <form className="knowledge-entry-form analytics-filter-bar" onSubmit={filter}>
+        <div className="analytics-filter-heading">
+          <div>
+            <span className="eyebrow">View controls</span>
+            <h2>Filter the signal</h2>
+          </div>
+          <p>Filters are allowlisted and privacy-safe.</p>
+        </div>
+        <div className="analytics-filter-fields">
+          <label>Role<input name="role" placeholder="Data Engineer" /></label>
+          <label>Country<input name="country" placeholder="Rwanda" /></label>
+          <label>Source ID<input name="source" placeholder="Optional source" /></label>
+          <label>Work model<input name="workModel" placeholder="Remote" /></label>
+          <label>Min match<input name="minMatch" type="number" /></label>
+          <label>Min opportunity<input name="minOpportunity" type="number" /></label>
+          <label>Min compensation<input name="minComp" type="number" /></label>
+          <label>Max compensation<input name="maxComp" type="number" /></label>
+          <label>From<input name="from" type="date" /></label>
+          <label>To<input name="to" type="date" /></label>
+        </div>
+        <div className="analytics-filter-actions">
+          <button type="submit">Apply filters</button>
+          <button type="reset" onClick={() => { setQuery(""); }}>Clear</button>
+        </div>
       </form>
       {state === "loading" ? <p role="status">Rebuilding analytics view…</p> : null}
       {state === "error" ? <p role="alert">Private analytics could not be loaded.</p> : null}
-      {state === "ready" && portfolio ? (
-        <section>
-          <h2>Portfolio</h2>
-          <p>{portfolio.privacy.message}</p>
-          <p>
-            Anonymous visitors: {portfolio.visitors ?? "Suppressed (fewer than 5)"} · Total accepted
-            events: {portfolio.totalEvents}
-          </p>
-          <PrivateCountTable caption="Privacy-safe portfolio activity" values={portfolio.metrics} />
-          <PrivateCountTable caption="Referral sources" values={portfolio.breakdowns.sources} />
-          <PrivateCountTable caption="Visitor countries" values={portfolio.breakdowns.countries} />
-          <PrivateCountTable caption="Pages viewed" values={portfolio.breakdowns.pages} />
-          <PrivateCountTable caption="Sections viewed" values={portfolio.breakdowns.sections} />
-          <EngagementTable caption="Time spent by page" values={portfolio.engagement.pages} />
-          <EngagementTable caption="Time spent by section" values={portfolio.engagement.sections} />
-        </section>
-      ) : null}
-      {state === "ready" && applications ? (
-        <section>
-          <h2>Applications</h2>
-          <p>
-            {applications.totals.applications} applications · conversion{" "}
-            {applications.totals.conversionRate === null
-              ? "Insufficient volume"
-              : `${String(Math.round(applications.totals.conversionRate * 100))}%`}
-          </p>
-          <MetricTable caption="Application funnel" values={applications.funnel} />
-          {applications.reconciliation.length ? (
-            <>
-              <h3>Lifecycle reconciliation needed</h3>
-              <ul>
-                {applications.reconciliation.map((item) => (
-                  <li key={item.applicationId}>
-                    {item.applicationStatus} application / {item.jobStatus} job — {item.action}
-                  </li>
+      {state === "ready" && portfolio && applications && interviews && career ? (
+        <div className="analytics-dashboard">
+          <section className="analytics-hero-panel">
+            <div className="analytics-panel-heading">
+              <div>
+                <span className="eyebrow">At a glance</span>
+                <h2>What is moving?</h2>
+              </div>
+              <p>{portfolio.privacy.message}</p>
+            </div>
+            <div className="analytics-kpi-grid">
+              <Kpi label="Portfolio visitors" value={portfolio.visitors === null ? "—" : String(portfolio.visitors)} detail="Privacy-safe unique visitors" />
+              <Kpi label="Accepted events" value={String(portfolio.totalEvents)} detail="Across your public portfolio" />
+              <Kpi label="Applications" value={String(applications.totals.applications)} detail="Tracked in the workspace" />
+              <Kpi label="Interview stages" value={`${String(interviews.totals.completed)}/${String(interviews.totals.stages)}`} detail="Completed versus recorded" />
+              <Kpi label="Evidence gaps" value={String(career.gaps.length)} detail={`${String(career.sampledRequirements)} market requirements sampled`} />
+            </div>
+          </section>
+
+          <section className="analytics-panel analytics-wide">
+            <div className="analytics-panel-heading">
+              <div><span className="eyebrow">Public portfolio</span><h2>Reach & engagement</h2></div>
+              <span className="analytics-panel-note">Anonymous by design</span>
+            </div>
+            <div className="analytics-chart-grid analytics-chart-grid-four">
+              <BarList title="Activity" values={portfolioMetrics} />
+              <BarList title="Referral sources" values={sourceMetrics} />
+              <BarList title="Pages viewed" values={pageMetrics} />
+              <BarList title="Sections viewed" values={sectionMetrics} />
+            </div>
+            <div className="analytics-chart-grid analytics-chart-grid-three">
+              <BarList title="Average seconds by page" values={pageEngagement} suffix="s" />
+              <BarList title="Average seconds by section" values={sectionEngagement} suffix="s" />
+              <BarList title="Total seconds by section" values={sectionTimeSpent} suffix="s" />
+            </div>
+            <details className="analytics-data-details">
+              <summary>View countries and complete privacy-safe tables</summary>
+              <div className="analytics-table-grid">
+                <BarList title="Visitor countries" values={countryMetrics} />
+                <PrivateCountTable caption="Portfolio activity" values={portfolio.metrics} />
+                <PrivateCountTable caption="Pages" values={portfolio.breakdowns.pages} />
+                <EngagementTable caption="Page engagement detail" values={portfolio.engagement.pages} />
+                <EngagementTable caption="Section time breakdown" values={portfolio.engagement.sections} />
+              </div>
+            </details>
+          </section>
+
+          <div className="analytics-dashboard-grid">
+            <section className="analytics-panel">
+              <div className="analytics-panel-heading">
+                <div><span className="eyebrow">Career operations</span><h2>Application funnel</h2></div>
+                <strong className="analytics-score">{applications.totals.conversionRate === null ? "—" : `${String(Math.round(applications.totals.conversionRate * 100))}%`}<small>conversion</small></strong>
+              </div>
+              <BarList title={`${String(applications.totals.applications)} applications`} values={applications.funnel} />
+              <div className={`analytics-callout ${applications.reconciliation.length ? "is-warning" : ""}`}>
+                {applications.reconciliation.length ? `${String(applications.reconciliation.length)} lifecycle item(s) need reconciliation.` : "Job and application lifecycle sources agree."}
+              </div>
+              {applications.reconciliation.length ? <ul className="analytics-compact-list">{applications.reconciliation.slice(0, 4).map((item) => <li key={item.applicationId}>{item.applicationStatus} / {item.jobStatus} — {item.action}</li>)}</ul> : null}
+            </section>
+            <section className="analytics-panel">
+              <div className="analytics-panel-heading">
+                <div><span className="eyebrow">Interview readiness</span><h2>Interview signals</h2></div>
+                <strong className="analytics-score">{interviews.totals.stages ? Math.round((interviews.totals.completed / interviews.totals.stages) * 100) : 0}%<small>complete</small></strong>
+              </div>
+              <div className="analytics-chart-grid analytics-chart-grid-two">
+                <BarList title="Stage types" values={interviews.stageTypes} />
+                <BarList title="Recurring topics" values={interviews.recurringTopics} />
+              </div>
+              {interviews.recommendations.length ? <ul className="analytics-compact-list analytics-recommendations">{interviews.recommendations.slice(0, 4).map((item) => <li key={item}>{item}</li>)}</ul> : <p className="analytics-empty">Approve more debrief insights to generate recommendations.</p>}
+            </section>
+          </div>
+
+          <section className="analytics-panel analytics-wide">
+            <div className="analytics-panel-heading">
+              <div><span className="eyebrow">Career Brain</span><h2>Evidence gaps to close</h2></div>
+              <span className="analytics-panel-note">Assessment required never means absent</span>
+            </div>
+            {career.gaps.length ? (
+              <div className="analytics-gap-list">
+                {career.gaps.map((gap) => (
+                  <article key={gap.skill}>
+                    <div><h3>{gap.skill}</h3><span>{gap.status.replaceAll("_", " ")}</span></div>
+                    <strong>{gap.demandCount}<small> demand mentions</small></strong>
+                    <p>{gap.actions.join(" ") || "No action needed."}</p>
+                  </article>
                 ))}
-              </ul>
-            </>
-          ) : (
-            <p>Job and application lifecycle sources agree.</p>
-          )}
-        </section>
-      ) : null}
-      {state === "ready" && interviews ? (
-        <section>
-          <h2>Interviews</h2>
-          <p>
-            {interviews.totals.completed} of {interviews.totals.stages} stages completed.
-          </p>
-          <MetricTable caption="Interview stage types" values={interviews.stageTypes} />
-          <MetricTable
-            caption="Recurring approved debrief topics"
-            values={interviews.recurringTopics}
-          />
-          {interviews.recommendations.length ? (
-            <ul>
-              {interviews.recommendations.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
-          ) : (
-            <p>Approve more debrief insights to generate recommendations.</p>
-          )}
-        </section>
-      ) : null}
-      {state === "ready" && career ? (
-        <section>
-          <h2>Career evidence gaps</h2>
-          <p>
-            Based on {career.sampledRequirements} saved market requirements. “Assessment required”
-            never means a skill is absent.
-          </p>
-          <table>
-            <caption>Market demand compared with documented Career Brain evidence</caption>
-            <thead>
-              <tr>
-                <th>Skill</th>
-                <th>Demand</th>
-                <th>Evidence status</th>
-                <th>Recommended action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {career.gaps.map((gap) => (
-                <tr key={gap.skill}>
-                  <th scope="row">{gap.skill}</th>
-                  <td>{gap.demandCount}</td>
-                  <td>{gap.status.replaceAll("_", " ")}</td>
-                  <td>{gap.actions.join(" ") || "No action needed."}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
+              </div>
+            ) : <p className="analytics-empty">No evidence gaps were identified in the sampled requirements.</p>}
+          </section>
+        </div>
       ) : null}
     </main>
   );

@@ -94,6 +94,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           wordLimit: field.word_limit
         },
         status: approved ? "approved" : "draft",
+        generation_status: approved ? "approved" : "manual",
         owner_approved_at: approved ? new Date().toISOString() : null,
         content_hash: createHash("sha256").update(text).digest("hex")
       })

@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
+import { WorkspaceToast } from "@/components/ui/workspace-toast";
 interface Schedule {
   id: string;
   purpose: string;
@@ -9,7 +10,9 @@ interface Schedule {
   timezone: string;
   enabled: boolean;
   next_run_at: string | null;
+  profile_id: string | null;
 }
+interface SearchProfile { id: string; name: string; }
 interface Run {
   id: string;
   workflow_name: string;
@@ -27,14 +30,19 @@ interface DeadLetter {
   created_at: string;
   resolved_at: string | null;
 }
-async function mutate(endpoint: string, body: unknown, method: "POST" | "PATCH" = "POST") {
+async function mutate(
+  endpoint: string,
+  body: unknown,
+  method: "POST" | "PATCH" | "DELETE" = "POST"
+) {
   const response = await fetch(endpoint, {
     method,
     headers: {
       "content-type": "application/json",
-      "idempotency-key": `${method}-${crypto.randomUUID()}`
+      "idempotency-key": `${method}-${crypto.randomUUID()}`,
+      ...(method === "PATCH" ? { "if-match": "*" } : {})
     },
-    body: JSON.stringify(body)
+      ...(body === undefined ? {} : { body: JSON.stringify(body) })
   });
   if (!response.ok) {
     const payload = (await response.json().catch(() => ({}))) as {
@@ -47,16 +55,22 @@ export function AutomationsWorkspace() {
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [runs, setRuns] = useState<Run[]>([]);
   const [deadLetters, setDeadLetters] = useState<DeadLetter[]>([]);
+  const [profiles, setProfiles] = useState<SearchProfile[]>([]);
   const [message, setMessage] = useState("");
   const load = useCallback(async () => {
-    const response = await fetch("/api/v1/automations", { cache: "no-store" });
-    if (!response.ok) throw new Error();
+    const [response, profilesResponse] = await Promise.all([
+      fetch("/api/v1/automations", { cache: "no-store" }),
+      fetch("/api/v1/search-profiles", { cache: "no-store" })
+    ]);
+    if (!response.ok || !profilesResponse.ok) throw new Error();
     const payload = (await response.json()) as {
       data?: { schedules?: Schedule[]; runs?: Run[]; deadLetters?: DeadLetter[] };
     };
+    const profilesPayload = (await profilesResponse.json()) as { data?: { profiles?: SearchProfile[] } };
     setSchedules(payload.data?.schedules ?? []);
     setRuns(payload.data?.runs ?? []);
     setDeadLetters(payload.data?.deadLetters ?? []);
+    setProfiles(profilesPayload.data?.profiles ?? []);
   }, []);
   useEffect(() => {
     void load().catch(() => {
@@ -65,14 +79,18 @@ export function AutomationsWorkspace() {
   }, [load]);
   async function create(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    // React clears the synthetic event's currentTarget after the async request;
+    // keep the concrete form node before awaiting so reset() is reliable.
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     try {
       await mutate("/api/v1/automations", {
         purpose: form.get("purpose"),
+        profileId: form.get("profileId") || undefined,
         cronExpression: form.get("cronExpression"),
         timezone: form.get("timezone")
       });
-      event.currentTarget.reset();
+      formElement.reset();
       setMessage("Disabled schedule created. Review it before enabling.");
       await load();
     } catch (error) {
@@ -86,6 +104,35 @@ export function AutomationsWorkspace() {
       await load();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not update schedule");
+    }
+  }
+  async function edit(event: FormEvent<HTMLFormElement>, schedule: Schedule) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    try {
+      await mutate(
+        `/api/v1/automations/${schedule.id}`,
+        {
+          cronExpression: form.get("cronExpression"),
+          timezone: form.get("timezone"),
+          ...(schedule.purpose === "job_search" ? { profileId: form.get("profileId") } : {})
+        },
+        "PATCH"
+      );
+      setMessage("Automation schedule updated.");
+      await load();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not update automation");
+    }
+  }
+  async function remove(schedule: Schedule) {
+    if (!window.confirm(`Delete the ${schedule.purpose} automation? This cannot be undone.`)) return;
+    try {
+      await mutate(`/api/v1/automations/${schedule.id}`, undefined, "DELETE");
+      setMessage("Automation deleted.");
+      await load();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not delete automation");
     }
   }
   async function control(run: Run, action: "cancel" | "retry") {
@@ -113,7 +160,7 @@ export function AutomationsWorkspace() {
     }
   }
   return (
-    <main className="workspace-page">
+    <main className="workspace-page automations-page">
       <header className="workspace-heading">
         <p className="eyebrow">Durable control plane</p>
         <h1>Automations</h1>
@@ -133,13 +180,20 @@ export function AutomationsWorkspace() {
           </select>
         </label>
         <label>
+          Search profile
+          <select name="profileId" defaultValue="">
+            <option value="">Select a profile (required for job search)</option>
+            {profiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.name}</option>)}
+          </select>
+        </label>
+        <label>
           Cron schedule
           <input
             aria-describedby="cron-help"
             name="cronExpression"
             required
-            defaultValue="0 9 * * *"
-            placeholder="0 9 * * *"
+            defaultValue="30 8 * * 1-5"
+            placeholder="30 8 * * 1-5"
           />
         </label>
         <p id="cron-help">
@@ -166,6 +220,38 @@ export function AutomationsWorkspace() {
                 <button type="button" onClick={() => void toggle(schedule)}>
                   {schedule.enabled ? "Disable" : "Enable"}
                 </button>
+                <button type="button" onClick={() => void remove(schedule)}>
+                  Delete
+                </button>
+                <details>
+                  <summary>Edit schedule</summary>
+                  <form
+                    className="knowledge-entry-form"
+                    onSubmit={(event) => {
+                      void edit(event, schedule);
+                    }}
+                  >
+                    {schedule.purpose === "job_search" ? (
+                      <label>
+                        Search profile
+                        <select name="profileId" defaultValue={schedule.profile_id ?? ""} required>
+                          {profiles.map((profile) => (
+                            <option key={profile.id} value={profile.id}>{profile.name}</option>
+                          ))}
+                        </select>
+                      </label>
+                    ) : null}
+                    <label>
+                      Cron schedule
+                      <input name="cronExpression" defaultValue={schedule.cron_expression} required />
+                    </label>
+                    <label>
+                      IANA timezone
+                      <input name="timezone" defaultValue={schedule.timezone} required />
+                    </label>
+                    <button type="submit">Save schedule</button>
+                  </form>
+                </details>
               </li>
             ))}
           </ul>
@@ -239,7 +325,12 @@ export function AutomationsWorkspace() {
           <p>No dead letters.</p>
         )}
       </section>
-      {message ? <p role="status">{message}</p> : null}
+      <WorkspaceToast
+        message={message}
+        onDismiss={() => {
+          setMessage("");
+        }}
+      />
     </main>
   );
 }

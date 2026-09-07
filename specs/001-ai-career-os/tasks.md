@@ -816,3 +816,63 @@ path and independent fixture path both pass.
 - [X] T344 Map Jobgether's documented keyword, location, industry, contract, experience, remote,
   hybrid, salary, currency, and language filters from the active search profile, with safe retries
   when provider taxonomy values are invalid.
+
+### Phase 18 — Live pipeline persistence and AI application answers
+
+- [X] T345 Persist live-search run/discovery events, profile links, eligibility outcomes, source
+  provenance, canonical deduplication, and review-queue records in
+  `supabase/migrations/0138_live_pipeline_and_ai_application_answers.sql` and the live-search route.
+- [X] T346 Automatically attach PASS live-search candidates to the owner opportunity pipeline,
+  preserve run/profile/match metadata, and expose review candidates without requiring a manual save
+  in `apps/web/app/api/v1/jobs/live-search/route.ts` and
+  `apps/web/components/dashboard/jobs/index.tsx`.
+- [X] T347 Generate application-specific answers from the selected job, captured form questions,
+  selected application profile, Career Brain, and private evidence using the shared orchestrator;
+  persist evidence-linked, versioned generated answers with explicit-owner handling for sensitive
+  fields in `apps/web/lib/server/application-answer-generation.ts`,
+  `apps/web/app/api/v1/applications/[id]/forms/route.ts`, and
+  `apps/web/app/api/v1/applications/[id]/answers/generate/route.ts`.
+- [X] T348 Replace manual-first answer copy in the Application Kit with generated-answer status,
+  regenerate controls, editable owner overrides, and final approval controls in
+  `apps/web/components/dashboard/applications/detail-workspace.tsx`.
+- [X] T349 Add a Codex App Server-compatible reasoning provider route with server-selected-model
+  support, provider configuration guidance, and regression coverage in
+  `apps/web/lib/server/reasoning-provider.ts`, `.env.example`, and provider tests.
+
+### Implementation update — 2026-09-07
+
+- T345–T346 are implemented: live web discovery creates a durable `live_web` search run, persists
+  PASS candidates directly to the private opportunity pipeline with profile/run/source/match metadata,
+  records FAIL and REVIEW outcomes in `job_discovery_events`, deduplicates by canonical URL/fingerprint,
+  and presents review candidates without a second save action.
+- T347–T348 are implemented: captured application fields automatically invoke the shared orchestrator;
+  generated answers use the exact employer questions, selected job, profile, Career Brain, and private
+  evidence retrieval. Sensitive/legal fields require explicit profile or owner input. Generated answers
+  remain versioned and editable, while final approval remains owner-controlled.
+- T349 is implemented: `codex_app_server` is an OpenAI-compatible reasoning gateway adapter. Set
+  `CODEX_APP_SERVER_URL`, register model `server-default`, and the gateway may select the model; set
+  `CODEX_APP_SERVER_MODEL` when explicit server-side routing is preferred. Embeddings remain separate.
+
+### Phase 19 — Native Codex App Server subagents
+
+- [X] T350 Move repository-owned native custom agents to `.codex/agents/*.toml` and add shared
+  `.codex/config.toml` settings for the single orchestrator session.
+- [X] T351 Replace the custom TOML parser and task-specific execution path with a Codex App Server
+  stdio client that starts one ephemeral orchestrator thread and delegates through native
+  `spawn_agent`; require a child-agent event before accepting a result.
+- [X] T352 Route the shared reasoning provider through the native orchestrator when the provider is
+  `codex_app_server`; allow local Codex authentication without a secret reference and preserve the
+  OpenAI/provider path as a fallback.
+- [X] T353 Document the native Codex App Server runtime variables and add orchestrator/provider
+  regression coverage.
+
+### Implementation update — 2026-09-07 (native Codex runtime)
+
+- T350–T353 are implemented. Native mode runs `codex app-server --stdio` per bounded reasoning turn,
+  starts one parent orchestrator, and delegates to the matching role from `.codex/agents/` through
+  native `spawn_agent`. It uses the local Codex login and rejects results without a child-agent event.
+  Set `CODEX_APP_SERVER_COMMAND`, `CODEX_APP_SERVER_ARGS`, or `CODEX_PROJECT_ROOT` only for a custom
+  installation; the default command is `codex app-server --stdio`. The orchestrator uses
+  `gpt-5.6-sol`/high, while career synthesis, interview coaching, and application writing use
+  `gpt-5.6-terra`/high; job matching and career-gap analysis use `gpt-5.6-terra`/medium; writing
+  and portfolio assistance use `gpt-5.6-luna`/low.

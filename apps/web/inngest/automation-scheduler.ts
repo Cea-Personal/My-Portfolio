@@ -74,6 +74,94 @@ export const automationScheduler = inngest.createFunction(
           throw automationRun.error ?? new Error("AUTOMATION_RUN_CREATE_FAILED");
 
         try {
+          if (schedule.purpose === "job_search") {
+            const weekday = new Intl.DateTimeFormat("en-US", {
+              timeZone: String(schedule.timezone),
+              weekday: "short"
+            }).format(now);
+            if (weekday === "Sat" || weekday === "Sun") {
+              await client
+                .schema("app")
+                .from("automation_runs")
+                .update({
+                  status: "completed",
+                  finished_at: new Date().toISOString(),
+                  error_code: "WEEKEND_JOB_SEARCH_SKIPPED"
+                })
+                .eq("id", automationRun.data.id);
+              outcomes.push({ scheduleId: schedule.id, status: "weekend_skipped" });
+              return;
+            }
+            if (!schedule.profile_id) throw new Error("JOB_SEARCH_PROFILE_REQUIRED");
+            const sources = await client
+              .schema("app")
+              .from("job_sources")
+              .select("id")
+              .eq("owner_id", schedule.owner_id)
+              .eq("enabled", true);
+            if (sources.error) throw sources.error;
+            const sourceIds = (sources.data ?? [])
+              .map((row) => row.id)
+              .filter((id): id is string => typeof id === "string");
+            if (!sourceIds.length) throw new Error("NO_ENABLED_JOB_SOURCES");
+            const dateParts = new Intl.DateTimeFormat("en-US", {
+              timeZone: String(schedule.timezone),
+              year: "numeric",
+              month: "2-digit",
+              day: "2-digit"
+            })
+              .formatToParts(now)
+              .reduce<Record<string, string>>((result, part) => {
+                if (part.type !== "literal") result[part.type] = part.value;
+                return result;
+              }, {});
+            const logicalDate = `${dateParts.year}-${dateParts.month}-${dateParts.day}`;
+            const searchRun = await client
+              .schema("app")
+              .from("job_search_runs")
+              .insert({
+                owner_id: schedule.owner_id,
+                profile_id: schedule.profile_id,
+                trigger_type: "schedule",
+                logical_date: logicalDate,
+                correlation_id: correlationId,
+                status: "pending"
+              })
+              .select("id")
+              .single();
+            if (searchRun.error || !searchRun.data)
+              throw searchRun.error ?? new Error("SEARCH_RUN_CREATE_FAILED");
+            const runSources = await client
+              .schema("app")
+              .from("job_search_run_sources")
+              .insert(sourceIds.map((sourceId) => ({ run_id: searchRun.data.id, source_id: sourceId })));
+            if (runSources.error) throw runSources.error;
+            const searchOperationKey = `schedule:${schedule.id}:${dueAt}`;
+            await inngest.send({
+              name: "career/job-search.requested.v1",
+              id: searchOperationKey,
+              data: {
+                schemaVersion: 1,
+                ownerId: schedule.owner_id,
+                correlationId,
+                resourceType: "job_search_run",
+                resourceId: searchRun.data.id,
+                operationKey: searchOperationKey,
+                requestedBy: "schedule",
+                metadata: { scheduleId: schedule.id, automationRunId: automationRun.data.id },
+                runId: searchRun.data.id,
+                profileId: schedule.profile_id,
+                sourceIds
+              }
+            });
+            await client
+              .schema("app")
+              .from("automation_runs")
+              .update({ status: "running", started_at: new Date().toISOString() })
+              .eq("id", automationRun.data.id);
+            outcomes.push({ scheduleId: schedule.id, status: "job_search_dispatched" });
+            return;
+          }
           if (schedule.purpose !== "drive_sync")
             throw new Error("SCHEDULED_PURPOSE_NOT_IMPLEMENTED");
           const connection = await client

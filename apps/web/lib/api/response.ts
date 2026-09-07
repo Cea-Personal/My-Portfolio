@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCorrelationId } from "@career-os/observability";
 import { ProblemError, problem } from "@career-os/contracts";
+import { isAllowedSameOrigin } from "./guard";
 
 function isPublicApiPath(request: Request): boolean {
   return new URL(request.url).pathname.startsWith("/api/v1/public/");
@@ -35,9 +36,8 @@ function privateBoundaryProblem(request: Request) {
     path.startsWith("/api/v1") &&
     request.method !== "GET"
   ) {
-    const origin = request.headers.get("origin");
     const expectedOrigin = new URL(request.url).origin;
-    if (origin && origin !== expectedOrigin)
+    if (!isAllowedSameOrigin(request, expectedOrigin))
       return problem(
         "CSRF_ORIGIN_MISMATCH",
         "The request origin is not allowed.",

@@ -31,6 +31,8 @@ export interface JobSourceInput {
   fieldMapping?: Record<string, string>;
   query?: Record<string, string | number | boolean>;
   headers?: Readonly<Record<string, string>>;
+  method?: "GET" | "POST";
+  body?: unknown;
   fetcher?: typeof fetch;
   signal?: AbortSignal;
 }
@@ -66,8 +68,13 @@ export async function fetchSourceJson(input: JobSourceInput): Promise<unknown> {
     ? AbortSignal.any([input.signal, controller.signal])
     : controller.signal;
   try {
+    const headers = new Headers(input.headers);
+    if (input.body !== undefined && !headers.has("content-type"))
+      headers.set("content-type", "application/json");
     const response = await (input.fetcher ?? fetch)(url, {
-      ...(input.headers ? { headers: input.headers } : {}),
+      method: input.method ?? "GET",
+      ...(input.headers || input.body !== undefined ? { headers } : {}),
+      ...(input.body !== undefined ? { body: JSON.stringify(input.body) } : {}),
       redirect: "error",
       signal
     });

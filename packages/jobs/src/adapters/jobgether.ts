@@ -2,6 +2,7 @@ import { contractAdapter, fetchSourceJson, type JobSourceAdapter } from "./regis
 
 function queryValue(input: { query?: Record<string, string | number | boolean> }, key: string) {
   const value = input.query?.[key];
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
@@ -31,7 +32,7 @@ function enumValues(
 }
 
 function canonicalEndpoint(value: string | undefined): string {
-  const endpoint = value ?? "https://jobgether.com/astroapi/ai/jobs.json";
+  const endpoint = value ?? "https://jobgether.com/api/v1/jobs";
   try {
     const url = new URL(endpoint);
     if (url.hostname.toLowerCase() === "www.jobgether.com") url.hostname = "jobgether.com";
@@ -44,7 +45,8 @@ function canonicalEndpoint(value: string | undefined): string {
         path === "/astroapi/ai/jobs" ||
         path === "/astroapi/ai/jobs.json")
     ) {
-      url.pathname = "/astroapi/ai/jobs.json";
+      // Normalize legacy/deprecated settings to Jobgether's stable API path.
+      url.pathname = "/api/v1/jobs";
       url.search = "";
     }
     return url.toString();
@@ -65,6 +67,9 @@ export const jobgetherAdapter: JobSourceAdapter = contractAdapter({
     const preferredTechnology = queryValue(input, "preferredTechnology");
     const preferredCompany = queryValue(input, "preferredCompany");
     const language = queryValue(input, "language");
+    const titleReferences = slugs(
+      [...(queryList(input, "title") ?? []), ...(queryList(input, "preferredTitle") ?? [])]
+    );
     const locationValues = queryList(input, "location");
     const location = slugs(locationValues, true);
     const industries = slugs(queryList(input, "industry"));
@@ -100,15 +105,16 @@ export const jobgetherAdapter: JobSourceAdapter = contractAdapter({
     ].map((value) => value.toLowerCase());
     const remoteType = arrangementValues.some((value) => value.includes("hybrid"))
       ? "hybrid"
-      : arrangementValues.some((value) => value.includes("remote"))
-        ? "full-remote"
-        : undefined;
+      : arrangementValues.some((value) => value.includes("remote-first"))
+        ? "remote-first"
+        : arrangementValues.some((value) => value.includes("remote"))
+          ? "full-remote"
+          : undefined;
     const includeHybrid = arrangementValues.some((value) => value.includes("hybrid"));
     const minimumSalary = queryValue(input, "minimumSalary");
+    const maximumSalary = queryValue(input, "preferredSalary");
     const salaryCurrency = queryValue(input, "salaryCurrency")?.toUpperCase();
     const keyword = [
-      title,
-      preferredTitle,
       technology,
       preferredTechnology,
       preferredCompany,
@@ -116,13 +122,22 @@ export const jobgetherAdapter: JobSourceAdapter = contractAdapter({
     ]
       .filter(Boolean)
       .join(" ");
+    const fallbackKeyword = [title, preferredTitle, keyword].filter(Boolean).join(" ");
+    const maxJobAgeDays = Number(queryValue(input, "maxJobAgeDays"));
+    const cutoff = Number.isInteger(maxJobAgeDays) && maxJobAgeDays >= 1
+      ? Date.now() - maxJobAgeDays * 24 * 60 * 60 * 1_000
+      : undefined;
     const endpoint = canonicalEndpoint(input.endpoint);
-    const request = (includeStructuredFilters: boolean, includeKeyword = true) =>
-      fetchSourceJson({
-        ...input,
-        endpoint,
-        query: {
-          ...(includeKeyword && keyword ? { keyword } : {}),
+    const legacyEndpoint = endpoint === "https://jobgether.com/api/v1/jobs"
+      ? "https://jobgether.com/astroapi/ai/jobs.json"
+      : undefined;
+    const request = (page: number, includeStructuredFilters: boolean, searchKeyword?: string) =>
+      (async () => {
+        const query = {
+          ...(searchKeyword ? { keyword: searchKeyword } : {}),
+          ...(includeStructuredFilters && titleReferences
+            ? { jobReferences: titleReferences }
+            : {}),
           ...(includeStructuredFilters && location ? { locations: location } : {}),
           ...(includeStructuredFilters && industries ? { industries } : {}),
           ...(includeStructuredFilters && contractType ? { contractType } : {}),
@@ -130,36 +145,79 @@ export const jobgetherAdapter: JobSourceAdapter = contractAdapter({
           ...(includeStructuredFilters && remoteType ? { remoteType } : {}),
           ...(includeStructuredFilters && includeHybrid ? { includeHybrid: true } : {}),
           ...(includeStructuredFilters && minimumSalary ? { salaryMin: minimumSalary } : {}),
+          ...(includeStructuredFilters && maximumSalary ? { salaryMax: maximumSalary } : {}),
           ...(includeStructuredFilters && salaryCurrency ? { currency: salaryCurrency } : {}),
-          sort: "date",
-          page: 1,
+          sort: "relevance",
+          page,
           limit: 25
+        };
+        try {
+          return (await fetchSourceJson({ ...input, endpoint, query })) as {
+            jobs?: readonly Record<string, unknown>[];
+            pagination?: { hasMore?: boolean };
+          };
+        } catch (error) {
+          // The provider currently serves both the stable and legacy public
+          // paths. Keep the stable path primary, but recover if one region
+          // still returns 404 for it.
+          if (
+            !legacyEndpoint ||
+            !(error instanceof Error) ||
+            !error.message.startsWith("SOURCE_HTTP_404")
+          )
+            throw error;
+          return (await fetchSourceJson({ ...input, endpoint: legacyEndpoint, query })) as {
+            jobs?: readonly Record<string, unknown>[];
+            pagination?: { hasMore?: boolean };
+          };
         }
-      });
-    let payload: { jobs?: readonly Record<string, unknown>[] };
+      })();
+
+    const collectPages = async (includeStructuredFilters: boolean, searchKeyword?: string) => {
+      const jobs: Record<string, unknown>[] = [];
+      for (let page = 1; page <= 10; page += 1) {
+        const payload = await request(page, includeStructuredFilters, searchKeyword);
+        const pageJobs = Array.isArray(payload.jobs) ? [...payload.jobs] : [];
+        jobs.push(...pageJobs);
+        const hasMore = payload.pagination?.hasMore;
+        if (!pageJobs.length || hasMore === false || (hasMore === undefined && pageJobs.length < 25))
+          break;
+      }
+      return jobs;
+    };
+
+    let jobs: Record<string, unknown>[];
     try {
-      payload = (await request(true)) as { jobs?: readonly Record<string, unknown>[] };
+      jobs = await collectPages(true, keyword || undefined);
     } catch (error) {
-      // Jobgether rejects unknown location slugs with 400. Do not mark the
-      // source unhealthy for an optional filter the provider cannot express;
-      // the canonical eligibility filter will enforce the profile locally.
-      if (!(error instanceof Error) || !error.message.startsWith("SOURCE_HTTP_400"))
-        throw error;
-      payload = (await request(false)) as { jobs?: readonly Record<string, unknown>[] };
+      // Jobgether returns 400 for unknown taxonomy values. Retry without
+      // structured filters and let the local eligibility filter decide.
+      if (!(error instanceof Error) || !error.message.startsWith("SOURCE_HTTP_400")) throw error;
+      jobs = await collectPages(false, fallbackKeyword || undefined);
     }
-    // Location slugs and free-text combinations can be accepted by the API
-    // but still produce an empty page. Fall back to keyword-only, then the
-    // broad first page; local eligibility performs the final filtering.
-    if (!payload.jobs?.length && location)
-      payload = (await request(false)) as { jobs?: readonly Record<string, unknown>[] };
-    if (!payload.jobs?.length && keyword)
-      payload = (await request(false, false)) as { jobs?: readonly Record<string, unknown>[] };
-    return (payload.jobs ?? []).flatMap((job) => {
+    // Valid filters can still produce an empty page. Retry with a title/skill
+    // keyword, then a broad first page so the local filter can make the final
+    // decision instead of incorrectly reporting zero provider results.
+    if (!jobs.length && fallbackKeyword && fallbackKeyword !== keyword)
+      jobs = await collectPages(false, fallbackKeyword);
+    if (!jobs.length) jobs = await collectPages(false);
+
+    return jobs.flatMap((job) => {
+      const postedAt = ["postedAt", "publishedAt", "datePosted", "createdAt", "date"]
+        .map((key) => job[key])
+        .find((value): value is string => typeof value === "string" && value.trim().length > 0);
+      if (
+        cutoff !== undefined &&
+        (!postedAt || Number.isNaN(Date.parse(postedAt)) || Date.parse(postedAt) < cutoff)
+      )
+        return [];
       const id = typeof job.id === "string" ? job.id : undefined;
       const titleValue = typeof job.title === "string" ? job.title : "";
       const company = typeof job.company === "string" ? job.company : "";
       const url = typeof job.url === "string" ? job.url : undefined;
-      const description = typeof job.description === "string" ? job.description : undefined;
+      const description = ["description", "jobDescription", "job_description", "summary", "content"]
+        .map((key) => job[key])
+        .find((value): value is string => typeof value === "string" && value.trim().length > 0);
       const remote = typeof job.remote === "string" ? job.remote : undefined;
       const location = [typeof job.location === "string" ? job.location : undefined, remote]
         .filter(Boolean)

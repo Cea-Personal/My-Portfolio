@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   getJobSourceAdapter,
+  defaultJobSourceEndpoint,
   validateLinkedInJobUrl,
   validateJobSourceEndpoint,
   validateSecretReference
@@ -11,6 +12,9 @@ describe("job source configuration", () => {
     expect(getJobSourceAdapter("greenhouse", "v1")?.type).toBe("greenhouse");
     expect(getJobSourceAdapter("greenhouse", "v2")).toBeNull();
     expect(getJobSourceAdapter("unknown", "v1")).toBeNull();
+    expect(getJobSourceAdapter("arbeitnow", "v1")?.type).toBe("arbeitnow");
+    expect(getJobSourceAdapter("jobspipe", "v1")?.type).toBe("jobspipe");
+    expect(defaultJobSourceEndpoint("adzuna")).toContain("api.adzuna.com");
   });
 
   it("rejects unsafe or credential-bearing endpoints", () => {

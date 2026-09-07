@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
+import { WorkspaceToast } from "@/components/ui/workspace-toast";
 
 type ApplicationStatus =
   | "draft"
@@ -312,10 +313,25 @@ export function ApplicationDetailWorkspace({ id }: { id: string }) {
         ]
       });
       event.currentTarget.reset();
-      setMessage("Application question captured.");
+      setMessage("Application question captured and an evidence-backed answer was generated.");
       await load();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not capture field.");
+    }
+  }
+  async function regenerateAnswers() {
+    try {
+      const result = (await write(`/api/v1/applications/${id}/answers/generate`, "POST", {})) as {
+        status?: string;
+        generatedCount?: number;
+        needsOwnerInput?: number;
+      };
+      setMessage(
+        `Answers regenerated: ${String(result.generatedCount ?? 0)} generated, ${String(result.needsOwnerInput ?? 0)} need explicit owner input.`
+      );
+      await load();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not regenerate answers.");
     }
   }
   async function saveAnswer(field: Field, approved: boolean) {
@@ -531,9 +547,15 @@ export function ApplicationDetailWorkspace({ id }: { id: string }) {
       <section>
         <h2>Application form and answers</h2>
         <p>
-          Paste fields manually when automated access is unavailable. Sensitive demographic
-          responses are never inferred.
+          Paste fields manually when automated access is unavailable. The orchestrator generates
+          answers from this job, the exact questions, your selected profile, Career Brain, and
+          private evidence. Sensitive and legal responses are never inferred.
         </p>
+        <div className="workspace-actions">
+          <button type="button" onClick={() => void regenerateAnswers()}>
+            Regenerate AI answers
+          </button>
+        </div>
         <form className="knowledge-entry-form" onSubmit={(event) => void addField(event)}>
           <label>
             Application URL (optional)
@@ -613,7 +635,7 @@ export function ApplicationDetailWorkspace({ id }: { id: string }) {
                   ) : null}
                   <div className="workspace-actions">
                     <button type="button" onClick={() => void saveAnswer(field, false)}>
-                      Save draft version
+                      Save owner edit
                     </button>
                     <button type="button" onClick={() => void saveAnswer(field, true)}>
                       Approve final answer
@@ -869,7 +891,12 @@ export function ApplicationDetailWorkspace({ id }: { id: string }) {
         )}
         <p>Final submission remains an owner action outside this application.</p>
       </section>
-      {message ? <p role="status">{message}</p> : null}
+      <WorkspaceToast
+        message={message}
+        onDismiss={() => {
+          setMessage("");
+        }}
+      />
     </main>
   );
 }

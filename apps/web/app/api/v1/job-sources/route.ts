@@ -2,6 +2,7 @@ import { apiResponse } from "@/lib/api/response";
 import { withPrivateApi } from "@/lib/api/private";
 import {
   getJobSourceAdapter,
+  defaultJobSourceEndpoint,
   validateJobSourceEndpoint,
   validateSecretReference
 } from "@/lib/job-source-config";
@@ -26,7 +27,7 @@ export async function POST(request: Request) {
     const name = typeof body.name === "string" ? body.name.trim().slice(0, 160) : "";
     const adapterType = typeof body.adapterType === "string" ? body.adapterType : "";
     const adapterVersion = typeof body.adapterVersion === "string" ? body.adapterVersion : "v1";
-    const endpoint = validateJobSourceEndpoint(body.endpoint);
+    const endpoint = validateJobSourceEndpoint(body.endpoint ?? defaultJobSourceEndpoint(adapterType));
     const secretRef = validateSecretReference(body.secretRef);
     const termsNote =
       typeof body.termsNote === "string" ? body.termsNote.trim().slice(0, 1000) : "";

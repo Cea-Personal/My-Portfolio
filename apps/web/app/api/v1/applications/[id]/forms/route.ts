@@ -1,6 +1,7 @@
 import { apiResponse } from "@/lib/api/response";
 import { withPrivateApi } from "@/lib/api/private";
 import { createHash } from "node:crypto";
+import { generateApplicationAnswers } from "@/lib/server/application-answer-generation";
 export function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   return withPrivateApi(request, async ({ client, ownerId }) => {
     const { id } = await params;
@@ -76,6 +77,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       const inserted = await client.schema("app").from("application_fields").insert(rows);
       if (inserted.error) throw inserted.error;
     }
-    return apiResponse(data, request, 201);
+    let generation: Awaited<ReturnType<typeof generateApplicationAnswers>> | null = null;
+    try {
+      generation = await generateApplicationAnswers(client, ownerId, applicationId);
+    } catch (error) {
+      generation = {
+        status: "unavailable",
+        generatedCount: 0,
+        needsOwnerInput: 0,
+        evidenceCount: 0,
+        error: error instanceof Error ? error.message.slice(0, 240) : "ANSWER_GENERATION_FAILED"
+      };
+    }
+    return apiResponse({ form: data, generation }, request, 201);
   });
 }
