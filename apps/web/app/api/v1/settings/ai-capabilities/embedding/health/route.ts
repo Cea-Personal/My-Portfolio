@@ -1,13 +1,30 @@
 import { apiResponse } from "@/lib/api/response";
 import { withPrivateApi } from "@/lib/api/private";
+import { diagnosticHash, recordProviderHealthCheck } from "@/lib/server/ai-health";
 import { embedWithFallback, resolveEmbeddingProviders } from "@/lib/server/embedding-provider";
+
+const HEALTH_INPUT = "Career Brain embedding health check";
 
 export async function POST(request: Request) {
   return withPrivateApi(request, async ({ client, ownerId }) => {
     const startedAt = performance.now();
+    let providerConfigId: string | undefined;
     try {
       const providers = await resolveEmbeddingProviders(client, ownerId);
-      const result = await embedWithFallback(providers, ["Career Brain embedding health check"]);
+      providerConfigId = providers[0]?.id;
+      const result = await embedWithFallback(providers, [HEALTH_INPUT]);
+      const elapsedMs = Math.round(performance.now() - startedAt);
+      await recordProviderHealthCheck(client, {
+        ownerId,
+        providerConfigId: result.provider.id,
+        task: "embedding_health",
+        status: "completed",
+        elapsedMs,
+        inputHash: diagnosticHash(HEALTH_INPUT),
+        outputHash: diagnosticHash(
+          `${result.provider.provider}:${result.provider.model}:${String(result.vectors[0]?.length ?? 0)}`
+        )
+      });
       await recordAudit(client, ownerId, "embedding_health.succeeded", null, {
         provider: result.provider.provider,
         model: result.provider.model,
@@ -20,7 +37,7 @@ export async function POST(request: Request) {
           provider: result.provider.provider,
           model: result.provider.model,
           dimensions: result.vectors[0]?.length ?? 0,
-          elapsedMs: Math.round(performance.now() - startedAt),
+          elapsedMs,
           checkedAt: new Date().toISOString()
         },
         request
@@ -28,6 +45,16 @@ export async function POST(request: Request) {
     } catch (error) {
       const detail =
         error instanceof Error ? error.message.slice(0, 240) : "embedding health check failed";
+      const elapsedMs = Math.round(performance.now() - startedAt);
+      await recordProviderHealthCheck(client, {
+        ownerId,
+        ...(providerConfigId ? { providerConfigId } : {}),
+        task: "embedding_health",
+        status: "failed",
+        elapsedMs,
+        inputHash: diagnosticHash(HEALTH_INPUT),
+        error: detail
+      }).catch(() => undefined);
       await recordAudit(client, ownerId, "embedding_health.failed", null, {
         code: detail.split(":")[0],
         detail
@@ -37,7 +64,7 @@ export async function POST(request: Request) {
           ok: false,
           status: "unhealthy",
           detail,
-          elapsedMs: Math.round(performance.now() - startedAt),
+          elapsedMs,
           checkedAt: new Date().toISOString()
         },
         request,

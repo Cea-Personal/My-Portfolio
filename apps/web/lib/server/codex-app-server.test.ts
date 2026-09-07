@@ -48,6 +48,7 @@ describe("native Codex orchestration", () => {
       expect(schema.type).toBe("object");
       expect(schema.additionalProperties).toBe(false);
       expect(Object.keys(schema.properties ?? {}).length).toBeGreaterThan(0);
+      expect(schema.required).toEqual(Object.keys(schema.properties ?? {}));
     }
   });
 

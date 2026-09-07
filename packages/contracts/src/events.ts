@@ -2,7 +2,10 @@ import { z } from "zod";
 import { eventBaseSchema } from "./common";
 
 export const workflowEventSchema = z.object({
-  name: z.string().regex(/^[a-z0-9-]+\/[a-z0-9-]+\.v\d+$/),
+  // Event names use a namespaced, dotted convention such as
+  // `career/export.requested.v1`. Keep the namespace conservative while
+  // allowing multiple dotted action segments before the version suffix.
+  name: z.string().regex(/^[a-z0-9-]+\/[a-z0-9-]+(?:\.[a-z0-9-]+)*\.v\d+$/),
   id: z.string().min(1).max(256),
   ts: z.number().int().positive(),
   data: eventBaseSchema

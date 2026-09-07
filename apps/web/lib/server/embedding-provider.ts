@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { aiRuntimeClient } from "./ai-runtime-client";
 
 export const PRODUCTION_EMBEDDING_DIMENSIONS = 1536;
 
@@ -40,7 +41,8 @@ export async function resolveEmbeddingProviders(
   client: SupabaseClient,
   ownerId: string
 ): Promise<ResolvedEmbeddingProvider[]> {
-  const { data: capability, error } = await client
+  const runtimeClient = aiRuntimeClient(client);
+  const { data: capability, error } = await runtimeClient
     .schema("app")
     .from("ai_capability_configs")
     .select("provider_config_id,fallback_provider_config_id")
@@ -53,7 +55,7 @@ export async function resolveEmbeddingProviders(
   const ids = [capability.provider_config_id, capability.fallback_provider_config_id].filter(
     (id): id is string => typeof id === "string"
   );
-  const rows = await providerRows(client, ids);
+  const rows = await providerRows(runtimeClient, ids);
   const resolved = ids
     .map((id) => rows.find((row) => row.id === id))
     .flatMap((row) => {

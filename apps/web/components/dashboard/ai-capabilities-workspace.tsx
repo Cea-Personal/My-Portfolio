@@ -133,6 +133,45 @@ export function AiCapabilitiesWorkspace({ view = "agents" }: { view?: "agents" |
       setMessage(error instanceof Error ? error.message : "Provider registration failed");
     }
   }
+  async function updateProvider(event: FormEvent<HTMLFormElement>, providerId: string) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    try {
+      await post(
+        `/api/v1/settings/ai-providers/${providerId}`,
+        {
+          provider: form.get("provider"),
+          model: form.get("model"),
+          modelVersion: form.get("modelVersion"),
+          secretRef: form.get("secretRef"),
+          capabilities: formText(form.get("capabilities"))
+            .split(",")
+            .map((item) => item.trim())
+            .filter(Boolean)
+        },
+        "PATCH"
+      );
+      setMessage("Provider configuration updated.");
+      await load();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Provider update failed");
+    }
+  }
+  async function deleteProvider(provider: Provider) {
+    if (
+      !window.confirm(
+        `Delete ${provider.provider} · ${provider.model}? Any orchestrator or embedding configuration using it will also be removed.`
+      )
+    )
+      return;
+    try {
+      await remove(`/api/v1/settings/ai-providers/${provider.id}`);
+      setMessage("Provider removed. Historical AI-run records were preserved.");
+      await load();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Provider removal failed");
+    }
+  }
   async function configure(event: FormEvent<HTMLFormElement>, task: "orchestrator" | "embedding") {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -200,6 +239,7 @@ export function AiCapabilitiesWorkspace({ view = "agents" }: { view?: "agents" |
           ? "Orchestrator health check completed."
           : (payload.data.detail ?? "Orchestrator health check failed.")
       );
+      await load();
     } catch (error) {
       const detail = error instanceof Error ? error.message : "Orchestrator health check failed.";
       setHealth({
@@ -233,6 +273,7 @@ export function AiCapabilitiesWorkspace({ view = "agents" }: { view?: "agents" |
           ? "Embedding health check completed."
           : (payload.data.detail ?? "Embedding health check failed.")
       );
+      await load();
     } catch (error) {
       const detail = error instanceof Error ? error.message : "Embedding health check failed.";
       setEmbeddingHealth({
@@ -316,6 +357,59 @@ export function AiCapabilitiesWorkspace({ view = "agents" }: { view?: "agents" |
                       : `Version ${provider.model_version}`}{" "}
                     · {provider.capabilities.join(", ")}
                   </p>
+                  <details>
+                    <summary>Edit provider</summary>
+                    <form
+                      className="knowledge-entry-form"
+                      onSubmit={(event) => void updateProvider(event, provider.id)}
+                    >
+                      <label>
+                        Provider identifier
+                        <input name="provider" required defaultValue={provider.provider} />
+                      </label>
+                      <label>
+                        Model
+                        <input name="model" required defaultValue={provider.model} />
+                      </label>
+                      <label>
+                        Model version (optional)
+                        <input
+                          name="modelVersion"
+                          defaultValue={
+                            provider.model_version === "unversioned"
+                              ? ""
+                              : provider.model_version
+                          }
+                        />
+                      </label>
+                      <label>
+                        Server secret environment variable
+                        <input
+                          name="secretRef"
+                          pattern="[A-Z][A-Z0-9_]{2,80}"
+                          placeholder="Leave blank to retain the current reference"
+                        />
+                      </label>
+                      <label>
+                        Supported capabilities
+                        <input
+                          name="capabilities"
+                          required
+                          defaultValue={provider.capabilities.join(", ")}
+                        />
+                      </label>
+                      <div className="workspace-actions">
+                        <button type="submit">Save provider</button>
+                        <button
+                          type="button"
+                          className="button-secondary"
+                          onClick={() => void deleteProvider(provider)}
+                        >
+                          Delete provider
+                        </button>
+                      </div>
+                    </form>
+                  </details>
                 </li>
               ))}
             </ul>

@@ -39,6 +39,7 @@ const TASK_TO_NATIVE_ROLE = {
 type JsonSchema = {
   type: "object" | "array" | "string" | "number" | "boolean" | Array<"string" | "null">;
   properties?: Record<string, JsonSchema>;
+  required?: string[];
   items?: JsonSchema;
   additionalProperties?: false;
 };
@@ -50,6 +51,7 @@ const nullableTextSchema = (): JsonSchema => ({ type: ["string", "null"] });
 const objectSchema = (properties: Record<string, JsonSchema>): JsonSchema => ({
   type: "object",
   properties,
+  required: Object.keys(properties),
   additionalProperties: false
 });
 const objectListSchema = (properties: Record<string, JsonSchema>): JsonSchema => ({
@@ -286,7 +288,7 @@ export function buildOrchestratorPrompt(
     "Do not answer the request yourself. Wait for the child agent to finish, then return the child's JSON object unchanged.",
     "Use only the supplied evidence and follow the child agent's privacy and grounding instructions.",
     "The caller requires a JSON object and will reject prose outside JSON.",
-    `Use only these top-level output keys: ${outputKeys}. Omit a key when the evidence does not support it.`,
+    `Return every one of these top-level output keys: ${outputKeys}. Use an empty string, empty array, or null where the schema permits it when evidence does not support a value.`,
     JSON.stringify({ task, nativeRole, request: input })
   ].join("\n");
 }

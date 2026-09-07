@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { runCodexOrchestrator } from "./codex-app-server";
+import { aiRuntimeClient } from "./ai-runtime-client";
 
 interface ProviderRow {
   id: string;
@@ -49,10 +50,11 @@ export async function resolveReasoningProviders(
   ownerId: string,
   task: string
 ): Promise<ResolvedReasoningProvider[]> {
+  const runtimeClient = aiRuntimeClient(client);
   // All reasoning work is delegated to the single owner-configured
   // orchestrator. The task-specific lookup is retained only as a migration
   // fallback for owners who have not saved an orchestrator configuration yet.
-  const orchestratorResult = await client
+  const orchestratorResult = await runtimeClient
     .schema("app")
     .from("ai_capability_configs")
     .select(
@@ -66,7 +68,7 @@ export async function resolveReasoningProviders(
   let capability = orchestratorResult.data as CapabilityRow | null;
   const configuredTask = capability ? "orchestrator" : task;
   if (!capability) {
-    const legacyResult = await client
+    const legacyResult = await runtimeClient
       .schema("app")
       .from("ai_capability_configs")
       .select(
@@ -83,7 +85,7 @@ export async function resolveReasoningProviders(
   const ids = [capability.provider_config_id, capability.fallback_provider_config_id].filter(
     (id): id is string => typeof id === "string"
   );
-  const providerResult = await client
+  const providerResult = await runtimeClient
     .schema("app")
     .from("ai_provider_configs")
     .select("id,provider,model,model_version,capabilities,secret_ref")
