@@ -131,10 +131,45 @@ function parseJsonObject(content: string): Record<string, unknown> {
     .trim()
     .replace(/^```(?:json)?\s*/i, "")
     .replace(/\s*```$/, "");
-  const parsed: unknown = JSON.parse(normalized);
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
-    throw new Error("AI_PROVIDER_RESPONSE_INVALID");
-  return parsed as Record<string, unknown>;
+  let candidateStart = -1;
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  let lastObject: Record<string, unknown> | undefined;
+  for (let index = 0; index < normalized.length; index += 1) {
+    const character = normalized[index];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (character === "\\") escaped = true;
+      else if (character === '"') inString = false;
+      continue;
+    }
+    if (character === '"' && candidateStart >= 0) {
+      inString = true;
+      continue;
+    }
+    if (character === "{" && depth === 0) {
+      candidateStart = index;
+      depth = 1;
+      continue;
+    }
+    if (candidateStart < 0) continue;
+    if (character === "{") depth += 1;
+    if (character !== "}") continue;
+    depth -= 1;
+    if (depth !== 0) continue;
+    try {
+      const parsed: unknown = JSON.parse(normalized.slice(candidateStart, index + 1));
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        lastObject = parsed as Record<string, unknown>;
+      }
+    } catch {
+      // Ignore an incomplete/prose brace and continue looking for a complete object.
+    }
+    candidateStart = -1;
+  }
+  if (!lastObject) throw new Error("AI_PROVIDER_RESPONSE_INVALID_JSON");
+  return lastObject;
 }
 
 export async function generateReasoningJson(

@@ -79,4 +79,33 @@ describe("reasoning provider", () => {
       { timeoutMs: 30_000 }
     );
   });
+
+  it("uses the last complete object when a native stream includes multiple JSON messages", async () => {
+    runCodexOrchestratorMock.mockResolvedValue({
+      text: '{"status":"child"}{"status":"orchestrator"}',
+      model: "gpt-test",
+      threadId: "thread-test"
+    });
+    const provider: ResolvedReasoningProvider = {
+      id: "codex-provider",
+      provider: "codex_app_server",
+      model: "server-default",
+      model_version: "unversioned",
+      capabilities: ["reasoning"],
+      secret_ref: null,
+      apiKey: "",
+      endpoint: "codex://local",
+      creativity: 0.2,
+      maxTokens: 2_000,
+      timeoutMs: 30_000,
+      retryLimit: 0
+    };
+    const result = await generateReasoningJson(
+      [provider],
+      "Return JSON",
+      { healthCheck: true },
+      { task: "writing_assistance" }
+    );
+    expect(result.output).toEqual({ status: "orchestrator" });
+  });
 });

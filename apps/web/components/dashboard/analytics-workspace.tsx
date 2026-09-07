@@ -32,6 +32,8 @@ interface PortfolioInsights {
   insights: PortfolioInsight[];
   nextSteps: string[];
   generatedAt: string;
+  fallback?: boolean;
+  fallbackReason?: string;
 }
 interface ApplicationReport {
   funnel: Record<string, number>;
@@ -174,6 +176,7 @@ export function AnalyticsWorkspace() {
   const [career, setCareer] = useState<GapReport | null>(null);
   const [jobs, setJobs] = useState<JobReport | null>(null);
   const [portfolioInsights, setPortfolioInsights] = useState<PortfolioInsights | null>(null);
+  const [insightsError, setInsightsError] = useState("");
   const [insightsState, setInsightsState] = useState<"idle" | "loading" | "ready" | "error">(
     "idle"
   );
@@ -227,6 +230,7 @@ export function AnalyticsWorkspace() {
   }, [load]);
   const loadInsights = useCallback(async () => {
     setInsightsState("loading");
+    setInsightsError("");
     const params = new URLSearchParams(query);
     for (const key of [
       "role",
@@ -240,6 +244,10 @@ export function AnalyticsWorkspace() {
     ]) {
       params.delete(key);
     }
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => {
+      controller.abort();
+    }, 130_000);
     try {
       const response = await fetch(
         `/api/v1/analytics/portfolio/insights${params.size ? `?${params.toString()}` : ""}`,
@@ -249,16 +257,32 @@ export function AnalyticsWorkspace() {
             "content-type": "application/json",
             "idempotency-key": `portfolio-insights-${crypto.randomUUID()}`
           },
-          body: "{}"
+          body: "{}",
+          signal: controller.signal
         }
       );
-      if (!response.ok) throw new Error();
-      const payload = (await response.json()) as { data?: PortfolioInsights };
-      if (!payload.data) throw new Error();
+      const payload = (await response.json().catch(() => ({}))) as {
+        data?: PortfolioInsights & { detail?: string; code?: string };
+      };
+      if (!response.ok) {
+        throw new Error(
+          payload.data?.detail ?? payload.data?.code ?? `Request failed (${String(response.status)})`
+        );
+      }
+      if (!payload.data) throw new Error("The analytics subagent returned no output.");
       setPortfolioInsights(payload.data);
       setInsightsState("ready");
-    } catch {
+    } catch (error) {
+      setInsightsError(
+        error instanceof DOMException && error.name === "AbortError"
+          ? "The analytics subagent timed out after 130 seconds. Check the orchestrator health and try again."
+          : error instanceof Error
+            ? error.message
+            : "The analytics subagent could not complete the request."
+      );
       setInsightsState("error");
+    } finally {
+      window.clearTimeout(timeout);
     }
   }, [query]);
   useEffect(() => {
@@ -447,7 +471,8 @@ export function AnalyticsWorkspace() {
               ) : null}
               {insightsState === "error" ? (
                 <p role="alert">
-                  Insights are temporarily unavailable. The summary dashboard is still available.
+                  {insightsError ||
+                    "Insights are temporarily unavailable. The summary dashboard is still available."}
                 </p>
               ) : null}
               {insightsState === "ready" && portfolioInsights ? (
@@ -483,8 +508,9 @@ export function AnalyticsWorkspace() {
                     </div>
                   ) : null}
                   <small>
-                    Generated {new Date(portfolioInsights.generatedAt).toLocaleString()} from
-                    aggregate portfolio activity only.
+                    {portfolioInsights.fallback
+                      ? `Aggregate fallback readout. The subagent was unavailable: ${portfolioInsights.fallbackReason ?? "unknown error"}`
+                      : `Generated ${new Date(portfolioInsights.generatedAt).toLocaleString()} from aggregate portfolio activity only.`}
                   </small>
                 </>
               ) : null}

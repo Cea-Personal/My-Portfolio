@@ -9,12 +9,35 @@ import {
   visitDetails
 } from "@/lib/server/portfolio-analytics";
 
+// The insight request waits for the orchestrator and its native child agent.
+// Allow enough time for that round trip while keeping the client bounded.
+export const maxDuration = 180;
+
 interface Insight {
   title: string;
   observation: string;
   implication: string;
   action: string;
   confidence: string;
+}
+
+interface InsightInput {
+  totalVisits: number;
+  totalEvents: number;
+  eventCounts: Record<string, number>;
+  pageViews: Record<string, number>;
+  sectionViews: Record<string, number>;
+  pageEngagement: Record<string, {
+    samples: number;
+    totalSeconds: number;
+    averageSeconds: number;
+  }>;
+  sectionEngagement: Record<string, {
+    samples: number;
+    totalSeconds: number;
+    averageSeconds: number;
+  }>;
+  visitDurationsSeconds: number[];
 }
 
 export async function POST(request: Request) {
@@ -50,7 +73,7 @@ export async function POST(request: Request) {
         .map((event) => event.session_id)
         .filter((sessionId): sessionId is string => Boolean(sessionId))
     ).size;
-    const input = {
+    const input: InsightInput = {
       totalVisits,
       totalEvents: portfolioEvents.length,
       eventCounts: countBy(portfolioEvents.map((event) => event.event_name)),
@@ -76,8 +99,15 @@ export async function POST(request: Request) {
     };
     try {
       const providers = await resolveReasoningProviders(client, ownerId, "portfolio_analytics");
+      // Portfolio analytics is a small aggregate request. Bound each attempt
+      // so a stalled native child does not block the dashboard for minutes.
+      const boundedProviders = providers.map((provider) => ({
+        ...provider,
+        timeoutMs: Math.min(provider.timeoutMs, 45_000),
+        retryLimit: 0
+      }));
       const generated = await generateReasoningJson(
-        providers,
+        boundedProviders,
         [
           "You are the public portfolio analytics subagent.",
           "Analyze only the supplied aggregate metrics.",
@@ -86,7 +116,7 @@ export async function POST(request: Request) {
           "Limit insights to five and nextSteps to four.",
           "Do not mention or infer visitor identity, country, referral source, demographics, or intent."
         ].join(" "),
-        input,
+        { ...input },
         { task: "portfolio_analytics" }
       );
       const output = generated.output;
@@ -130,13 +160,75 @@ export async function POST(request: Request) {
       await recordAudit(client, ownerId, "portfolio_insights.failed", detail, {
         code: detail.split(":")[0]
       });
-      return apiResponse({ code: detail.split(":")[0], detail }, request, 503);
+      const fallback = fallbackInsights(input, detail);
+      return apiResponse(
+        {
+          ...fallback,
+          generatedAt: new Date().toISOString(),
+          filters,
+          fallback: true,
+          fallbackReason: detail
+        },
+        request
+      );
     }
   });
 }
 
 function text(value: unknown): string {
   return typeof value === "string" ? value.trim().slice(0, 700) : "";
+}
+
+function fallbackInsights(input: InsightInput, reason: string) {
+  const sections = Object.entries(input.sectionEngagement).sort(
+    ([, left], [, right]) => right.totalSeconds - left.totalSeconds
+  );
+  const topSection = sections[0];
+  const averageVisit = input.visitDurationsSeconds.length
+    ? Math.round(
+        input.visitDurationsSeconds.reduce((total, seconds) => total + seconds, 0) /
+          input.visitDurationsSeconds.length
+      )
+    : 0;
+  const insights: Insight[] = [];
+  if (input.totalVisits) {
+    insights.push({
+      title: "Portfolio activity",
+      observation: `${String(input.totalVisits)} visit${input.totalVisits === 1 ? "" : "s"} generated ${String(input.totalEvents)} tracked event${input.totalEvents === 1 ? "" : "s"}.`,
+      implication: "The current sample is enough to monitor movement, but not to claim broad audience preferences.",
+      action: "Continue collecting privacy-safe visits before making major content decisions.",
+      confidence: "Descriptive only"
+    });
+  }
+  if (topSection) {
+    insights.push({
+      title: "Most measured attention",
+      observation: `${topSection[0]} has the highest recorded section dwell time at ${String(topSection[1].totalSeconds)} seconds across ${String(topSection[1].samples)} sample${topSection[1].samples === 1 ? "" : "s"}.`,
+      implication: "This section currently receives the strongest measured attention in the available sample.",
+      action: "Keep its explanation clear and connect it to a useful next action.",
+      confidence: topSection[1].samples >= 3 ? "Moderate" : "Low volume"
+    });
+  }
+  if (averageVisit) {
+    insights.push({
+      title: "Visit duration",
+      observation: `Measured visits average ${String(averageVisit)} seconds in the available session sample.`,
+      implication: "Session duration is a directional engagement signal, not a measure of visitor intent.",
+      action: "Compare this trend over time with section dwell rather than judging a single visit.",
+      confidence: input.visitDurationsSeconds.length >= 3 ? "Moderate" : "Low volume"
+    });
+  }
+  return {
+    summary: input.totalVisits
+      ? `The portfolio has ${String(input.totalVisits)} measured visit${input.totalVisits === 1 ? "" : "s"}. This readout uses the recorded aggregate activity only.`
+      : "There is not enough portfolio activity yet for a meaningful pattern readout.",
+    insights: insights.slice(0, 5),
+    nextSteps: [
+      "Verify the portfolio analytics orchestrator health to restore generated insights.",
+      "Collect more visits before treating a section trend as representative."
+    ],
+    fallbackReason: reason
+  };
 }
 
 async function recordAudit(
