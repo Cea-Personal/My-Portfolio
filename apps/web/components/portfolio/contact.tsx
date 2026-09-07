@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 
-export function Contact({ email }: { email?: string }) {
+export function Contact() {
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [message, setMessage] = useState("");
 
@@ -29,11 +29,7 @@ export function Contact({ email }: { email?: string }) {
       return;
     }
     setStatus("error");
-    setMessage(
-      email
-        ? "That didn’t send. Please try again or use the email link below."
-        : "That didn’t send. Please try again when the contact service is available."
-    );
+    setMessage("That didn’t send. Please try again when the contact service is available.");
   }
 
   return (
@@ -42,11 +38,6 @@ export function Contact({ email }: { email?: string }) {
         <p className="eyebrow">Start a conversation</p>
         <h2 id="contact-title">Let&apos;s build something useful.</h2>
         <p>Have a data platform, engineering, or AI challenge worth solving?</p>
-        {email ? (
-          <a className="contact-email" href={`mailto:${email}`}>
-            {email}
-          </a>
-        ) : null}
       </div>
       <form
         className="contact-form"

@@ -9,9 +9,17 @@ export function GET(request: Request) {
       .from("journal_entries")
       .select("*, journal_versions(*), journal_insights(*)")
       .eq("owner_id", ownerId)
+      .is("deleted_at", null)
       .order("created_at", { ascending: false });
     if (error) throw error;
-    return apiResponse({ entries: data ?? [] }, request);
+    const entries = (data ?? []).map((entry) => ({
+      ...entry,
+      // Older rows and relationship failures can surface nullable child
+      // collections. Keep the client contract array-shaped.
+      journal_versions: Array.isArray(entry.journal_versions) ? entry.journal_versions : [],
+      journal_insights: Array.isArray(entry.journal_insights) ? entry.journal_insights : []
+    }));
+    return apiResponse({ entries }, request);
   });
 }
 export async function POST(request: Request) {

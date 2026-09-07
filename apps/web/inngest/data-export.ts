@@ -25,15 +25,30 @@ export const dataExport = inngest.createFunction(
     const client = workflowClient();
     if (!client) throw new Error("EXPORT_CONFIGURATION_MISSING");
     const envelope = event.data as Record<string, unknown>;
-    const run = await step.run("begin-run", async () =>
-      beginRun(client, { id: event.id, name: "career/export.requested.v1", data: envelope })
-    );
+    const exportId = typeof envelope.resourceId === "string" ? envelope.resourceId : "";
+    let run: Awaited<ReturnType<typeof beginRun>>;
+    try {
+      run = await step.run("begin-run", async () =>
+        beginRun(client, { id: event.id, name: "career/export.requested.v1", data: envelope })
+      );
+    } catch (error) {
+      // A failure before beginRun (for example a missing owner authorization)
+      // previously left the request permanently queued with no UI diagnostic.
+      if (exportId) {
+        await client
+          .schema("app")
+          .from("export_requests")
+          .update({ status: "failed" })
+          .eq("id", exportId)
+          .eq("owner_id", typeof envelope.ownerId === "string" ? envelope.ownerId : "");
+      }
+      throw error;
+    }
     if (run.cancelled) {
       await finishRun(client, run.id, "cancelled");
       return { status: "cancelled" as const };
     }
     if (run.alreadyComplete) return { status: "unchanged" as const };
-    const exportId = typeof envelope.resourceId === "string" ? envelope.resourceId : "";
     const operationKey =
       typeof envelope.operationKey === "string" ? envelope.operationKey : `export:${exportId}`;
     return step.run("build-private-export", async () => {
@@ -44,8 +59,15 @@ export const dataExport = inngest.createFunction(
         .eq("id", exportId)
         .eq("owner_id", run.ownerId)
         .maybeSingle();
-      if (request.error || !request.data)
+      if (request.error || !request.data) {
+        await client
+          .schema("app")
+          .from("export_requests")
+          .update({ status: "failed" })
+          .eq("id", exportId)
+          .eq("owner_id", run.ownerId);
         throw request.error ?? new Error("EXPORT_REQUEST_NOT_FOUND");
+      }
       await client
         .schema("app")
         .from("export_requests")

@@ -10,6 +10,7 @@ const taskTypes = new Set([
   "compensation",
   "interview_preparation",
   "writing_assistance",
+  "portfolio_analytics",
   "embedding",
   "orchestrator"
 ]);
@@ -38,7 +39,7 @@ export async function PATCH(
       );
     const creativity = Number(body.creativity ?? 0.2);
     const lengthLimit = Number(body.lengthLimit ?? 2000);
-    const timeoutMs = Number(body.timeoutMs ?? 30000);
+    const timeoutMs = Number(body.timeoutMs ?? (taskType === "orchestrator" ? 120000 : 30000));
     const retryLimit = Number(body.retryLimit ?? 2);
     if (
       !Number.isFinite(creativity) ||
@@ -108,5 +109,26 @@ export async function PATCH(
       .single();
     if (error) throw error;
     return apiResponse(data, request);
+  });
+}
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ taskType: string }> }
+) {
+  return withPrivateApi(request, async ({ client, ownerId }) => {
+    const { taskType } = await params;
+    if (!taskTypes.has(taskType))
+      return apiResponse({ code: "INVALID_CAPABILITY_CONFIGURATION" }, request, 400);
+    const { data, error } = await client
+      .schema("app")
+      .from("ai_capability_configs")
+      .delete()
+      .eq("owner_id", ownerId)
+      .eq("task_type", taskType)
+      .select("id")
+      .maybeSingle();
+    if (error) throw error;
+    return apiResponse({ deleted: Boolean(data), taskType }, request, data ? 200 : 404);
   });
 }

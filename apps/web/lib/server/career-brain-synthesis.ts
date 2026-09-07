@@ -145,6 +145,7 @@ async function loadInputs(client: SupabaseClient, ownerId: string) {
       .from("journal_entries")
       .select("id,title,entry_date,updated_at,journal_versions(version,text)")
       .eq("owner_id", ownerId)
+      .is("deleted_at", null)
       .order("entry_date", { ascending: false })
       .limit(200),
     client

@@ -9,6 +9,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       .select("id")
       .eq("id", entryId)
       .eq("owner_id", ownerId)
+      .is("deleted_at", null)
       .maybeSingle();
     if (!entry) return apiResponse(null, request, 404);
     const { data: version } = await client

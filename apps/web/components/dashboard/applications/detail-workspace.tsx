@@ -295,25 +295,24 @@ export function ApplicationDetailWorkspace({ id }: { id: string }) {
   }
   async function addField(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const target = event.currentTarget;
+    const form = new FormData(target);
     try {
-      await write(`/api/v1/applications/${id}/forms`, "POST", {
+      const result = (await write(`/api/v1/applications/${id}/forms`, "POST", {
         sourceUrl: form.get("sourceUrl"),
         accessMethod: "manual",
-        fields: [
-          {
-            label: form.get("label"),
-            fieldType: form.get("fieldType"),
-            required: form.get("required") === "on",
-            sensitive: form.get("sensitive") === "on",
-            category: form.get("category"),
-            charLimit: Number(form.get("charLimit")) || null,
-            wordLimit: Number(form.get("wordLimit")) || null
-          }
-        ]
-      });
-      event.currentTarget.reset();
-      setMessage("Application question captured and an evidence-backed answer was generated.");
+        questionsText: form.get("questionsText"),
+        fieldType: form.get("fieldType"),
+        required: form.get("required") === "on",
+        sensitive: form.get("sensitive") === "on",
+        category: form.get("category"),
+        charLimit: Number(form.get("charLimit")) || null,
+        wordLimit: Number(form.get("wordLimit")) || null
+      })) as { addedQuestionCount?: number; generation?: { generatedCount?: number } };
+      target.reset();
+      setMessage(
+        `${String(result.addedQuestionCount ?? 0)} job-specific question(s) captured. ${String(result.generation?.generatedCount ?? 0)} answer(s) generated.`
+      );
       await load();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not capture field.");
@@ -547,9 +546,11 @@ export function ApplicationDetailWorkspace({ id }: { id: string }) {
       <section>
         <h2>Application form and answers</h2>
         <p>
-          Paste fields manually when automated access is unavailable. The orchestrator generates
-          answers from this job, the exact questions, your selected profile, Career Brain, and
-          private evidence. Sensitive and legal responses are never inferred.
+          Add questions from this job&apos;s application form when automated access is unavailable.
+          Separate each question with a blank paragraph. They are stored only on this application,
+          never in your application profile. The orchestrator generates an answer for each question
+          from this job, your selected profile, Career Brain, and private evidence. Sensitive and
+          legal responses are never inferred.
         </p>
         <div className="workspace-actions">
           <button type="button" onClick={() => void regenerateAnswers()}>
@@ -562,8 +563,18 @@ export function ApplicationDetailWorkspace({ id }: { id: string }) {
             <input name="sourceUrl" type="url" />
           </label>
           <label>
-            Question / field label
-            <textarea name="label" required rows={3} />
+            Additional employer questions
+            <textarea
+              name="questionsText"
+              required
+              rows={8}
+              placeholder={
+                "Why do you want to work here?\n\nDescribe your experience with Airflow.\n\nWhat are your salary expectations?"
+              }
+            />
+            <small>
+              Use one blank line between questions. Each paragraph becomes a separate answer field.
+            </small>
           </label>
           <label>
             Field type

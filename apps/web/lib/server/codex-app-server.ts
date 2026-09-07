@@ -32,8 +32,173 @@ const TASK_TO_NATIVE_ROLE = {
   document_composition: "application_writer",
   compensation: "compensation_analyst",
   interview_preparation: "interview_coach",
-  writing_assistance: "writing_editor"
+  writing_assistance: "writing_editor",
+  portfolio_analytics: "portfolio_analytics"
 } as const;
+
+type JsonSchema = {
+  type: "object" | "array" | "string" | "number" | "boolean" | Array<"string" | "null">;
+  properties?: Record<string, JsonSchema>;
+  items?: JsonSchema;
+  additionalProperties?: false;
+};
+
+const textSchema = (): JsonSchema => ({ type: "string" });
+const numberSchema = (): JsonSchema => ({ type: "number" });
+const textListSchema = (): JsonSchema => ({ type: "array", items: textSchema() });
+const nullableTextSchema = (): JsonSchema => ({ type: ["string", "null"] });
+const objectSchema = (properties: Record<string, JsonSchema>): JsonSchema => ({
+  type: "object",
+  properties,
+  additionalProperties: false
+});
+const objectListSchema = (properties: Record<string, JsonSchema>): JsonSchema => ({
+  type: "array",
+  items: objectSchema(properties)
+});
+
+const TASK_OUTPUT_SCHEMAS: Readonly<Record<string, JsonSchema>> = {
+  public_qa: objectSchema({
+    answer: textSchema(),
+    sources: textListSchema(),
+    confidence: textSchema(),
+    status: textSchema(),
+    message: textSchema()
+  }),
+  role_fit: objectSchema({
+    summary: textSchema(),
+    matches: textListSchema(),
+    gaps: textListSchema(),
+    evidence: textListSchema(),
+    recommendations: textListSchema(),
+    confidence: textSchema()
+  }),
+  evidence_extraction: objectSchema({
+    cvSummary: textSchema(),
+    portfolioSummary: textSchema(),
+    about: textSchema(),
+    experiences: objectListSchema({
+      organization: textSchema(),
+      role: textSchema(),
+      period: textSchema(),
+      summary: textSchema(),
+      responsibilities: textListSchema(),
+      achievements: textListSchema(),
+      projects: textListSchema(),
+      technologies: textListSchema()
+    }),
+    projects: objectListSchema({
+      title: textSchema(),
+      summary: textSchema(),
+      role: textSchema(),
+      outcome: textSchema(),
+      technologies: textListSchema(),
+      url: textSchema()
+    }),
+    education: objectListSchema({
+      qualification: textSchema(),
+      institution: textSchema(),
+      period: textSchema(),
+      summary: textSchema()
+    }),
+    certifications: objectListSchema({
+      name: textSchema(),
+      issuer: textSchema(),
+      date: textSchema(),
+      summary: textSchema()
+    }),
+    technicalSkills: objectListSchema({
+      category: textSchema(),
+      skills: textListSchema(),
+      summary: textSchema()
+    })
+  }),
+  career_gap: objectSchema({
+    summary: textSchema(),
+    gaps: objectListSchema({
+      skill: textSchema(),
+      evidenceGap: textSchema(),
+      recommendations: textListSchema(),
+      confidence: textSchema()
+    }),
+    recommendations: textListSchema()
+  }),
+  job_scoring: objectSchema({
+    score: numberSchema(),
+    eligibility: textSchema(),
+    summary: textSchema(),
+    matches: textListSchema(),
+    gaps: textListSchema(),
+    uncertainties: textListSchema(),
+    recommendations: textListSchema()
+  }),
+  document_composition: objectSchema({
+    answers: objectListSchema({
+      fieldId: textSchema(),
+      answer: textSchema(),
+      evidenceIds: textListSchema(),
+      explanation: textSchema()
+    })
+  }),
+  compensation: objectSchema({
+    summary: textSchema(),
+    currency: textSchema(),
+    range: textSchema(),
+    recommendation: textSchema(),
+    sources: textListSchema(),
+    uncertainties: textListSchema()
+  }),
+  interview_preparation: objectSchema({
+    stagePurpose: textSchema(),
+    roleRequirements: textListSchema(),
+    likelyTopics: textListSchema(),
+    questions: objectListSchema({
+      question: textSchema(),
+      probability: textSchema(),
+      rationale: textSchema(),
+      evidenceFactId: nullableTextSchema()
+    }),
+    weakAreas: textListSchema(),
+    companyResearch: textSchema(),
+    revisionTopics: textListSchema(),
+    behavioralPreparation: textSchema(),
+    interviewerQuestions: textListSchema(),
+    compensationPreparation: textSchema(),
+    personalNotes: textSchema(),
+    storyDrafts: objectListSchema({
+      title: textSchema(),
+      situation: textSchema(),
+      task: textSchema(),
+      action: textSchema(),
+      result: textSchema(),
+      evidenceIds: textListSchema()
+    })
+  }),
+  writing_assistance: objectSchema({
+    status: textSchema(),
+    message: textSchema(),
+    content: textSchema(),
+    editedText: textSchema(),
+    suggestions: textListSchema()
+  }),
+  portfolio_analytics: objectSchema({
+    summary: textSchema(),
+    insights: objectListSchema({
+      title: textSchema(),
+      observation: textSchema(),
+      implication: textSchema(),
+      action: textSchema(),
+      confidence: textSchema()
+    }),
+    nextSteps: textListSchema()
+  })
+};
+
+export function codexOutputSchemaForTask(task: string): JsonSchema {
+  const schema = TASK_OUTPUT_SCHEMAS[task];
+  if (!schema) throw new Error(`CODEX_OUTPUT_SCHEMA_UNKNOWN:${task}`);
+  return schema;
+}
 
 export function codexAgentRoleForTask(task: string): string {
   if (!Object.prototype.hasOwnProperty.call(TASK_TO_NATIVE_ROLE, task)) {
@@ -99,17 +264,29 @@ function requestError(message: string): Error {
   return new Error(`CODEX_APP_SERVER_REQUEST_FAILED:${message}`);
 }
 
+export function codexErrorMessage(params: Record<string, unknown> | undefined): string {
+  const nestedError = params?.error;
+  const nestedMessage =
+    nestedError && typeof nestedError === "object"
+      ? (nestedError as Record<string, unknown>).message
+      : undefined;
+  const detail = nestedMessage ?? params?.message;
+  return typeof detail === "string" ? detail : "server error";
+}
+
 export function buildOrchestratorPrompt(
   task: string,
   input: Record<string, unknown>,
   nativeRole = codexAgentRoleForTask(task)
 ): string {
+  const outputKeys = Object.keys(codexOutputSchemaForTask(task).properties ?? {}).join(", ");
   return [
     "You are the Career OS orchestrator.",
     `Delegate this request to exactly one native Codex custom agent named ${nativeRole} using the native spawn_agent tool.`,
     "Do not answer the request yourself. Wait for the child agent to finish, then return the child's JSON object unchanged.",
     "Use only the supplied evidence and follow the child agent's privacy and grounding instructions.",
     "The caller requires a JSON object and will reject prose outside JSON.",
+    `Use only these top-level output keys: ${outputKeys}. Omit a key when the evidence does not support it.`,
     JSON.stringify({ task, nativeRole, request: input })
   ].join("\n");
 }
@@ -162,6 +339,7 @@ async function runTurn(
   let model = modelFor() ?? "server-default";
   let turnId: string | undefined;
   let streamedText = "";
+  let stderrText = "";
   const childState = { started: false, subagentThreadId: undefined as string | undefined };
   const pending = new Map<number, (message: JsonRpcResponse) => void>();
   const rejected = new Map<number, (error: Error) => void>();
@@ -267,8 +445,7 @@ async function runTurn(
       return;
     }
     if (message.method === "error") {
-      const detail = message.params?.message;
-      completedReject?.(requestError(typeof detail === "string" ? detail : "server error"));
+      completedReject?.(requestError(codexErrorMessage(message.params)));
     }
   };
   child.stdout.on("data", (chunk: Buffer | string) => {
@@ -277,13 +454,21 @@ async function runTurn(
     buffer = lines.pop() ?? "";
     for (const line of lines) onLine(line);
   });
-  child.stderr.on("data", () => {
-    // Keep the stderr pipe drained; Codex emits startup diagnostics there.
+  child.stderr.on("data", (chunk: Buffer | string) => {
+    // Keep the stderr pipe drained, while retaining a bounded startup
+    // diagnostic for health checks and configuration failures.
+    stderrText = `${stderrText}${chunk.toString()}`.slice(-1200);
   });
   child.once("error", (error) => completedReject?.(error));
   child.once("exit", (code, signal) => {
-    if (!streamedText)
-      completedReject?.(requestError(`process exited (${String(code ?? signal)})`));
+    if (!streamedText) {
+      const diagnostic = stderrText.trim().replace(/\s+/g, " ").slice(-600);
+      completedReject?.(
+        requestError(
+          `process exited (${String(code ?? signal)})${diagnostic ? `:${diagnostic}` : ""}`
+        )
+      );
+    }
   });
   const timer = setTimeout(() => completedReject?.(requestError("timeout")), timeoutMs);
   try {
@@ -291,6 +476,9 @@ async function runTurn(
       clientInfo: { name: "ai-career-os", version: "0.1.0" },
       capabilities: { experimentalApi: true }
     });
+    // The app-server protocol requires this notification before any thread
+    // methods are called. It is intentionally a notification (no request id).
+    send({ jsonrpc: "2.0", method: "initialized", params: {} });
     const threadResponse = await request("thread/start", {
       ...(modelFor() ? { model: modelFor() } : {}),
       ephemeral: true,
@@ -310,7 +498,7 @@ async function runTurn(
       input: [{ type: "text", text: buildOrchestratorPrompt(task, input, nativeAgentRole) }],
       effort: "high",
       approvalPolicy: "never",
-      outputSchema: { type: "object", additionalProperties: true }
+      outputSchema: codexOutputSchemaForTask(task)
     });
     return await completed;
   } finally {

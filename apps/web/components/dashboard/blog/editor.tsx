@@ -2,6 +2,7 @@
 
 import { ArticleBody } from "@/components/portfolio/article-body";
 import { WorkspaceToast } from "@/components/ui/workspace-toast";
+import { slugifyBlogTitle } from "@/lib/blog-slug";
 import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
 
@@ -16,11 +17,15 @@ interface Version {
   seo_title: string | null;
   seo_description: string | null;
   evidence_ids: string[];
+  created_at?: string;
 }
 interface Post {
   id: string;
   slug: string;
   status: string;
+  scheduled_at?: string | null;
+  published_at?: string | null;
+  archived_at?: string | null;
   currentVersion: Version | null;
   versions?: Version[];
 }
@@ -63,6 +68,8 @@ export function BlogEditor() {
   const [preview, setPreview] = useState("");
   const [assistance, setAssistance] = useState("");
   const [message, setMessage] = useState("");
+  const [titleDraft, setTitleDraft] = useState("");
+  const [scheduleDraft, setScheduleDraft] = useState("");
   const load = useCallback(async () => {
     const [postResponse, factResponse] = await Promise.all([
       fetch("/api/v1/posts", { cache: "no-store" }),
@@ -86,17 +93,28 @@ export function BlogEditor() {
   }, [load]);
   const selected = posts.find((post) => post.id === selectedId);
   const version = selected?.currentVersion;
+  useEffect(() => {
+    setTitleDraft(version?.title ?? "");
+    if (selected?.scheduled_at) {
+      const scheduled = new Date(selected.scheduled_at);
+      const local = new Date(scheduled.getTime() - scheduled.getTimezoneOffset() * 60_000)
+        .toISOString()
+        .slice(0, 16);
+      setScheduleDraft(local);
+    } else {
+      setScheduleDraft("");
+    }
+  }, [selected, selectedId, version?.title]);
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const target = event.currentTarget;
     const form = new FormData(target);
     try {
-      await mutate(
+      const saved = (await mutate(
         selected ? `/api/v1/posts/${selected.id}` : "/api/v1/posts",
         {
           title: form.get("title"),
-          slug: form.get("slug"),
           excerpt: form.get("excerpt"),
           markdown: form.get("markdown"),
           coverUrl: form.get("coverUrl"),
@@ -106,10 +124,14 @@ export function BlogEditor() {
           evidenceIds: form.getAll("evidenceIds")
         },
         selected ? "PATCH" : "POST"
-      );
+      )) as { post?: { id?: string } } | undefined;
       setMessage(selected ? "New immutable article version saved as draft." : "Draft created.");
       await load();
-      if (!selected) target.reset();
+      if (!selected) {
+        target.reset();
+        setTitleDraft("");
+        if (saved?.post?.id) setSelectedId(saved.post.id);
+      }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not save article");
     }
@@ -119,8 +141,11 @@ export function BlogEditor() {
     if (!selected) return;
     try {
       if (actionName === "schedule") {
-        const scheduledAt = window.prompt("Publication time (ISO 8601, in the future)")?.trim();
-        if (!scheduledAt) return;
+        if (!scheduleDraft) {
+          setMessage("Choose a future publication time first.");
+          return;
+        }
+        const scheduledAt = new Date(scheduleDraft).toISOString();
         await mutate(`/api/v1/posts/${selected.id}/schedule`, { confirmation: true, scheduledAt });
       } else {
         const confirmed = window.confirm(
@@ -151,6 +176,15 @@ export function BlogEditor() {
       setAssistance(data.output ?? "");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Writing assistance failed");
+    }
+  }
+
+  async function copySuggestion() {
+    try {
+      await navigator.clipboard.writeText(assistance);
+      setMessage("Assistant suggestion copied to your clipboard.");
+    } catch {
+      setMessage("Clipboard access was unavailable. Select the suggestion and copy it manually.");
     }
   }
 
@@ -186,17 +220,22 @@ export function BlogEditor() {
       >
         <label>
           Title
-          <input name="title" required defaultValue={version?.title} />
-        </label>
-        <label>
-          Shareable slug
           <input
-            name="slug"
+            name="title"
             required
-            pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
-            defaultValue={selected?.slug}
+            value={titleDraft}
+            onChange={(event) => {
+              setTitleDraft(event.target.value);
+            }}
           />
         </label>
+        <p className="form-note">
+          The shareable slug is generated automatically from the title and made URL-safe.
+          <br />
+          Preview: <code>{slugifyBlogTitle(titleDraft) || "post"}</code> (a numeric suffix may be
+          added for duplicate titles).
+          {selected?.slug ? ` Current slug: ${selected.slug}` : ""}
+        </p>
         <label>
           Excerpt
           <textarea name="excerpt" defaultValue={version?.excerpt} />
@@ -250,28 +289,67 @@ export function BlogEditor() {
             setPreview(version?.markdown ?? "");
           }}
         >
-          Preview saved version
+          Preview current version
         </button>
       </form>
       {selected ? (
         <section>
+          <div className="workspace-section-heading">
+            <div>
+              <p className="eyebrow">Article lifecycle</p>
+              <h2>{selected.status === "published" ? "Published article" : "Draft controls"}</h2>
+            </div>
+            <strong>{selected.status}</strong>
+          </div>
+          <p>
+            Slug: <code>/blog/{selected.slug}</code>
+            {selected.published_at
+              ? ` · published ${new Date(selected.published_at).toLocaleString()}`
+              : ""}
+          </p>
           <div className="workspace-actions">
+            <label>
+              Publish at
+              <input
+                type="datetime-local"
+                value={scheduleDraft}
+                onChange={(event) => {
+                  setScheduleDraft(event.target.value);
+                }}
+              />
+            </label>
             <button type="button" onClick={() => void action("schedule")}>
-              Schedule with approval
+              Schedule
             </button>
             <button type="button" onClick={() => void action("publish")}>
-              Publish / republish
+              {selected.status === "published" ? "Republish current version" : "Publish"}
             </button>
-            <button type="button" onClick={() => void action("archive")}>
-              Archive
-            </button>
+            {selected.status !== "archived" ? (
+              <button type="button" onClick={() => void action("archive")}>
+                Archive
+              </button>
+            ) : null}
           </div>
           <details>
             <summary>Immutable revision history ({selected.versions?.length ?? 0})</summary>
-            <ol>
+            <ol className="blog-version-history">
               {selected.versions?.map((item) => (
                 <li key={item.id}>
-                  Version {item.version ?? "?"}: {item.title}
+                  <span>
+                    <strong>Version {item.version ?? "?"}</strong>: {item.title}
+                    <small>
+                      {item.created_at ? ` · ${new Date(item.created_at).toLocaleString()}` : ""}
+                    </small>
+                  </span>
+                  <button
+                    type="button"
+                    className="button-secondary"
+                    onClick={() => {
+                      setPreview(item.markdown);
+                    }}
+                  >
+                    Preview version
+                  </button>
                 </li>
               ))}
             </ol>
@@ -316,7 +394,18 @@ export function BlogEditor() {
       </form>
       {assistance ? (
         <section>
-          <h2>Assistant suggestion</h2>
+          <div className="workspace-section-heading">
+            <h2>Assistant suggestion</h2>
+            <button
+              type="button"
+              className="button-secondary"
+              onClick={() => {
+                void copySuggestion();
+              }}
+            >
+              Copy suggestion
+            </button>
+          </div>
           <pre>{assistance}</pre>
           <p>Review and deliberately copy any useful material into the editor.</p>
         </section>

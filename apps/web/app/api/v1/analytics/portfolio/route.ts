@@ -1,6 +1,13 @@
-import { countBy, parseAnalyticsFilters, suppressSmallCounts } from "@/lib/analytics-filters";
+import { countBy, parseAnalyticsFilters } from "@/lib/analytics-filters";
 import { apiResponse } from "@/lib/api/response";
 import { withPrivateApi } from "@/lib/api/private";
+import {
+  engagement,
+  isPortfolioEvent,
+  type AnalyticsEventRow,
+  visitDetails
+} from "@/lib/server/portfolio-analytics";
+
 export function GET(request: Request) {
   return withPrivateApi(request, async ({ client, ownerId }) => {
     let filters;
@@ -25,61 +32,40 @@ export function GET(request: Request) {
     if (filters.to) query = query.lte("occurred_at", filters.to);
     const { data, error } = await query;
     if (error) throw error;
-    const events = data ?? [];
-    const rawCounts = countBy(events.map((event) => event.event_name));
-    const propertyCounts = (eventName: string, property: string) =>
-      countBy(
-        events.flatMap((event) => {
-          const value = event.event_name === eventName ? event.properties?.[property] : null;
-          return typeof value === "string" && value ? [value] : [];
-        })
-      );
-    const engagement = (scope: "page" | "section") => {
-      const grouped = new Map<string, number[]>();
-      for (const event of events) {
-        if (event.event_name !== `${scope}_engagement`) continue;
-        const name = event.properties?.[scope];
-        const duration = event.properties?.duration_seconds;
-        if (typeof name !== "string" || typeof duration !== "number") continue;
-        grouped.set(name, [...(grouped.get(name) ?? []), duration]);
-      }
-      return Object.fromEntries(
-        [...grouped].map(([name, durations]) => {
-          const lowVolume = durations.length < 5;
-          const total = durations.reduce((sum, duration) => sum + duration, 0);
-          return [
-            name,
-            {
-              samples: lowVolume ? null : durations.length,
-              totalSeconds: lowVolume ? null : Math.round(total),
-              averageSeconds: lowVolume ? null : Math.round(total / durations.length),
-              lowVolume
-            }
-          ];
-        })
-      );
-    };
-    const uniqueVisitors = new Set(
-      events.flatMap((event) => (event.session_id ? [event.session_id] : []))
+    const events = (data ?? []) as AnalyticsEventRow[];
+    const portfolioEvents = events.filter(isPortfolioEvent);
+    const totalVisits = new Set(
+      portfolioEvents
+        .map((event) => event.session_id)
+        .filter((sessionId): sessionId is string => Boolean(sessionId))
     ).size;
+    const sectionCounts = countBy(
+      portfolioEvents.flatMap((event) => {
+        const section = event.properties?.section;
+        return event.event_name === "section_view" && typeof section === "string" ? [section] : [];
+      })
+    );
+    const pageCounts = countBy(
+      portfolioEvents.flatMap((event) => {
+        const page = event.properties?.page;
+        return event.event_name === "page_view" && typeof page === "string" ? [page] : [];
+      })
+    );
     return apiResponse(
       {
-        totalEvents: events.length,
-        visitors: uniqueVisitors < 5 ? null : uniqueVisitors,
-        lowData: events.length < 5,
-        metrics: suppressSmallCounts(rawCounts),
-        breakdowns: {
-          sources: suppressSmallCounts(propertyCounts("page_view", "source")),
-          countries: suppressSmallCounts(propertyCounts("page_view", "country")),
-          pages: suppressSmallCounts(propertyCounts("page_view", "page")),
-          sections: suppressSmallCounts(propertyCounts("section_view", "section"))
+        totalEvents: portfolioEvents.length,
+        totalVisits,
+        metrics: countBy(portfolioEvents.map((event) => event.event_name)),
+        breakdowns: { pages: pageCounts, sections: sectionCounts },
+        engagement: {
+          pages: engagement(portfolioEvents, "page"),
+          sections: engagement(portfolioEvents, "section")
         },
-        engagement: { pages: engagement("page"), sections: engagement("section") },
-        calculationVersion: "analytics.v3",
+        visits: visitDetails(portfolioEvents),
+        calculationVersion: "analytics.v5",
         privacy: {
-          threshold: 5,
           message:
-            "Anonymous visitors consent before measurement. Groups below five samples are suppressed; raw IP addresses, full URLs, queries, prompts, and free text are never stored."
+            "Summary and visit details contain portfolio page and section activity only. Visitor identity, location, referral source, URLs, queries, prompts, and free text are not exposed."
         },
         filters
       },

@@ -10,6 +10,11 @@ const settingsAreas = [
     "Review private portfolio, application, interview, and career-gap signals."
   ],
   [
+    "Logs",
+    "/settings/logs",
+    "Filter successes, failures, system errors, AI runs, and grouped portfolio visits."
+  ],
+  [
     "AI providers",
     "/settings/providers",
     "Register model connections, capabilities, versions, and secret environment references."

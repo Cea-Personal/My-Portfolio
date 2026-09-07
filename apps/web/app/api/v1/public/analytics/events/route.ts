@@ -6,13 +6,6 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
   try {
     const event = createPublicEvent(body.name, body.properties);
-    const countryHeader =
-      request.headers.get("cf-ipcountry") ?? request.headers.get("x-vercel-ip-country") ?? "";
-    const country = /^[A-Z]{2}$/.test(countryHeader.toUpperCase())
-      ? countryHeader.toUpperCase()
-      : "unknown";
-    const properties =
-      event.name === "page_view" ? { ...event.properties, country } : event.properties;
     const pseudonym = typeof body.pseudonym === "string" ? body.pseudonym : "";
     const consent = body.consent === "granted" ? "granted" : "denied";
     const env = parsePublicEnv();
@@ -21,7 +14,7 @@ export async function POST(request: Request) {
     const client = createServiceSupabaseClient(env.NEXT_PUBLIC_SUPABASE_URL, serviceRoleKey);
     const { data, error } = await client.schema("app").rpc("record_public_analytics_event", {
       requested_name: event.name,
-      requested_properties: properties,
+      requested_properties: event.properties,
       requested_pseudonym: pseudonym,
       requested_consent: consent
     });

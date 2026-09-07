@@ -18,18 +18,6 @@ async function capture(name: string, properties: Record<string, string | number 
     keepalive: true
   });
 }
-function referralSource(): string {
-  const campaign = new URLSearchParams(window.location.search).get("utm_source")?.toLowerCase();
-  const candidate = campaign || document.referrer;
-  if (!candidate) return "direct";
-  if (candidate === window.location.origin || candidate.startsWith(`${window.location.origin}/`))
-    return "internal";
-  if (/linkedin/i.test(candidate)) return "linkedin";
-  if (/github/i.test(candidate)) return "github";
-  if (/google/i.test(candidate)) return "google";
-  if (/bing/i.test(candidate)) return "bing";
-  return "other";
-}
 export function PublicEvents({
   name = "page_view",
   properties = {},
@@ -54,10 +42,7 @@ export function PublicEvents({
           : window.location.pathname.startsWith("/blog")
             ? "blog"
             : "project";
-    void capture(
-      name,
-      name === "page_view" ? { ...properties, page, source: referralSource() } : properties
-    );
+    void capture(name, name === "page_view" ? { ...properties, page } : properties);
     const observed = new Set<string>();
     const enteredAt = new Map<string, number>();
     const observer = new IntersectionObserver(
@@ -106,8 +91,8 @@ export function PublicEvents({
   return (
     <aside className="analytics-consent" aria-label="Privacy preference">
       <p>
-        Allow anonymous, low-volume-suppressed visits, referral category, country, and time spent by
-        section? No IP address, full URL, query, prompt, or free text is stored.
+        Allow anonymous portfolio page views and time spent by section? No identity, location,
+        referral source, IP address, full URL, query, prompt, or free text is stored.
       </p>
       <button
         type="button"

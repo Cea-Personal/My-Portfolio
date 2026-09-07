@@ -2,17 +2,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { WorkspaceToast } from "@/components/ui/workspace-toast";
-const subagents = [
-  ["Portfolio assistant", "public_qa"],
-  ["Role-fit analyst", "role_fit"],
-  ["Career synthesizer", "evidence_extraction"],
-  ["Career gap analyst", "career_gap"],
-  ["Job matcher", "job_scoring"],
-  ["Application writer", "document_composition"],
-  ["Compensation analyst", "compensation"],
-  ["Interview coach", "interview_preparation"],
-  ["Writing editor", "writing_assistance"]
-] as const;
 interface Provider {
   id: string;
   provider: string;
@@ -47,6 +36,26 @@ interface AiRun {
   sanitized_error: string | null;
   created_at: string;
 }
+interface OrchestratorHealth {
+  ok: boolean;
+  status: "healthy" | "unhealthy";
+  provider?: string;
+  model?: string;
+  elapsedMs?: number;
+  output?: Record<string, unknown>;
+  detail?: string;
+  checkedAt: string;
+}
+interface EmbeddingHealth {
+  ok: boolean;
+  status: "healthy" | "unhealthy";
+  provider?: string;
+  model?: string;
+  dimensions?: number;
+  elapsedMs?: number;
+  detail?: string;
+  checkedAt: string;
+}
 const formText = (value: FormDataEntryValue | null) => (typeof value === "string" ? value : "");
 async function post(endpoint: string, body: unknown, method: "POST" | "PATCH" = "POST") {
   const response = await fetch(endpoint, {
@@ -63,11 +72,25 @@ async function post(endpoint: string, body: unknown, method: "POST" | "PATCH" = 
   };
   if (!response.ok) throw new Error(payload.data?.detail ?? payload.data?.code ?? "Request failed");
 }
+async function remove(endpoint: string) {
+  const response = await fetch(endpoint, {
+    method: "DELETE",
+    headers: { "idempotency-key": `delete-${crypto.randomUUID()}` }
+  });
+  const payload = (await response.json().catch(() => ({}))) as {
+    data?: { code?: string; detail?: string };
+  };
+  if (!response.ok) throw new Error(payload.data?.detail ?? payload.data?.code ?? "Delete failed");
+}
 export function AiCapabilitiesWorkspace({ view = "agents" }: { view?: "agents" | "providers" }) {
   const [providers, setProviders] = useState<Provider[]>([]);
   const [capabilities, setCapabilities] = useState<Capability[]>([]);
   const [runs, setRuns] = useState<AiRun[]>([]);
   const [message, setMessage] = useState("");
+  const [health, setHealth] = useState<OrchestratorHealth | null>(null);
+  const [healthRunning, setHealthRunning] = useState(false);
+  const [embeddingHealth, setEmbeddingHealth] = useState<EmbeddingHealth | null>(null);
+  const [embeddingHealthRunning, setEmbeddingHealthRunning] = useState(false);
   const load = useCallback(async () => {
     const response = await fetch("/api/v1/settings/ai-capabilities", { cache: "no-store" });
     if (!response.ok) throw new Error();
@@ -110,29 +133,117 @@ export function AiCapabilitiesWorkspace({ view = "agents" }: { view?: "agents" |
       setMessage(error instanceof Error ? error.message : "Provider registration failed");
     }
   }
-  async function configure(event: FormEvent<HTMLFormElement>) {
+  async function configure(event: FormEvent<HTMLFormElement>, task: "orchestrator" | "embedding") {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const task = "orchestrator";
+    const numberValue = (name: string, fallback: number) => {
+      const raw = form.get(name);
+      if (raw === null || raw === "") return fallback;
+      const value = Number(raw);
+      return Number.isFinite(value) ? value : fallback;
+    };
     try {
       await post(
         `/api/v1/settings/ai-capabilities/${task}`,
         {
           providerId: form.get("providerId"),
           fallbackProviderId: undefined,
-          modelClass: form.get("modelClass"),
-          creativity: Number(form.get("creativity")),
-          lengthLimit: Number(form.get("lengthLimit")),
-          timeoutMs: Number(form.get("timeoutMs")),
-          retryLimit: Number(form.get("retryLimit")),
+          modelClass: form.get("modelClass") || "balanced",
+          creativity: numberValue("creativity", 0.2),
+          lengthLimit: numberValue("lengthLimit", 2000),
+          timeoutMs: numberValue("timeoutMs", task === "orchestrator" ? 120000 : 30000),
+          retryLimit: numberValue("retryLimit", 2),
           enabled: form.get("enabled") === "on"
         },
         "PATCH"
       );
-      setMessage(`${task} configuration saved.`);
+      setMessage(`${task === "embedding" ? "Embedding" : "Orchestrator"} configuration saved.`);
       await load();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Configuration failed");
+    }
+  }
+  async function deleteOrchestrator() {
+    if (
+      !window.confirm(
+        "Remove the active orchestrator configuration? AI reasoning will be unavailable until one is saved again."
+      )
+    )
+      return;
+    try {
+      await remove("/api/v1/settings/ai-capabilities/orchestrator");
+      setMessage("Orchestrator configuration removed.");
+      await load();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Orchestrator deletion failed");
+    }
+  }
+  async function testOrchestrator() {
+    setHealthRunning(true);
+    setHealth(null);
+    try {
+      const response = await fetch("/api/v1/settings/ai-capabilities/orchestrator/health", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "idempotency-key": `orchestrator-health-${crypto.randomUUID()}`
+        },
+        body: JSON.stringify({})
+      });
+      const payload = (await response.json().catch(() => ({}))) as {
+        data?: OrchestratorHealth;
+      };
+      if (!payload.data) throw new Error("The health check returned no diagnostic.");
+      setHealth(payload.data);
+      setMessage(
+        payload.data.ok
+          ? "Orchestrator health check completed."
+          : (payload.data.detail ?? "Orchestrator health check failed.")
+      );
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : "Orchestrator health check failed.";
+      setHealth({
+        ok: false,
+        status: "unhealthy",
+        detail,
+        checkedAt: new Date().toISOString()
+      });
+      setMessage(detail);
+    } finally {
+      setHealthRunning(false);
+    }
+  }
+  async function testEmbedding() {
+    setEmbeddingHealthRunning(true);
+    setEmbeddingHealth(null);
+    try {
+      const response = await fetch("/api/v1/settings/ai-capabilities/embedding/health", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "idempotency-key": `embedding-health-${crypto.randomUUID()}`
+        },
+        body: JSON.stringify({})
+      });
+      const payload = (await response.json().catch(() => ({}))) as { data?: EmbeddingHealth };
+      if (!payload.data) throw new Error("The embedding health check returned no diagnostic.");
+      setEmbeddingHealth(payload.data);
+      setMessage(
+        payload.data.ok
+          ? "Embedding health check completed."
+          : (payload.data.detail ?? "Embedding health check failed.")
+      );
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : "Embedding health check failed.";
+      setEmbeddingHealth({
+        ok: false,
+        status: "unhealthy",
+        detail,
+        checkedAt: new Date().toISOString()
+      });
+      setMessage(detail);
+    } finally {
+      setEmbeddingHealthRunning(false);
     }
   }
   if (view === "providers") {
@@ -227,73 +338,240 @@ export function AiCapabilitiesWorkspace({ view = "agents" }: { view?: "agents" |
         <p className="eyebrow">Task orchestration</p>
         <h1>Agents</h1>
         <p>
-          One orchestrator model coordinates every bounded reasoning subagent. Agents are focused
-          roles with their own instructions and tools; they never select independent models.
+          One orchestrator coordinates every bounded reasoning subagent. Native Codex roles keep
+          focused instructions and can override the orchestrator model in <code>.codex/agents</code>
+          .
         </p>
       </header>
-      <form className="knowledge-entry-form" onSubmit={(event) => void configure(event)}>
-        <h2>Configure the orchestrator</h2>
+      {(() => {
+        const orchestrator = capabilities.find(
+          (capability) => capability.task_type === "orchestrator"
+        );
+        const formKey = orchestrator
+          ? [
+              orchestrator.provider_id,
+              orchestrator.enabled,
+              orchestrator.creativity,
+              orchestrator.length_limit,
+              orchestrator.timeout_ms,
+              orchestrator.retry_limit
+            ]
+              .map(String)
+              .join("-")
+          : "new-orchestrator";
+        return (
+          <form
+            key={formKey}
+            className="knowledge-entry-form"
+            onSubmit={(event) => void configure(event, "orchestrator")}
+          >
+            <h2>{orchestrator ? "Edit orchestrator" : "Configure the orchestrator"}</h2>
+            <p>
+              Choose the parent orchestrator model. Native Codex role files may override this model
+              per agent; embeddings remain a separate retrieval model configured below.
+            </p>
+            <label>
+              Orchestrator provider
+              <select name="providerId" required defaultValue={orchestrator?.provider_id ?? ""}>
+                <option value="">Select provider</option>
+                {providers.map((provider) => (
+                  <option key={provider.id} value={provider.id}>
+                    {provider.provider} · {provider.model}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Model class
+              <select name="modelClass" defaultValue={orchestrator?.model_class ?? "balanced"}>
+                <option value="fast">fast</option>
+                <option value="balanced">balanced</option>
+                <option value="deep">deep</option>
+              </select>
+            </label>
+            <label>
+              Creativity
+              <input
+                name="creativity"
+                type="number"
+                min="0"
+                max="1"
+                step="0.05"
+                defaultValue={orchestrator?.creativity ?? 0.2}
+              />
+            </label>
+            <label>
+              Length limit
+              <input
+                name="lengthLimit"
+                type="number"
+                min="128"
+                max="32000"
+                defaultValue={orchestrator?.length_limit ?? 2000}
+              />
+            </label>
+            <label>
+              Timeout ms
+              <input
+                name="timeoutMs"
+                type="number"
+                min="1000"
+                max="120000"
+                defaultValue={orchestrator?.timeout_ms ?? 120000}
+              />
+            </label>
+            <label>
+              Retries
+              <input
+                name="retryLimit"
+                type="number"
+                min="0"
+                max="5"
+                defaultValue={orchestrator?.retry_limit ?? 2}
+              />
+            </label>
+            <label>
+              <input
+                name="enabled"
+                type="checkbox"
+                defaultChecked={orchestrator?.enabled ?? false}
+              />{" "}
+              Enable after validation
+            </label>
+            <div className="workspace-actions">
+              <button type="submit" disabled={!providers.length}>
+                {orchestrator ? "Save changes" : "Save orchestrator"}
+              </button>
+              {orchestrator ? (
+                <button
+                  type="button"
+                  className="button-secondary"
+                  onClick={() => void deleteOrchestrator()}
+                >
+                  Delete orchestrator
+                </button>
+              ) : null}
+            </div>
+          </form>
+        );
+      })()}
+      <section className="ai-health-panel" aria-live="polite">
+        <div className="workspace-section-heading">
+          <div>
+            <p className="eyebrow">Runtime verification</p>
+            <h2>Test orchestrator health</h2>
+          </div>
+          <button
+            type="button"
+            className="button-secondary"
+            disabled={
+              healthRunning ||
+              !capabilities.some((item) => item.task_type === "orchestrator" && item.enabled)
+            }
+            onClick={() => void testOrchestrator()}
+          >
+            {healthRunning ? "Running check…" : "Run health check"}
+          </button>
+        </div>
         <p>
-          Choose the one reasoning model used by all subagents. Embeddings remain a separate
-          retrieval model and are configured under AI providers.
+          Sends a minimal diagnostic through the configured orchestrator and its native child agent.
+          It does not use your career evidence or create an application.
         </p>
-        <label>
-          Orchestrator provider
-          <select name="providerId" required>
-            <option value="">Select provider</option>
-            {providers.map((provider) => (
-              <option key={provider.id} value={provider.id}>
-                {provider.provider} · {provider.model}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Model class
-          <select name="modelClass">
-            <option>fast</option>
-            <option defaultValue="balanced">balanced</option>
-            <option>deep</option>
-          </select>
-        </label>
-        <label>
-          Creativity
-          <input name="creativity" type="number" min="0" max="1" step="0.05" defaultValue="0.2" />
-        </label>
-        <label>
-          Length limit
-          <input name="lengthLimit" type="number" min="128" max="32000" defaultValue="2000" />
-        </label>
-        <label>
-          Timeout ms
-          <input name="timeoutMs" type="number" min="1000" max="120000" defaultValue="30000" />
-        </label>
-        <label>
-          Retries
-          <input name="retryLimit" type="number" min="0" max="5" defaultValue="2" />
-        </label>
-        <label>
-          <input name="enabled" type="checkbox" /> Enable after validation
-        </label>
-        <button type="submit" disabled={!providers.length}>
-          Save orchestrator
-        </button>
-      </form>
-      <section>
-        <h2>Subagents</h2>
-        <p>
-          Each role below is a subagent running under the same orchestrator model. Role prompts,
-          permissions, and output schemas stay independent even though model selection is shared.
-        </p>
-        <ul className="workspace-list">
-          {subagents.map(([label, task]) => (
-            <li key={task}>
-              <strong>{label}</strong>
-              <p>{task} · delegated to the orchestrator</p>
-            </li>
-          ))}
-        </ul>
+        {!capabilities.some((item) => item.task_type === "orchestrator" && item.enabled) ? (
+          <p role="note">Enable an orchestrator configuration above before testing it.</p>
+        ) : null}
+        {health ? (
+          <div className={`ai-health-result ${health.ok ? "is-healthy" : "is-unhealthy"}`}>
+            <strong>{health.ok ? "Healthy" : "Unhealthy"}</strong>
+            <span>
+              {health.provider
+                ? `${health.provider} · ${health.model ?? "server-selected model"}`
+                : health.detail}
+              {typeof health.elapsedMs === "number" ? ` · ${String(health.elapsedMs)}ms` : ""}
+            </span>
+            {health.output ? <pre>{JSON.stringify(health.output, null, 2)}</pre> : null}
+            <small>Checked {new Date(health.checkedAt).toLocaleString()}</small>
+          </div>
+        ) : null}
       </section>
+      {(() => {
+        const embedding = capabilities.find((capability) => capability.task_type === "embedding");
+        const embeddingProviders = providers.filter((provider) =>
+          provider.capabilities.some(
+            (capability) => capability === "*" || /^(embedding|embeddings)$/i.test(capability)
+          )
+        );
+        return (
+          <div>
+            <form
+              key={`embedding-${embedding?.provider_id ?? "new"}-${String(embedding?.enabled ?? false)}`}
+              className="knowledge-entry-form"
+              onSubmit={(event) => void configure(event, "embedding")}
+            >
+              <h2>{embedding ? "Edit embeddings" : "Configure embeddings"}</h2>
+              <p>
+                Career Brain and document indexing need an enabled embedding capability. The
+                provider credential stays server-side; for OpenAI, set <code>OPENAI_API_KEY</code>{" "}
+                in the web server environment.
+              </p>
+              <label>
+                Embedding provider
+                <select name="providerId" required defaultValue={embedding?.provider_id ?? ""}>
+                  <option value="">Select provider</option>
+                  {embeddingProviders.map((provider) => (
+                    <option key={provider.id} value={provider.id}>
+                      {provider.provider} · {provider.model}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <input
+                  name="enabled"
+                  type="checkbox"
+                  defaultChecked={embedding?.enabled ?? false}
+                />{" "}
+                Enable embeddings
+              </label>
+              <div className="workspace-actions">
+                <button type="submit" disabled={!embeddingProviders.length}>
+                  {embedding ? "Save embedding changes" : "Enable embeddings"}
+                </button>
+                <button
+                  type="button"
+                  className="button-secondary"
+                  disabled={!embedding?.enabled || embeddingHealthRunning}
+                  onClick={() => void testEmbedding()}
+                >
+                  {embeddingHealthRunning ? "Testing…" : "Test embedding connection"}
+                </button>
+              </div>
+              {!embeddingProviders.length ? (
+                <p role="note">
+                  Register a provider with capability <code>embeddings</code> above first.
+                </p>
+              ) : null}
+            </form>
+            {embeddingHealth ? (
+              <div
+                className={`ai-health-result ${embeddingHealth.ok ? "is-healthy" : "is-unhealthy"}`}
+                aria-live="polite"
+              >
+                <strong>{embeddingHealth.ok ? "Healthy" : "Unhealthy"}</strong>
+                <span>
+                  {embeddingHealth.provider
+                    ? `${embeddingHealth.provider} · ${embeddingHealth.model ?? "server-selected model"} · ${String(embeddingHealth.dimensions ?? 0)} dimensions`
+                    : embeddingHealth.detail}
+                  {typeof embeddingHealth.elapsedMs === "number"
+                    ? ` · ${String(embeddingHealth.elapsedMs)}ms`
+                    : ""}
+                </span>
+                <small>Checked {new Date(embeddingHealth.checkedAt).toLocaleString()}</small>
+              </div>
+            ) : null}
+          </div>
+        );
+      })()}
       <section>
         <h2>Active orchestrator configuration</h2>
         {capabilities.filter((capability) => capability.task_type === "orchestrator").length ? (

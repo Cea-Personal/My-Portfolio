@@ -1,5 +1,6 @@
 import { apiResponse } from "@/lib/api/response";
 import { withPrivateApi } from "@/lib/api/private";
+import { slugifyBlogTitle, uniqueBlogSlug } from "@/lib/blog-slug";
 
 export function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   return withPrivateApi(request, async ({ client, ownerId }) => {
@@ -30,10 +31,18 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (!existing.data) return apiResponse(null, request, 404);
     const title = typeof body.title === "string" ? body.title.trim() : "";
     const markdown = typeof body.markdown === "string" ? body.markdown.trim() : "";
-    const slug =
-      typeof body.slug === "string" ? body.slug.trim().toLowerCase() : existing.data.slug;
-    if (!title || !markdown || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug))
-      return apiResponse({ code: "INVALID_POST_VERSION" }, request, 400);
+    if (!title || !markdown) return apiResponse({ code: "INVALID_POST_VERSION" }, request, 400);
+    const existingSlugs = await client
+      .schema("app")
+      .from("posts")
+      .select("slug")
+      .eq("owner_id", ownerId);
+    if (existingSlugs.error) throw existingSlugs.error;
+    const slug = uniqueBlogSlug(
+      slugifyBlogTitle(title),
+      (existingSlugs.data ?? []).map((post) => String(post.slug)),
+      existing.data.slug
+    );
     const evidenceIds = Array.isArray(body.evidenceIds)
       ? body.evidenceIds.filter((value: unknown): value is string => typeof value === "string")
       : [];
@@ -90,7 +99,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       .schema("app")
       .from("posts")
       .update({
-        slug: slug.slice(0, 160),
+        slug,
         current_version_id: versionResult.data.id,
         status: "draft",
         scheduled_at: null,

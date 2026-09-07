@@ -13,7 +13,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       .select("id")
       .eq("id", id)
       .eq("owner_id", ownerId)
+      .is("deleted_at", null)
       .maybeSingle();
+    if (entry.error) throw entry.error;
     if (!entry.data) return apiResponse(null, request, 404);
     const text = typeof body.text === "string" ? body.text.trim().slice(0, 50_000) : "";
     if (!text) return apiResponse({ code: "JOURNAL_TEXT_REQUIRED" }, request, 400);
@@ -48,11 +50,30 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         updated_at: new Date().toISOString()
       })
       .eq("id", id)
-      .eq("owner_id", ownerId);
+      .eq("owner_id", ownerId)
+      .is("deleted_at", null);
     if (update.error) throw update.error;
     await requestCareerBrainRefresh(ownerId, "journal", `${id}:${contentHash}`).catch(
       () => undefined
     );
     return apiResponse({ version: version.data }, request);
+  });
+}
+
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  return withPrivateApi(request, async ({ client, ownerId }) => {
+    const { id } = await params;
+    const { data, error } = await client
+      .schema("app")
+      .from("journal_entries")
+      .update({ deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .eq("id", id)
+      .eq("owner_id", ownerId)
+      .is("deleted_at", null)
+      .select("id")
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) return apiResponse(null, request, 404);
+    return apiResponse({ deleted: true, entryId: id }, request);
   });
 }

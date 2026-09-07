@@ -1,5 +1,6 @@
 import { apiResponse } from "@/lib/api/response";
 import { withPrivateApi } from "@/lib/api/private";
+import { slugifyBlogTitle, uniqueBlogSlug } from "@/lib/blog-slug";
 
 export function GET(request: Request) {
   return withPrivateApi(request, async ({ client, ownerId }) => {
@@ -38,13 +39,22 @@ export async function POST(request: Request) {
     const body = await request.json().catch(() => ({}));
     const title = typeof body.title === "string" ? body.title.trim() : "";
     const markdown = typeof body.markdown === "string" ? body.markdown.trim() : "";
-    const slug = typeof body.slug === "string" ? body.slug.trim().toLowerCase() : "";
-    if (!title || !markdown || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug))
+    if (!title || !markdown)
       return apiResponse(
-        { code: "INVALID_POST", detail: "title, content, and a URL-safe slug are required" },
+        { code: "INVALID_POST", detail: "title and content are required" },
         request,
         400
       );
+    const existingSlugs = await client
+      .schema("app")
+      .from("posts")
+      .select("slug")
+      .eq("owner_id", ownerId);
+    if (existingSlugs.error) throw existingSlugs.error;
+    const slug = uniqueBlogSlug(
+      slugifyBlogTitle(title),
+      (existingSlugs.data ?? []).map((post) => String(post.slug))
+    );
     const evidenceIds = Array.isArray(body.evidenceIds)
       ? body.evidenceIds.filter((value: unknown): value is string => typeof value === "string")
       : [];
@@ -66,7 +76,7 @@ export async function POST(request: Request) {
     const { data: post, error } = await client
       .schema("app")
       .from("posts")
-      .insert({ owner_id: ownerId, slug: slug.slice(0, 160), status: "draft" })
+      .insert({ owner_id: ownerId, slug, status: "draft" })
       .select("*")
       .single();
     if (error || !post) throw error ?? new Error("POST_CREATE_FAILED");

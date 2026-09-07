@@ -258,10 +258,19 @@ export default async function PublicPortfolioPage() {
             name={displayName}
             {...(profileImage ? { photoSrc: profileImage } : {})}
             links={profileLinks}
+            className="desktop-profile-rail"
             {...(portfolioSummary || bio ? { statement: portfolioSummary || bio } : {})}
           />
           <div className="portfolio-stream">
             <Hero name={displayName} headline={headline} />
+            <div className="mobile-profile-rail">
+              <ProfileRail
+                name={displayName}
+                {...(profileImage ? { photoSrc: profileImage } : {})}
+                links={profileLinks}
+                {...(portfolioSummary || bio ? { statement: portfolioSummary || bio } : {})}
+              />
+            </div>
             <About {...(bio ? { bio } : {})} />
             <EngineeringProcesses />
             <CareerTimeline stages={timelineStages} />
@@ -303,7 +312,7 @@ export default async function PublicPortfolioPage() {
                 }))
               ]}
             />
-            <Contact {...(email ? { email } : {})} />
+            <Contact />
           </div>
         </div>
       </main>

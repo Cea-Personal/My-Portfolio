@@ -37,4 +37,32 @@ describe("production embedding provider", () => {
       dimensions: 1536
     });
   });
+
+  it("does not send the dimensions option to older embedding models", async () => {
+    const embedding = Array.from({ length: PRODUCTION_EMBEDDING_DIMENSIONS }, () => 0.01);
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      void input;
+      void init;
+      return Promise.resolve(
+        new Response(JSON.stringify({ data: [{ index: 0, embedding }] }), { status: 200 })
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    await embedWithProvider(
+      {
+        id: "provider",
+        provider: "openai",
+        model: "text-embedding-ada-002",
+        model_version: "1",
+        capabilities: ["embeddings"],
+        secret_ref: "OPENAI_API_KEY",
+        apiKey: "test-key",
+        endpoint: "https://api.openai.com/v1/embeddings"
+      },
+      ["career evidence"]
+    );
+    const request = fetchMock.mock.calls[0]?.[1];
+    if (typeof request?.body !== "string") throw new Error("Expected JSON request body");
+    expect(request.body).not.toContain('"dimensions"');
+  });
 });

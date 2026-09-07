@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   buildOrchestratorPrompt,
+  codexErrorMessage,
   codexAgentRoleForTask,
+  codexOutputSchemaForTask,
   isNativeChildAgentEvent
 } from "./codex-app-server";
 
@@ -28,5 +30,31 @@ describe("native Codex orchestration", () => {
     expect(isNativeChildAgentEvent({ type: "collabAgentToolCall", tool: "spawnAgent" })).toBe(true);
     expect(isNativeChildAgentEvent({ type: "subAgentActivity", kind: "started" })).toBe(true);
     expect(isNativeChildAgentEvent({ type: "agentMessage", text: "answer" })).toBe(false);
+  });
+
+  it("uses a closed, task-specific output schema for native turns", () => {
+    for (const task of [
+      "public_qa",
+      "role_fit",
+      "evidence_extraction",
+      "career_gap",
+      "job_scoring",
+      "document_composition",
+      "compensation",
+      "interview_preparation",
+      "writing_assistance"
+    ]) {
+      const schema = codexOutputSchemaForTask(task);
+      expect(schema.type).toBe("object");
+      expect(schema.additionalProperties).toBe(false);
+      expect(Object.keys(schema.properties ?? {}).length).toBeGreaterThan(0);
+    }
+  });
+
+  it("reads nested app-server error messages", () => {
+    expect(codexErrorMessage({ error: { message: "invalid output schema" } })).toBe(
+      "invalid output schema"
+    );
+    expect(codexErrorMessage({ message: "fallback" })).toBe("fallback");
   });
 });

@@ -25,6 +25,41 @@ interface IdempotencyRow {
   expires_at: string;
 }
 
+async function responseDiagnostic(response: Response): Promise<{
+  code?: string;
+  detail?: string;
+}> {
+  if (response.status < 400) return {};
+  const payload: unknown = await response
+    .clone()
+    .json()
+    .catch(() => null);
+  if (!payload || typeof payload !== "object") return {};
+  const data = (payload as Record<string, unknown>).data;
+  if (!data || typeof data !== "object") return {};
+  const record = data as Record<string, unknown>;
+  return {
+    ...(typeof record.code === "string" ? { code: record.code.slice(0, 120) } : {}),
+    ...(typeof record.detail === "string" ? { detail: record.detail.slice(0, 500) } : {})
+  };
+}
+
+function safeErrorDiagnostic(error: unknown): { code: string; detail: string } {
+  if (error instanceof ProblemError) {
+    return {
+      code: error.problem.code,
+      detail: error.problem.detail.slice(0, 500)
+    };
+  }
+  const detail = error instanceof Error ? error.message : "Request failed without a diagnostic.";
+  return {
+    code: "REQUEST_FAILED",
+    detail: detail
+      .replace(/(secret|token|password|api[_-]?key)\s*[:=]\s*\S+/gi, "$1=[redacted]")
+      .slice(0, 500)
+  };
+}
+
 function unauthorized(request: Request): ProblemError {
   return new ProblemError(
     problem("UNAUTHORIZED", "Authentication required.", 401, getCorrelationId(request.headers))
@@ -86,6 +121,7 @@ export async function withPrivateApi(
         requestHash: string;
       }
     | undefined;
+  let auditContext: PrivateApiContext | undefined;
   try {
     let idempotencyKey: string | undefined;
     if (request.method !== "GET" && request.method !== "HEAD") {
@@ -108,6 +144,7 @@ export async function withPrivateApi(
       }
     }
     const context = await requirePrivateApiContext(request);
+    auditContext = context;
     if (idempotencyKey) {
       const requestHash = createHash("sha256")
         .update(new Uint8Array(await request.clone().arrayBuffer()))
@@ -198,7 +235,8 @@ export async function withPrivateApi(
       }
     }
     const response = await handler(context);
-    if (request.method !== "GET" && request.method !== "HEAD") {
+    if (response.status >= 400 || (request.method !== "GET" && request.method !== "HEAD")) {
+      const diagnostic = await responseDiagnostic(response);
       const { error: auditError } = await context.client
         .schema("app")
         .from("audit_events")
@@ -209,7 +247,8 @@ export async function withPrivateApi(
           action: `${request.method} ${new URL(request.url).pathname}`.slice(0, 120),
           target_type: "http_request",
           correlation_id: context.correlationId,
-          after_metadata: { status: response.status }
+          reason: diagnostic.detail ?? diagnostic.code ?? null,
+          after_metadata: { status: response.status, ...diagnostic }
         });
       if (auditError) throw auditError;
     }
@@ -233,6 +272,26 @@ export async function withPrivateApi(
     return response;
   } catch (error) {
     const response = apiProblem(error, request);
+    const diagnostic = safeErrorDiagnostic(error);
+    if (auditContext) {
+      try {
+        await auditContext.client
+          .schema("app")
+          .from("audit_events")
+          .insert({
+            owner_id: auditContext.ownerId,
+            actor_type: "owner",
+            actor_id: auditContext.ownerId,
+            action: `FAILED ${request.method} ${new URL(request.url).pathname}`.slice(0, 120),
+            target_type: "http_request",
+            correlation_id: auditContext.correlationId,
+            reason: diagnostic.detail,
+            after_metadata: { status: response.status, code: diagnostic.code }
+          });
+      } catch {
+        // Preserve the original error response if observability is unavailable.
+      }
+    }
     if (idempotencyContext) {
       const responseBody: unknown = await response
         .clone()

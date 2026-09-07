@@ -3,7 +3,14 @@ import { expect, test } from "@playwright/test";
 test("public portfolio exposes semantic section anchors", async ({ page }) => {
   await page.goto("/");
   await expect(page.locator(".page-intro")).toBeHidden();
-  await expect(page.locator("main")).toBeVisible();
+  const portfolioMain = page.locator("main.portfolio-main");
+  await expect(portfolioMain).toBeVisible();
+  const mainBox = await portfolioMain.boundingBox();
+  const viewport = page.viewportSize();
+  expect(mainBox).not.toBeNull();
+  expect(viewport).not.toBeNull();
+  expect(mainBox?.x).toBeCloseTo(0, 0);
+  expect(mainBox?.width).toBeCloseTo(viewport?.width ?? 0, 0);
   await expect(page.locator("#projects")).toBeVisible();
   await expect(page.locator("#impact")).toHaveCount(0);
   await expect(
@@ -65,4 +72,32 @@ test("public portfolio exposes semantic section anchors", async ({ page }) => {
     "href",
     "#experience"
   );
+});
+
+test("mobile portfolio keeps navigation visible and moves the profile below the hero", async ({
+  page
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+
+  const navigation = page.getByRole("navigation", { name: "Portfolio sections" });
+  await expect(navigation).toBeVisible();
+  for (const label of ["About", "Experience", "Projects", "Blog", "Let's talk"]) {
+    await expect(navigation.getByRole("link", { name: label })).toBeVisible();
+  }
+  expect(await navigation.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(
+    true
+  );
+
+  const hero = page.locator(".cinematic-hero");
+  const mobileProfile = page.locator(".mobile-profile-rail");
+  await expect(mobileProfile).toBeVisible();
+  await expect(page.locator(".desktop-profile-rail")).toBeHidden();
+  const heroBox = await hero.boundingBox();
+  const profileBox = await mobileProfile.boundingBox();
+  expect(heroBox).not.toBeNull();
+  expect(profileBox).not.toBeNull();
+  expect(profileBox?.y ?? 0).toBeGreaterThanOrEqual((heroBox?.y ?? 0) + (heroBox?.height ?? 0));
+  await expect(mobileProfile.locator(".profile-portrait")).toHaveCSS("min-height", "352px");
+  await expect(page.locator(".contact-email")).toHaveCount(0);
 });

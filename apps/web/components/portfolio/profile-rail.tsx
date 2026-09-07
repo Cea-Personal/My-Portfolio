@@ -7,15 +7,20 @@ export function ProfileRail({
   name,
   photoSrc,
   links = [],
-  statement
+  statement,
+  className
 }: {
   name: string;
   photoSrc?: string;
   links?: readonly ProfileLink[];
   statement?: string;
+  className?: string;
 }) {
   return (
-    <aside className="profile-rail" aria-label={`${name} profile`}>
+    <aside
+      className={`profile-rail${className ? ` ${className}` : ""}`}
+      aria-label={`${name} profile`}
+    >
       <div
         className={`profile-portrait${photoSrc ? " has-photo" : ""}`}
         {...(!photoSrc ? { role: "img", "aria-label": `Portrait placeholder for ${name}` } : {})}

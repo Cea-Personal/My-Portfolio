@@ -60,13 +60,15 @@ export async function resolveEmbeddingProviders(
       if (!row) return [];
       if (
         !row.capabilities.some((capabilityName) => /^(embedding|embeddings)$/i.test(capabilityName))
-      )
+      ) {
         return [];
-    if (!row.secret_ref) throw new Error("EMBEDDING_SECRET_REFERENCE_MISSING");
-    const apiKey = process.env[row.secret_ref]?.trim();
-    if (!apiKey) throw new Error(`EMBEDDING_SECRET_MISSING:${row.secret_ref}`);
-    if (/^secret:\/\//i.test(apiKey))
-      throw new Error(`EMBEDDING_SECRET_UNRESOLVED:${row.secret_ref}`);
+      }
+      if (!row.secret_ref) throw new Error("EMBEDDING_SECRET_REFERENCE_MISSING");
+      const apiKey = process.env[row.secret_ref]?.trim();
+      if (!apiKey) throw new Error(`EMBEDDING_SECRET_MISSING:${row.secret_ref}`);
+      if (/^secret:\/\//i.test(apiKey)) {
+        throw new Error(`EMBEDDING_SECRET_UNRESOLVED:${row.secret_ref}`);
+      }
       return [{ ...row, apiKey, endpoint: endpointFor(row) }];
     });
   if (!resolved.length) throw new Error("EMBEDDING_PROVIDER_NOT_AVAILABLE");
@@ -79,6 +81,11 @@ export async function embedWithProvider(
   signal?: AbortSignal
 ): Promise<number[][]> {
   if (!inputs.length) return [];
+  // `dimensions` is supported by OpenAI's text-embedding-3 family, but not by
+  // older models (or by every OpenAI-compatible gateway). The database stores
+  // a 1536-dimensional vector, so gateways that omit this option must still
+  // return that size and will be rejected below with a useful diagnostic.
+  const supportsDimensions = /^text-embedding-3(?:-|$)/i.test(provider.model);
   const response = await fetch(provider.endpoint, {
     method: "POST",
     headers: {
@@ -89,27 +96,38 @@ export async function embedWithProvider(
       model: provider.model,
       input: inputs,
       encoding_format: "float",
-      dimensions: PRODUCTION_EMBEDDING_DIMENSIONS
+      ...(supportsDimensions ? { dimensions: PRODUCTION_EMBEDDING_DIMENSIONS } : {})
     }),
     signal: signal ?? AbortSignal.timeout(60_000)
   });
-  if (!response.ok) throw new Error(`EMBEDDING_PROVIDER_HTTP_${String(response.status)}`);
+  if (!response.ok) {
+    const body = await response.text().catch(() => "");
+    let detail = body;
+    try {
+      const parsed = JSON.parse(body) as { error?: { message?: string } };
+      detail = parsed.error?.message ?? body;
+    } catch {
+      // Preserve a bounded plain-text provider diagnostic.
+    }
+    throw new Error(
+      `EMBEDDING_PROVIDER_HTTP_${String(response.status)}${detail.trim() ? `:${detail.trim().slice(0, 180)}` : ""}`
+    );
+  }
   const payload = (await response.json()) as {
     data?: Array<{ index?: number; embedding?: number[] }>;
   };
   const ordered = [...(payload.data ?? [])].sort(
     (left, right) => (left.index ?? 0) - (right.index ?? 0)
   );
-  if (
-    ordered.length !== inputs.length ||
-    ordered.some(
-      (item) =>
-        !Array.isArray(item.embedding) ||
-        item.embedding.length !== PRODUCTION_EMBEDDING_DIMENSIONS ||
-        item.embedding.some((value) => !Number.isFinite(value))
-    )
-  )
-    throw new Error("EMBEDDING_PROVIDER_RESPONSE_INVALID");
+  if (ordered.length !== inputs.length) throw new Error("EMBEDDING_PROVIDER_RESPONSE_INVALID");
+  for (const item of ordered) {
+    if (!Array.isArray(item.embedding) || item.embedding.some((value) => !Number.isFinite(value)))
+      throw new Error("EMBEDDING_PROVIDER_RESPONSE_INVALID");
+    if (item.embedding.length !== PRODUCTION_EMBEDDING_DIMENSIONS)
+      throw new Error(
+        `EMBEDDING_PROVIDER_DIMENSIONS_INVALID:received=${String(item.embedding.length)},expected=${String(PRODUCTION_EMBEDDING_DIMENSIONS)}`
+      );
+  }
   return ordered.map((item) => {
     if (!item.embedding) throw new Error("EMBEDDING_PROVIDER_RESPONSE_INVALID");
     return item.embedding;

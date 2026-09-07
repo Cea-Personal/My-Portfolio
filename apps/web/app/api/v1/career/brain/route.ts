@@ -43,27 +43,53 @@ export async function POST(request: Request) {
     try {
       const generated = await synthesizeCareerBrain(client, ownerId);
       const current = await readLatest(client, ownerId);
+      await recordAudit(client, ownerId, "career_brain.generated", null, {
+        reused: generated.reused
+      });
       return apiResponse(
         { ...current, reused: generated.reused },
         request,
         generated.reused ? 200 : 201
       );
     } catch (error) {
+      const diagnostic =
+        error instanceof Error ? error.message.slice(0, 180) : "CAREER_BRAIN_FAILED";
       const code =
         error instanceof Error
           ? (error.message.split(":")[0] ?? "CAREER_BRAIN_FAILED")
           : "CAREER_BRAIN_FAILED";
+      await recordAudit(client, ownerId, "career_brain.failed", diagnostic, { code });
       if (/^(EMBEDDING|AI_CAPABILITY|AI_PROVIDER)/.test(code))
         return apiResponse(
           {
             code,
-            detail:
-              "Configure enabled embedding and evidence-extraction providers in Settings, then regenerate Career Brain."
+            detail: `${diagnostic}. Configure the matching enabled provider in Settings, verify its server secret is available to the web process, then regenerate Career Brain.`
           },
           request,
           409
         );
-      throw error;
+      return apiResponse({ code, detail: diagnostic }, request, 503);
     }
   });
+}
+
+async function recordAudit(
+  client: Parameters<Parameters<typeof withPrivateApi>[1]>[0]["client"],
+  ownerId: string,
+  action: string,
+  reason: string | null,
+  metadata: Record<string, unknown>
+) {
+  try {
+    await client.schema("app").from("audit_events").insert({
+      owner_id: ownerId,
+      actor_type: "owner",
+      action,
+      target_type: "career_brain",
+      reason,
+      after_metadata: metadata
+    });
+  } catch {
+    // Preserve the original Career Brain result if observability is unavailable.
+  }
 }

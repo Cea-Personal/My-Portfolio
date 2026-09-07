@@ -1,5 +1,6 @@
 import { apiResponse } from "@/lib/api/response";
 import { withPrivateApi } from "@/lib/api/private";
+import { generateReasoningJson, resolveReasoningProviders } from "@/lib/server/reasoning-provider";
 
 const modes = new Set(["ideas", "outline", "draft", "rewrite", "summary", "titles", "tags", "seo"]);
 
@@ -41,35 +42,48 @@ export async function POST(request: Request) {
       if (versions.error) throw versions.error;
       evidenceStatements = (versions.data ?? []).map((version) => version.statement as string);
     }
-    const evidence = evidenceStatements.length
-      ? `\n\nApproved evidence available (do not exceed these claims):\n${evidenceStatements.map((item) => `- ${item}`).join("\n")}`
-      : "";
-    const outputs: Record<string, string> = {
-      ideas: `Explore three angles: the system constraint behind ${input}; the trade-off that mattered; and a practical field guide.`,
-      outline: `# Working title\n\n## The problem\n${input}\n\n## Constraints\n\n## Approach\n\n## Trade-offs\n\n## What to test next${evidence}`,
-      draft: `# Draft\n\n${input}\n\nExplain the operating context, the decision, the implementation, and the observable result. Separate demonstrated facts from interpretation.${evidence}`,
-      rewrite: `${input}\n\nRevision note: tighten the opening, use concrete verbs, state constraints, and qualify every unsupported conclusion.${evidence}`,
-      summary: input.length > 320 ? `${input.slice(0, 317)}…` : input,
-      titles: `1. Building the reliable version of ${input.slice(0, 100)}\n2. What ${input.slice(0, 100)} taught me\n3. A practical guide to ${input.slice(0, 100)}`,
-      tags: input
-        .toLowerCase()
-        .split(/[^a-z0-9+#.]+/)
-        .filter((word: string) => word.length > 4)
-        .slice(0, 8)
-        .join(", "),
-      seo: `SEO title: ${input.slice(0, 60)}\nMeta description: A practical engineering note about ${input.slice(0, 130)}.`
-    };
-    return apiResponse(
-      {
-        mode,
-        output: outputs[mode],
-        evidenceIds,
-        limitations: [
-          "This is drafting assistance, not independently verified proof.",
-          "Professional claims remain bounded by the selected approved evidence."
-        ]
-      },
-      request
-    );
+    try {
+      const providers = await resolveReasoningProviders(client, ownerId, "writing_assistance");
+      const generated = await generateReasoningJson(
+        providers,
+        [
+          "You are the Blog writing editor subagent for Basil Ogbonna.",
+          "Use only the supplied prompt and explicitly approved evidence.",
+          "Do not invent employers, achievements, metrics, technologies, dates, or outcomes.",
+          `Produce a ${mode} suggestion. Return JSON only with status, message, content, editedText, and suggestions.`,
+          "Put the usable result in content or editedText; use suggestions for titles, tags, or alternatives.",
+          "Keep the result practical and ready to copy into the Blog editor."
+        ].join(" "),
+        { mode, input, approvedEvidence: evidenceStatements },
+        { task: "writing_assistance" }
+      );
+      const output = generated.output;
+      const suggestions = Array.isArray(output.suggestions)
+        ? output.suggestions.filter((item): item is string => typeof item === "string")
+        : [];
+      const content = [output.content, output.editedText, output.message]
+        .find((value): value is string => typeof value === "string" && value.trim().length > 0)
+        ?.trim();
+      const rendered = content || suggestions.join("\n");
+      if (!rendered) throw new Error("AI_PROVIDER_RESPONSE_INVALID");
+      return apiResponse(
+        {
+          mode,
+          output: rendered,
+          evidenceIds,
+          provider: generated.provider.provider,
+          model: generated.provider.model,
+          limitations: [
+            "This is drafting assistance, not independently verified proof.",
+            "Professional claims remain bounded by the selected approved evidence."
+          ]
+        },
+        request
+      );
+    } catch (error) {
+      const detail =
+        error instanceof Error ? error.message.slice(0, 240) : "WRITING_ASSISTANCE_FAILED";
+      return apiResponse({ code: detail.split(":")[0], detail }, request, 503);
+    }
   });
 }
