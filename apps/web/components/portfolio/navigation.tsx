@@ -5,7 +5,9 @@ import { ThemeToggle } from "./theme-toggle";
 
 export function PortfolioNavigation() {
   const [menuOpen, setMenuOpen] = useState(false);
-  const closeMenu = () => setMenuOpen(false);
+  const closeMenu = () => {
+    setMenuOpen(false);
+  };
 
   return (
     <nav aria-label="Portfolio sections">
@@ -19,7 +21,9 @@ export function PortfolioNavigation() {
         aria-label="Toggle portfolio navigation"
         aria-expanded={menuOpen}
         aria-controls="portfolio-mobile-menu"
-        onClick={() => setMenuOpen((open) => !open)}
+        onClick={() => {
+          setMenuOpen((open) => !open);
+        }}
       >
         <span aria-hidden="true">☰</span> Menu
       </button>

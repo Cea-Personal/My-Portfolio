@@ -169,7 +169,7 @@ async function mutation(endpoint: string, method: "POST" | "PATCH", body: unknow
   return payload.data;
 }
 
-export function JobsWorkspace() {
+export function JobsWorkspace({ initialJobId }: { initialJobId?: string } = {}) {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [profiles, setProfiles] = useState<SearchProfile[]>([]);
   const [runs, setRuns] = useState<SearchRun[]>([]);
@@ -357,7 +357,7 @@ export function JobsWorkspace() {
       setLiveSearching(false);
     }
   }
-  async function loadDetail(id: string) {
+  const loadDetail = useCallback(async (id: string) => {
     setMessage("Loading opportunity evidence…");
     try {
       const response = await fetch(`/api/v1/jobs/${id}`, { cache: "no-store" });
@@ -368,7 +368,16 @@ export function JobsWorkspace() {
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not load opportunity.");
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    if (state === "ready" && initialJobId) void loadDetail(initialJobId);
+  }, [initialJobId, loadDetail, state]);
+
+  useEffect(() => {
+    if (detail?.id !== initialJobId) return;
+    document.getElementById("job-detail-panel")?.scrollIntoView({ block: "start" });
+  }, [detail, initialJobId]);
   async function updateJob(event: FormEvent<HTMLFormElement>, job: Job) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -748,7 +757,7 @@ export function JobsWorkspace() {
         </section>
       ) : null}
       {detail ? (
-        <section aria-labelledby="job-detail-title">
+        <section id="job-detail-panel" aria-labelledby="job-detail-title">
           <h2 id="job-detail-title">
             {detail.canonical_title} at {detail.canonical_company}
           </h2>

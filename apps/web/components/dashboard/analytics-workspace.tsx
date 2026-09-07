@@ -53,6 +53,44 @@ interface GapReport {
   gaps: Array<{ skill: string; demandCount: number; status: string; actions: string[] }>;
   sampledRequirements: number;
 }
+interface JobReport {
+  totals: {
+    jobs: number;
+    active: number;
+    rejected: number;
+    expired: number;
+    withDescriptions: number;
+    searchRuns: number;
+    failedSearchRuns: number;
+  };
+  statusBreakdown: Record<string, number>;
+  sourceBreakdown: Record<string, number>;
+  eligibilityBreakdown: Record<string, number>;
+  roleBreakdown: Record<string, number>;
+  discoveryByDay: Record<string, number>;
+  searchRunStatus: Record<string, number>;
+  searchTriggerTypes: Record<string, number>;
+  sourcePerformance: Array<{
+    id: string;
+    name: string;
+    adapterType: string;
+    listings: number;
+    fetched: number;
+    accepted: number;
+    rejected: number;
+    failures: number;
+  }>;
+  recentRuns: Array<{
+    id: string;
+    status: string;
+    triggerType: string;
+    logicalDate: string;
+    discovered: number;
+    persisted: number;
+    filtered: number;
+    errorSummary?: string | null;
+  }>;
+}
 function displayName(value: string): string {
   return value.replaceAll("_", " ").replaceAll("-", " ");
 }
@@ -134,6 +172,7 @@ export function AnalyticsWorkspace() {
   const [applications, setApplications] = useState<ApplicationReport | null>(null);
   const [interviews, setInterviews] = useState<InterviewReport | null>(null);
   const [career, setCareer] = useState<GapReport | null>(null);
+  const [jobs, setJobs] = useState<JobReport | null>(null);
   const [portfolioInsights, setPortfolioInsights] = useState<PortfolioInsights | null>(null);
   const [insightsState, setInsightsState] = useState<"idle" | "loading" | "ready" | "error">(
     "idle"
@@ -163,7 +202,8 @@ export function AnalyticsWorkspace() {
         fetch(
           `/api/v1/analytics/career-gaps${limited(["source", "workModel", "minMatch", "minOpportunity", "minComp", "maxComp"])}`,
           { cache: "no-store" }
-        )
+        ),
+        fetch(`/api/v1/analytics/jobs${shared}`, { cache: "no-store" })
       ]);
       if (responses.some((response) => !response.ok)) throw new Error();
       const payloads = (await Promise.all(
@@ -176,6 +216,7 @@ export function AnalyticsWorkspace() {
       setApplications(payloads[1]?.data as ApplicationReport);
       setInterviews(payloads[2]?.data as InterviewReport);
       setCareer(payloads[3]?.data as GapReport);
+      setJobs(payloads[4]?.data as JobReport);
       setState("ready");
     } catch {
       setState("error");
@@ -336,7 +377,7 @@ export function AnalyticsWorkspace() {
       </form>
       {state === "loading" ? <p role="status">Rebuilding analytics view…</p> : null}
       {state === "error" ? <p role="alert">Private analytics could not be loaded.</p> : null}
-      {state === "ready" && portfolio && applications && interviews && career ? (
+      {state === "ready" && portfolio && applications && interviews && career && jobs ? (
         <div className="analytics-dashboard">
           <section className="analytics-panel analytics-wide">
             <div className="analytics-panel-heading">
@@ -448,6 +489,89 @@ export function AnalyticsWorkspace() {
                 </>
               ) : null}
             </section>
+          </section>
+
+          <section className="analytics-panel analytics-wide">
+            <div className="analytics-panel-heading">
+              <div>
+                <span className="eyebrow">Job discovery</span>
+                <h2>Opportunity pipeline</h2>
+              </div>
+              <span className="analytics-panel-note">Search runs and saved opportunities</span>
+            </div>
+            <div className="analytics-kpi-grid">
+              <SummaryMetric
+                label="Jobs saved"
+                value={String(jobs.totals.jobs)}
+                detail="Matched private pipeline"
+              />
+              <SummaryMetric
+                label="Active"
+                value={String(jobs.totals.active)}
+                detail="Not closed or expired"
+              />
+              <SummaryMetric
+                label="Search runs"
+                value={String(jobs.totals.searchRuns)}
+                detail={`${String(jobs.totals.failedSearchRuns)} failed`}
+              />
+              <SummaryMetric
+                label="With descriptions"
+                value={String(jobs.totals.withDescriptions)}
+                detail="Ready for matching"
+              />
+              <SummaryMetric
+                label="Rejected"
+                value={String(jobs.totals.rejected)}
+                detail={`${String(jobs.totals.expired)} expired`}
+              />
+            </div>
+            <div className="analytics-chart-grid analytics-chart-grid-four">
+              <BarList title="Pipeline status" values={jobs.statusBreakdown} />
+              <BarList title="Jobs by source" values={jobs.sourceBreakdown} />
+              <BarList title="Eligibility outcome" values={jobs.eligibilityBreakdown} />
+              <BarList title="Search run status" values={jobs.searchRunStatus} />
+            </div>
+            <div className="analytics-chart-grid analytics-chart-grid-three">
+              <BarList title="Roles discovered" values={jobs.roleBreakdown} />
+              <BarList title="Discovery by day" values={jobs.discoveryByDay} />
+              <BarList title="Search trigger" values={jobs.searchTriggerTypes} />
+            </div>
+            <div className="analytics-dashboard-grid">
+              <div>
+                <h3>Source performance</h3>
+                {jobs.sourcePerformance.length ? (
+                  <ul className="analytics-compact-list">
+                    {jobs.sourcePerformance.map((source) => (
+                      <li key={source.id}>
+                        <strong>{source.name}</strong> ({source.adapterType}) · {source.listings}{" "}
+                        listing{source.listings === 1 ? "" : "s"} · {source.accepted} accepted ·{" "}
+                        {source.rejected} rejected · {source.failures} failed source runs
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="analytics-empty">No configured job sources have run yet.</p>
+                )}
+              </div>
+              <div>
+                <h3>Recent search runs</h3>
+                {jobs.recentRuns.length ? (
+                  <ul className="analytics-compact-list">
+                    {jobs.recentRuns.map((run) => (
+                      <li key={run.id}>
+                        <strong>{run.logicalDate}</strong> · {displayName(run.triggerType)} ·{" "}
+                        {displayName(run.status)} · {run.discovered} discovered · {run.persisted}{" "}
+                        saved · {run.filtered} filtered
+                        {run.errorSummary ? ` — ${run.errorSummary}` : ""}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="analytics-empty">No job searches have been recorded yet.</p>
+                )}
+              </div>
+            </div>
           </section>
 
           <div className="analytics-dashboard-grid">
