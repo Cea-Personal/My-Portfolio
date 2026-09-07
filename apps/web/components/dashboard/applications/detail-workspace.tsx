@@ -540,7 +540,10 @@ export function ApplicationDetailWorkspace({ id }: { id: string }) {
       </section>
       <section>
         <h2>Readiness and required materials</h2>
-        <form className="knowledge-entry-form" onSubmit={(event) => void addMaterial(event)}>
+        <p>The AI kit does not require this checklist. Add an employer-specific requirement only when one is provided.</p>
+        <details>
+          <summary>Add a requirement (optional)</summary>
+          <form className="knowledge-entry-form" onSubmit={(event) => void addMaterial(event)}>
           <label>
             Material type
             <select name="materialType">
@@ -563,8 +566,9 @@ export function ApplicationDetailWorkspace({ id }: { id: string }) {
           <label>
             <input name="required" type="checkbox" defaultChecked /> Required
           </label>
-          <button type="submit">Add material</button>
-        </form>
+            <button type="submit">Add material</button>
+          </form>
+        </details>
         {application.application_required_materials?.length ? (
           <ul className="workspace-list">
             {application.application_required_materials.map((material) => (
@@ -866,6 +870,9 @@ export function ApplicationDetailWorkspace({ id }: { id: string }) {
       </section>
       <section>
         <h2>Compensation research</h2>
+        <p>Optional: add market sources only if you want a salary recommendation for this application.</p>
+        <details>
+          <summary>Add compensation sources</summary>
         <form
           className="knowledge-entry-form"
           onSubmit={(event) => void researchCompensation(event)}
@@ -895,6 +902,7 @@ export function ApplicationDetailWorkspace({ id }: { id: string }) {
           </label>
           <button type="submit">Analyze compensation</button>
         </form>
+        </details>
         {application.compensation_recommendations?.length ? (
           <ul>
             {application.compensation_recommendations.map((item) => (

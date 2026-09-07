@@ -1,5 +1,4 @@
 import { createHash } from "node:crypto";
-import { createServiceSupabaseClient } from "@career-os/database/service";
 import { renderPdf } from "@career-os/applications";
 import { apiResponse } from "@/lib/api/response";
 import { withPrivateApi } from "@/lib/api/private";
@@ -193,7 +192,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const saved: Array<{ artifactType: string; artifactId: string; versionId: string }> = [];
     for (const document of documentsToSave) {
       if (document.artifactType === "resume" && !document.evidenceIds.length) continue;
-      if (document.artifactType === "cover_letter" && document.evidenceIds.length < 2) continue;
+      if (document.artifactType === "cover_letter" && !document.evidenceIds.length) continue;
       const existing = await client
         .schema("app")
         .from("generated_artifacts")

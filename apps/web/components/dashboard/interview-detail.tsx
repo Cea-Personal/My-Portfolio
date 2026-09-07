@@ -161,7 +161,10 @@ export function InterviewDetail({ id }: { id: string }) {
           })}
         </ol>
       ) : (
-        <p>Interview Process Unknown — add a manual stage when evidence is insufficient.</p>
+        <p>
+          Interview stages have not been inferred yet. Refresh the AI package after the selected job
+          description is indexed; adding a stage manually is optional.
+        </p>
       )}
     </main>
   );

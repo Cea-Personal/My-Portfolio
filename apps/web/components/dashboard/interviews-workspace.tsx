@@ -527,11 +527,14 @@ export function InterviewsWorkspace() {
                       ) : null}
                     </p>
                   ))}
-                  <form
-                    className="knowledge-entry-form"
-                    onSubmit={(event) => void addDebrief(event, stage)}
-                  >
-                    <h3>Post-interview debrief</h3>
+                  <details>
+                    <summary>Record a post-interview debrief (optional)</summary>
+                    <p>This is only for reflection after the interview; it is not needed to create the AI kit.</p>
+                    <form
+                      className="knowledge-entry-form"
+                      onSubmit={(event) => void addDebrief(event, stage)}
+                    >
+                      <h3>Post-interview debrief</h3>
                     <label>
                       Original notes
                       <textarea name="notes" required rows={6} />
@@ -556,8 +559,9 @@ export function InterviewsWorkspace() {
                       Follow-ups
                       <input name="followUps" />
                     </label>
-                    <button type="submit">Preserve debrief</button>
-                  </form>
+                      <button type="submit">Preserve debrief</button>
+                    </form>
+                  </details>
                   {stage.interview_debriefs?.map((debrief) => (
                     <div key={debrief.id}>
                       <p>{debrief.original_notes}</p>
