@@ -76,7 +76,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ slug: 
       ) : null}
       {citations.length ? (
         <section aria-labelledby="project-evidence">
-          <h2 id="project-evidence">Evidence and contribution</h2>
+          <h2 id="project-evidence">Facts and contribution</h2>
           <ul>
             {citations.map((item, index) => (
               <li
@@ -86,7 +86,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ slug: 
                     : `evidence-${String(index)}`
                 }
               >
-                Approved public evidence reference
+                Published fact reference
               </li>
             ))}
           </ul>

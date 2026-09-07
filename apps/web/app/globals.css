@@ -5761,6 +5761,15 @@ nav[aria-label="Portfolio sections"] a {
   grid-template-columns: repeat(6, minmax(6rem, 1fr));
 }
 
+.hero-career-track-shell {
+  position: relative;
+  min-width: 0;
+}
+
+.hero-career-scroll-cue {
+  display: none;
+}
+
 .hero-career-track > span {
   display: grid;
   gap: 0.35rem;
@@ -6468,6 +6477,31 @@ nav[aria-label="Portfolio sections"] a {
 
   .hero-career-track > span {
     min-width: 8rem;
+  }
+
+  .hero-career-scroll-cue {
+    position: absolute;
+    top: 0;
+    bottom: 0.5rem;
+    z-index: 1;
+    display: inline-flex;
+    width: 1.9rem;
+    align-items: center;
+    justify-content: center;
+    color: #8ae6d0;
+    font-size: 1.15rem;
+    font-weight: 800;
+    pointer-events: none;
+  }
+
+  .hero-career-scroll-cue-left {
+    left: 0;
+    background: linear-gradient(90deg, rgb(12 16 23 / 96%), transparent);
+  }
+
+  .hero-career-scroll-cue-right {
+    right: 0;
+    background: linear-gradient(270deg, rgb(12 16 23 / 96%), transparent);
   }
 
   .about-layout > h2 {
@@ -7209,6 +7243,18 @@ html[data-portfolio-theme="light"] .cinematic-hero .hero-career-track > span {
   color: #526071;
 }
 
+html[data-portfolio-theme="light"] .hero-career-scroll-cue {
+  color: #365bd6;
+}
+
+html[data-portfolio-theme="light"] .hero-career-scroll-cue-left {
+  background: linear-gradient(90deg, rgb(201 217 242 / 96%), transparent);
+}
+
+html[data-portfolio-theme="light"] .hero-career-scroll-cue-right {
+  background: linear-gradient(270deg, rgb(201 217 242 / 96%), transparent);
+}
+
 @media (max-width: 50rem) {
   nav[aria-label="Portfolio sections"] {
     flex-wrap: nowrap;
@@ -7635,5 +7681,12 @@ html[data-portfolio-theme="light"] .analytics-consent button + button {
 
   nav[aria-label="Portfolio sections"] .portfolio-nav-links .theme-toggle {
     justify-content: flex-start;
+  }
+
+  /* Keep the public portfolio content visually balanced against the viewport
+     edge on narrow screens. */
+  .portfolio-layout {
+    width: min(calc(100% - 2rem), 64rem);
+    margin-inline: auto;
   }
 }

@@ -1,5 +1,5 @@
 export function About({
-  bio = "A clear, evidence-backed view of the work behind the outcomes."
+  bio = "A clear, fact-based view of the work behind the outcomes."
 }: {
   bio?: string;
 }) {

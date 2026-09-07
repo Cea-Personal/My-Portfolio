@@ -57,7 +57,7 @@ export async function POST(request: Request) {
   if (!question || hostilePublicInput(question))
     return publicApiResponse(
       {
-        answer: "I can only answer career questions from approved public evidence.",
+        answer: "I can only answer career questions from the facts shared in this portfolio.",
         citations: [],
         abstained: true,
         reason: !question ? "EMPTY_QUESTION" : "UNSAFE_INSTRUCTION"
@@ -68,7 +68,7 @@ export async function POST(request: Request) {
   const snapshot = await loadPublicPortfolio();
   if (snapshot.source !== "live") {
     const unavailable = {
-      answer: "The public assistant is temporarily unavailable while approved evidence reconnects.",
+      answer: "The public assistant is temporarily unavailable while portfolio facts reconnect.",
       citations: [] as string[],
       abstained: true,
       unavailable: true

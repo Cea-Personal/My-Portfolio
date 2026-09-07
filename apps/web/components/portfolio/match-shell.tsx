@@ -71,7 +71,7 @@ export function RoleFit() {
         <i aria-hidden="true">+</i>
       </summary>
       <div className="assistant-role-fit-body" aria-live="polite">
-        <p>Share a role description to explore the approved evidence behind the fit.</p>
+        <p>Share a role description to see how it fits with the facts in this portfolio.</p>
         <form
           onSubmit={(event) => {
             event.preventDefault();
@@ -97,24 +97,24 @@ export function RoleFit() {
           <div className="role-fit-results">
             {result.unavailable ? (
               <p className="assistant-unavailable" role="status">
-                Live public evidence is reconnecting. Role fit will be available when the approved
-                publication is reachable.
+                Portfolio facts are reconnecting. Role fit will be available when the published
+                portfolio data is reachable.
               </p>
             ) : null}
             <p>
               Match score: {result.score}
-              {result.abstained ? " (no approved evidence matched)" : ""}
+              {result.abstained ? " (no matching portfolio facts)" : ""}
             </p>
             {result.requirements.length ? (
               <div className="role-fit-table-wrap">
                 <table>
-                  <caption>Requirement-by-requirement evidence comparison</caption>
+                  <caption>Requirement-by-requirement fit</caption>
                   <thead>
                     <tr>
                       <th>Requirement</th>
                       <th>Priority</th>
                       <th>Outcome</th>
-                      <th>Evidence</th>
+                      <th>Relevant facts</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -129,7 +129,7 @@ export function RoleFit() {
                         <td>
                           {requirement.evidence?.length
                             ? requirement.evidence.join(", ")
-                            : "No citation"}
+                            : "No supporting facts"}
                         </td>
                       </tr>
                     ))}
@@ -140,7 +140,7 @@ export function RoleFit() {
               <p>There were no distinct requirements to compare.</p>
             )}
             <small>
-              Scores summarize approved public evidence only; they are not a hiring prediction.
+              Scores summarize the portfolio facts only; they are not a hiring prediction.
             </small>
           </div>
         ) : null}

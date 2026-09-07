@@ -39,7 +39,7 @@ export function AskShell() {
       };
       if (!response.ok) throw new Error("request failed");
       setAnswer(
-        payload.data?.answer ?? "I don't have enough approved public evidence to answer that."
+        payload.data?.answer ?? "I don't have enough portfolio facts to answer that."
       );
       setCitations(payload.data?.citations ?? []);
       setUnavailable(payload.data?.unavailable === true);
@@ -62,7 +62,7 @@ export function AskShell() {
           <h2 id="ask-title">Ask Basil</h2>
         </div>
         <span className="assistant-ready">
-          <i aria-hidden="true" /> evidence tool ready
+          <i aria-hidden="true" /> portfolio facts ready
         </span>
       </header>
 
@@ -101,7 +101,7 @@ export function AskShell() {
           <span aria-hidden="true">BO</span>
           <p>
             Ask about my engineering background, career journey, projects, outcomes, or role fit. I
-            answer only from approved public evidence.
+            answer from the facts shared in this portfolio.
           </p>
         </div>
 
@@ -118,7 +118,7 @@ export function AskShell() {
             </li>
             <li data-state={status === "loading" ? "running" : answer ? "complete" : "waiting"}>
               <span>02</span>
-              <code>retrieve_public_evidence</code>
+              <code>retrieve_portfolio_facts</code>
               <small>
                 {status === "loading" ? "searching" : answer ? "context returned" : "idle"}
               </small>
@@ -126,7 +126,7 @@ export function AskShell() {
             <li data-state={answer ? "complete" : "waiting"}>
               <span>03</span>
               <code>compose_grounded_answer</code>
-              <small>{answer ? "citations checked" : "idle"}</small>
+              <small>{answer ? "facts checked" : "idle"}</small>
             </li>
           </ol>
         </details>
@@ -135,28 +135,28 @@ export function AskShell() {
           <div className="assistant-conversation">
             <p className="assistant-user-message">{submittedQuestion}</p>
             {status === "loading" ? (
-              <p className="assistant-thinking">Retrieving evidence…</p>
+              <p className="assistant-thinking">Retrieving portfolio facts…</p>
             ) : null}
             {status === "error" ? (
               <p role="alert">The public assistant is unavailable. Try again.</p>
             ) : null}
             {unavailable ? (
               <p className="assistant-unavailable" role="status">
-                Live evidence is reconnecting. Ask Basil will resume when the approved public source
-                is available.
+                Portfolio facts are reconnecting. Ask Basil will resume when the published portfolio
+                data is available.
               </p>
             ) : null}
             {answer ? (
               <div className="assistant-answer">
                 <p>{answer}</p>
                 {citations.length ? (
-                  <ul aria-label="Answer evidence">
+                  <ul aria-label="Supporting facts">
                     {citations.map((citation) => (
                       <li key={citation}>{citation}</li>
                     ))}
                   </ul>
                 ) : (
-                  <small>No public evidence handles were returned.</small>
+                  <small>No supporting facts were returned.</small>
                 )}
               </div>
             ) : null}

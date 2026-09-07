@@ -7,17 +7,17 @@ const proofSteps = [
   {
     number: "02",
     title: "Curate",
-    text: "Only reviewed, public-safe evidence is projected into the portfolio experience."
+    text: "Only reviewed facts are projected into the portfolio experience."
   },
   {
     number: "03",
     title: "Match",
-    text: "A role description is compared with published evidence to explain fit."
+    text: "A role description is compared with published facts to explain fit."
   },
   {
     number: "04",
     title: "Answer",
-    text: "The portfolio assistant answers from public context and returns evidence references."
+    text: "The portfolio assistant answers from portfolio facts and returns supporting references."
   }
 ] as const;
 
@@ -32,14 +32,14 @@ const buildStack = [
 ];
 
 const architecturePoints = [
-  "Private source material is ingested, chunked, and embedded before it becomes retrievable evidence.",
+  "Private source material is ingested, chunked, and embedded before it becomes searchable portfolio context.",
   "Hybrid retrieval combines lexical search with vector similarity, then ranks context before answer generation.",
-  "Public projection and Supabase row-level security ensure only approved, safe evidence reaches this portfolio.",
+  "Public projection and Supabase row-level security ensure only facts selected for publication reach this portfolio.",
   "Async workflow runs keep ingestion, embedding, review, and publication observable and recoverable."
 ];
 
 const privateCapabilities = [
-  "Career knowledge base and evidence curation",
+  "Career knowledge base and fact curation",
   "Job, application, and document workspaces",
   "Interview preparation assistant and interview runs",
   "Automations, analytics, and owner-only settings"

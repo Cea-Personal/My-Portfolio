@@ -40,9 +40,9 @@ const processes = {
     statement: "Turn an uncertain question into an evaluated, observable system.",
     steps: ["Frame", "Retrieve", "Generate", "Evaluate", "Observe"],
     snippet: [
-      "context = retrieve(question, public_evidence)",
+      "context = retrieve(question, portfolio_facts)",
       "answer = model.generate(context, constraints)",
-      "score = evaluate(answer, citations, risk)",
+      "score = evaluate(answer, sources, risk)",
       "return answer if score.passes else abstain"
     ]
   }
