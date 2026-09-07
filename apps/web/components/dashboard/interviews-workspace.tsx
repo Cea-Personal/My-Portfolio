@@ -74,6 +74,7 @@ export function InterviewsWorkspace() {
   const [applications, setApplications] = useState<Application[]>([]);
   const [message, setMessage] = useState("");
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
+  const [autoPreparedProcesses, setAutoPreparedProcesses] = useState<string[]>([]);
   const load = useCallback(async () => {
     try {
       const [processResponse, applicationResponse] = await Promise.all([
@@ -93,6 +94,21 @@ export function InterviewsWorkspace() {
     }
   }, []);
   useEffect(() => void load(), [load]);
+  useEffect(() => {
+    if (state !== "ready") return;
+    const pending = processes.filter(
+      (process) =>
+        !autoPreparedProcesses.includes(process.id) &&
+        !(process.interview_stages ?? []).some((stage) => (stage.preparation_kits ?? []).length)
+    );
+    if (!pending.length) return;
+    setAutoPreparedProcesses((current) => [...current, ...pending.map((process) => process.id)]);
+    void Promise.all(
+      pending.map((process) =>
+        write(`/api/v1/interview-processes/${process.id}/auto-prepare`, "POST", {}).catch(() => null)
+      )
+    ).then(() => void load());
+  }, [autoPreparedProcesses, load, processes, state]);
   async function createProcess(application: Application) {
     try {
       const process = (await write(
@@ -245,7 +261,7 @@ export function InterviewsWorkspace() {
                 <strong>{application.jobs?.canonical_title ?? "Application"}</strong> ·{" "}
                 {application.jobs?.canonical_company ?? "Company"}
                 <button type="button" onClick={() => void createProcess(application)}>
-                  Create interview process
+                  Create interview kit (AI prepares it)
                 </button>
               </li>
             ))}
@@ -572,11 +588,17 @@ export function InterviewsWorkspace() {
               available.
             </p>
           )}
-          <form
-            className="knowledge-entry-form"
-            onSubmit={(event) => void addStage(event, process.id)}
-          >
-            <h3>Add stage</h3>
+          <details>
+            <summary>Add or correct an interview stage (optional)</summary>
+            <p>
+              Stages are inferred from the job description automatically. Use this only when the
+              employer gives you an additional stage or a correction.
+            </p>
+            <form
+              className="knowledge-entry-form"
+              onSubmit={(event) => void addStage(event, process.id)}
+            >
+              <h3>Add stage</h3>
             <label>
               Name
               <input name="name" required />
@@ -610,8 +632,9 @@ export function InterviewsWorkspace() {
               Notes
               <textarea name="notes" />
             </label>
-            <button type="submit">Add stage</button>
-          </form>
+              <button type="submit">Add stage</button>
+            </form>
+          </details>
         </section>
       ))}
       <WorkspaceToast

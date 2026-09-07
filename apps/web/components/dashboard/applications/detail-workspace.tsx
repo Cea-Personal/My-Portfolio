@@ -192,6 +192,8 @@ export function ApplicationDetailWorkspace({ id }: { id: string }) {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [message, setMessage] = useState("");
+  const [preparingKit, setPreparingKit] = useState(false);
+  const [autoPrepareAttempted, setAutoPrepareAttempted] = useState(false);
   const load = useCallback(async () => {
     try {
       const [applicationResponse, profileResponse, factsResponse] = await Promise.all([
@@ -218,6 +220,15 @@ export function ApplicationDetailWorkspace({ id }: { id: string }) {
     }
   }, [id]);
   useEffect(() => void load(), [load]);
+  useEffect(() => {
+    if (state !== "ready" || !application || autoPrepareAttempted) return;
+    if (application.generated_artifacts?.length) {
+      setAutoPrepareAttempted(true);
+      return;
+    }
+    setAutoPrepareAttempted(true);
+    void prepareApplicationKit(true);
+  }, [application, autoPrepareAttempted, state]);
   if (state === "loading")
     return (
       <main className="workspace-page">
@@ -263,6 +274,29 @@ export function ApplicationDetailWorkspace({ id }: { id: string }) {
       await load();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not save notes.");
+    }
+  }
+  async function prepareApplicationKit(silent = false) {
+    setPreparingKit(true);
+    try {
+      const result = (await write(`/api/v1/applications/${id}/auto-prepare`, "POST", {})) as {
+        generatedCount?: number;
+        status?: string;
+      };
+      if (!silent || result.generatedCount) {
+        setMessage(
+          result.generatedCount
+            ? `AI prepared ${String(result.generatedCount)} application document(s) from this job and your private career data.`
+            : "The AI could not create a grounded document yet. Add or index a CV and career facts, then try again."
+        );
+      }
+      await load();
+    } catch (error) {
+      if (!silent) {
+        setMessage(error instanceof Error ? error.message : "Could not prepare the application kit.");
+      }
+    } finally {
+      setPreparingKit(false);
     }
   }
   async function transition(status: ApplicationStatus) {
@@ -548,10 +582,10 @@ export function ApplicationDetailWorkspace({ id }: { id: string }) {
       <section>
         <h2>Application form and answers</h2>
         <p>
-          Add questions from this job&apos;s application form when automated access is unavailable.
-          Separate each question with a blank paragraph. They are stored only on this application,
-          never in your application profile. The orchestrator generates an answer for each question
-          from this job, your selected profile, Career Brain, and private evidence. Sensitive and
+          This section is optional. The AI prepares the kit without a form. When an employer asks
+          additional questions that cannot be imported automatically, add them here and answers
+          will be generated for the exact wording. Separate each question with a blank paragraph;
+          they are stored only on this application, never in your application profile. Sensitive and
           legal responses are never inferred.
         </p>
         <div className="workspace-actions">
@@ -559,7 +593,9 @@ export function ApplicationDetailWorkspace({ id }: { id: string }) {
             Regenerate AI answers
           </button>
         </div>
-        <form className="knowledge-entry-form" onSubmit={(event) => void addField(event)}>
+        <details>
+          <summary>Add employer questions (optional)</summary>
+          <form className="knowledge-entry-form" onSubmit={(event) => void addField(event)}>
           <label>
             Application URL (optional)
             <input name="sourceUrl" type="url" />
@@ -568,7 +604,6 @@ export function ApplicationDetailWorkspace({ id }: { id: string }) {
             Additional employer questions
             <textarea
               name="questionsText"
-              required
               rows={8}
               placeholder={
                 "Why do you want to work here?\n\nDescribe your experience with Airflow.\n\nWhat are your salary expectations?"
@@ -616,8 +651,9 @@ export function ApplicationDetailWorkspace({ id }: { id: string }) {
           <label>
             <input name="sensitive" type="checkbox" /> Sensitive / voluntary demographic
           </label>
-          <button type="submit">Capture field</button>
-        </form>
+            <button type="submit">Capture and generate answers</button>
+          </form>
+        </details>
         {fields.length ? (
           <ul className="workspace-list">
             {fields.map((field) => {
@@ -673,12 +709,24 @@ export function ApplicationDetailWorkspace({ id }: { id: string }) {
         )}
       </section>
       <section>
-        <h2>CV, cover letter, and other artifacts</h2>
+        <h2>AI-prepared application documents</h2>
         <p>
-          Draft content is rendered to a private PDF. Select only verified facts that support its
-          claims.
+          You do not need to write a CV or cover letter here. The application writer uses the job
+          description, your selected profile, indexed CVs, Career Brain, and private career facts to
+          prepare tailored drafts. Review them before using them.
         </p>
-        <form className="knowledge-entry-form" onSubmit={(event) => void composeArtifact(event)}>
+        <div className="workspace-actions">
+          <button type="button" disabled={preparingKit} onClick={() => void prepareApplicationKit()}>
+            {preparingKit ? "Preparing with AI…" : "Prepare / refresh CV and cover letter"}
+          </button>
+        </div>
+        {!application.generated_artifacts?.length ? (
+          <p>Preparing automatically… if no draft appears, index a CV or add verified career facts and retry.</p>
+        ) : null}
+        <details>
+          <summary>Advanced: compose a document manually</summary>
+          <p>Manual composition is optional and is not required to prepare an application.</p>
+          <form className="knowledge-entry-form" onSubmit={(event) => void composeArtifact(event)}>
           <label>
             Artifact type
             <select name="artifactType">
@@ -739,10 +787,11 @@ export function ApplicationDetailWorkspace({ id }: { id: string }) {
               <p>Approve facts in Career Brain before composing evidence-backed materials.</p>
             )}
           </fieldset>
-          <button type="submit" disabled={!facts.length}>
-            Create private PDF draft
-          </button>
-        </form>
+            <button type="submit" disabled={!facts.length}>
+              Create private PDF draft
+            </button>
+          </form>
+        </details>
         {application.generated_artifacts?.length ? (
           <ul className="workspace-list">
             {application.generated_artifacts.map((artifact) => (
