@@ -10,7 +10,8 @@ export function Contact() {
     event.preventDefault();
     setStatus("sending");
     setMessage("");
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const response = await fetch("/api/v1/public/contact", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -23,7 +24,7 @@ export function Contact() {
       })
     }).catch(() => null);
     if (response?.ok) {
-      event.currentTarget.reset();
+      formElement.reset();
       setStatus("sent");
       setMessage("Message sent. I’ll be in touch soon.");
       return;

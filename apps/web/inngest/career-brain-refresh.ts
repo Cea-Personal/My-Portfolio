@@ -7,6 +7,7 @@ export const careerBrainRefresh = inngest.createFunction(
     id: "career-brain-refresh",
     retries: 2,
     concurrency: [{ limit: 1, key: "event.data.ownerId" }],
+    debounce: { key: "event.data.ownerId", period: "30s", timeout: "5m" },
     triggers: [{ event: "career/brain.refresh.requested.v1" }]
   },
   async ({ event, step }) => {

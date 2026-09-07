@@ -234,7 +234,10 @@ export function JobsWorkspace() {
 
   async function createJob(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    // React clears the synthetic event's currentTarget after the first await;
+    // retain the DOM form before the network mutation completes.
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     setMessage("Saving opportunity…");
     try {
       await mutation("/api/v1/jobs", "POST", {
@@ -244,7 +247,7 @@ export function JobsWorkspace() {
         description: form.get("description"),
         sourceUrl: form.get("sourceUrl")
       });
-      event.currentTarget.reset();
+      formElement.reset();
       setMessage("Opportunity saved with its initial history entry.");
       await load();
     } catch (error) {

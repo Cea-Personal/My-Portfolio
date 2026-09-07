@@ -27,16 +27,6 @@ export async function PATCH(
     const body = await request.json().catch(() => ({}));
     if (!taskTypes.has(taskType) || typeof body.providerId !== "string")
       return apiResponse({ code: "INVALID_CAPABILITY_CONFIGURATION" }, request, 400);
-    if (taskType === "orchestrator" && body.fallbackProviderId)
-      return apiResponse(
-        {
-          code: "SINGLE_ORCHESTRATOR_MODEL_REQUIRED",
-          detail:
-            "The orchestrator uses one model for every reasoning subagent; remove the fallback provider."
-        },
-        request,
-        409
-      );
     const creativity = Number(body.creativity ?? 0.2);
     const lengthLimit = Number(body.lengthLimit ?? 2000);
     const timeoutMs = Number(body.timeoutMs ?? (taskType === "orchestrator" ? 120000 : 30000));

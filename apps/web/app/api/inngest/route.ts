@@ -9,12 +9,14 @@ import { outboxDrain } from "../../../inngest/outbox-drain";
 import { dataExport } from "../../../inngest/data-export";
 import { automationScheduler } from "../../../inngest/automation-scheduler";
 import { careerBrainRefresh } from "../../../inngest/career-brain-refresh";
+import { embeddingBackfill } from "../../../inngest/embedding-backfill";
 
 const handler = serve({
   client: inngest,
   functions: [
     driveSync,
     documentIngestion,
+    embeddingBackfill,
     careerBrainRefresh,
     jobSearch,
     analyticsAggregation,

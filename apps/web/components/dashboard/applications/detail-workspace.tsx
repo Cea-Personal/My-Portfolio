@@ -278,7 +278,8 @@ export function ApplicationDetailWorkspace({ id }: { id: string }) {
   }
   async function addMaterial(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     try {
       await write(`/api/v1/applications/${id}/required-materials`, "POST", {
         label: form.get("label"),
@@ -286,7 +287,7 @@ export function ApplicationDetailWorkspace({ id }: { id: string }) {
         required: form.get("required") === "on",
         notes: form.get("notes")
       });
-      event.currentTarget.reset();
+      formElement.reset();
       setMessage("Required material added.");
       await load();
     } catch (error) {
@@ -356,7 +357,8 @@ export function ApplicationDetailWorkspace({ id }: { id: string }) {
 
   async function composeArtifact(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     try {
       await write(`/api/v1/applications/${id}/compose`, "POST", {
         artifactType: form.get("artifactType"),
@@ -366,7 +368,7 @@ export function ApplicationDetailWorkspace({ id }: { id: string }) {
         tone: form.get("tone"),
         evidenceIds
       });
-      event.currentTarget.reset();
+      formElement.reset();
       setEvidenceIds([]);
       setMessage("Evidence-backed PDF draft created as immutable version 1.");
       await load();

@@ -91,8 +91,7 @@ export function PublicEvents({
   return (
     <aside className="analytics-consent" aria-label="Privacy preference">
       <p>
-        Allow anonymous portfolio page views and time spent by section? No identity, location,
-        referral source, IP address, full URL, query, prompt, or free text is stored.
+        Allow cookies
       </p>
       <button
         type="button"
@@ -101,7 +100,7 @@ export function PublicEvents({
           setConsent("granted");
         }}
       >
-        Allow
+        Allow cookies
       </button>
       <button
         type="button"

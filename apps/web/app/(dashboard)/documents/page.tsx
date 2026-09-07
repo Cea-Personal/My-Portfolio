@@ -12,6 +12,7 @@ export default function DocumentsPage() {
   const [file, setFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [reprocessingId, setReprocessingId] = useState<string | null>(null);
+  const [reindexingKnowledge, setReindexingKnowledge] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -335,6 +336,63 @@ export default function DocumentsPage() {
     }
   }
 
+  async function reindexKnowledge() {
+    setReindexingKnowledge(true);
+    setSaveError(null);
+    setSaveMessage(null);
+    try {
+      const response = await fetch("/api/v1/documents/reindex", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "idempotency-key": `knowledge-reindex-${crypto.randomUUID()}`
+        },
+        body: "{}"
+      });
+      const payload = (await response.json().catch(() => null)) as {
+        data?: {
+          runId?: string;
+          provider?: string;
+          model?: string;
+          detail?: string;
+          code?: string;
+        };
+      } | null;
+      if (!response.ok || !payload?.data?.runId)
+        throw new Error(
+          payload?.data?.detail ?? payload?.data?.code ?? "Knowledge re-indexing could not start."
+        );
+      setSaveMessage(
+        `Re-indexing existing knowledge with ${payload.data.provider ?? "the active provider"} / ${payload.data.model ?? "embedding model"}. Career Brain will refresh automatically.`
+      );
+
+      const deadline = Date.now() + 15 * 60 * 1000;
+      while (Date.now() < deadline) {
+        await new Promise((resolve) => window.setTimeout(resolve, 3_000));
+        const statusResponse = await fetch(`/api/v1/ingestion-runs/${payload.data.runId}`, {
+          cache: "no-store"
+        });
+        const statusPayload = (await statusResponse.json().catch(() => null)) as {
+          data?: { status?: string; document_count?: number; error_summary?: string | null };
+        } | null;
+        const run = statusPayload?.data;
+        if (run?.status === "completed") {
+          setSaveMessage(
+            `Knowledge re-indexed successfully (${String(run.document_count ?? 0)} chunks added). Career Brain refresh is queued.`
+          );
+          return;
+        }
+        if (run?.status === "failed" || run?.status === "cancelled")
+          throw new Error(run.error_summary ?? "Knowledge re-indexing failed.");
+      }
+      setSaveMessage("Knowledge re-indexing is still running in the background.");
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : "Knowledge re-indexing could not start.");
+    } finally {
+      setReindexingKnowledge(false);
+    }
+  }
+
   return (
     <main>
       <h1>Documents</h1>
@@ -432,6 +490,22 @@ export default function DocumentsPage() {
           }}
         />
       </form>
+      <section aria-labelledby="knowledge-index-title">
+        <h2 id="knowledge-index-title">Knowledge index</h2>
+        <p>
+          Re-embed existing document chunks after changing the embedding provider or model. This
+          keeps the documents private and does not create duplicate files or extracted facts.
+        </p>
+        <button
+          disabled={reindexingKnowledge}
+          type="button"
+          onClick={() => void reindexKnowledge()}
+        >
+          {reindexingKnowledge
+            ? "Re-indexing existing knowledge…"
+            : "Re-index all with the current embedding model"}
+        </button>
+      </section>
       {state === "loading" ? <p role="status">Loading documents…</p> : null}
       {state === "error" ? <p role="alert">{loadError ?? "Documents are unavailable."}</p> : null}
       {state === "ready" && documents.length ? (

@@ -121,7 +121,8 @@ export function ApplicationsWorkspace() {
 
   async function createProfile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const languagesEntry = form.get("languages");
     try {
       await write("/api/v1/application-profiles", "POST", {
@@ -144,7 +145,7 @@ export function ApplicationsWorkspace() {
         approved: form.get("approved") === "on",
         isDefault: form.get("isDefault") === "on"
       });
-      event.currentTarget.reset();
+      formElement.reset();
       setMessage("Application profile saved as an immutable version.");
       await load();
     } catch (error) {

@@ -3444,8 +3444,8 @@ html[data-portfolio-theme="dark"] .profile-links {
   justify-content: center;
 }
 
-/* Mobile portfolio navigation stays available as a horizontal tab strip, and
-   the profile portrait follows the hero instead of preceding it. */
+/* Mobile portfolio navigation and profile placement refinements. The final
+   mobile navigation override below uses a collapsible menu. */
 .mobile-profile-rail {
   display: none;
 }
@@ -4771,11 +4771,19 @@ nav[aria-label="Portfolio sections"] .owner-login::after {
   color: #625e57;
 }
 
+.process-switcher-shell {
+  position: relative;
+  margin-top: clamp(3rem, 6vw, 5rem);
+}
+
 .process-switcher {
   display: flex;
-  margin-top: clamp(3rem, 6vw, 5rem);
   border-top: 1px solid #101010;
   border-bottom: 1px solid #101010;
+}
+
+.process-scroll-cue {
+  display: none;
 }
 
 .process-switcher button {
@@ -5174,6 +5182,33 @@ nav[aria-label="Portfolio sections"] .owner-login::after {
     overflow-x: auto;
   }
 
+  .process-scroll-cue {
+    position: absolute;
+    top: 50%;
+    right: 0;
+    display: inline-flex;
+    min-height: calc(100% - 2px);
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0 0.65rem 0 1.5rem;
+    background: linear-gradient(90deg, transparent 0%, #f1efe8 38%, #f1efe8 100%);
+    color: #365bd6;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.62rem;
+    font-weight: 750;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    transform: translateY(-50%);
+    pointer-events: none;
+  }
+
+  .process-scroll-cue > span {
+    font-family: inherit;
+    font-size: 1.15rem;
+    line-height: 1;
+    animation: process-scroll-hint 1.6s ease-in-out infinite;
+  }
+
   .process-switcher button {
     min-width: 9rem;
   }
@@ -5197,8 +5232,20 @@ nav[aria-label="Portfolio sections"] .owner-login::after {
 
 @media (prefers-reduced-motion: reduce) {
   .process-stage,
-  .assistant-trace li[data-state="running"] span {
+  .assistant-trace li[data-state="running"] span,
+  .process-scroll-cue > span {
     animation: none;
+  }
+}
+
+@keyframes process-scroll-hint {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+
+  50% {
+    transform: translateX(0.25rem);
   }
 }
 
@@ -7059,6 +7106,11 @@ html[data-portfolio-theme="dark"] .process-flow li {
   color: #edf1f5;
 }
 
+html[data-portfolio-theme="dark"] .process-scroll-cue {
+  background: linear-gradient(90deg, transparent 0%, #0c0f14 38%, #0c0f14 100%);
+  color: #8ae6d0;
+}
+
 html[data-portfolio-theme="dark"] .portfolio-stream .intelligence-card textarea,
 html[data-portfolio-theme="dark"] .portfolio-stream .intelligence-card input {
   border-color: #46515f;
@@ -7435,5 +7487,153 @@ html[data-portfolio-theme="dark"] .profile-rail {
 
   .projects-section .proof-flow li:nth-child(even) {
     border-right: 0;
+  }
+}
+/* Public portfolio cookie consent stays available at the bottom of the viewport. */
+.analytics-consent {
+  position: fixed;
+  right: max(1rem, env(safe-area-inset-right));
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  left: max(1rem, env(safe-area-inset-left));
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  width: min(100% - 2rem, 48rem);
+  margin-inline: auto;
+  padding: 0.8rem 1rem;
+  border: 1px solid rgb(255 255 255 / 18%);
+  border-radius: 0.85rem;
+  background: rgb(8 19 40 / 96%);
+  box-shadow: 0 1rem 3rem rgb(0 0 0 / 24%);
+  color: #f7fbff;
+}
+
+.analytics-consent p {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 650;
+}
+
+.analytics-consent button {
+  flex: 0 0 auto;
+  min-height: 2.25rem;
+  padding: 0.45rem 0.8rem;
+  border: 1px solid rgb(255 255 255 / 28%);
+  border-radius: 999px;
+  background: #67e8f9;
+  color: #081328;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.analytics-consent button + button {
+  background: transparent;
+  color: inherit;
+}
+
+html[data-portfolio-theme="light"] .analytics-consent {
+  border-color: #dbe2ee;
+  background: rgb(255 255 255 / 96%);
+  color: #172033;
+}
+
+html[data-portfolio-theme="light"] .analytics-consent button {
+  border-color: #3264e8;
+  background: #3264e8;
+  color: #fff;
+}
+
+html[data-portfolio-theme="light"] .analytics-consent button + button {
+  background: transparent;
+  color: #2348b5;
+}
+
+@media (max-width: 38rem) {
+  .analytics-consent {
+    right: max(0.75rem, env(safe-area-inset-right));
+    left: max(0.75rem, env(safe-area-inset-left));
+    align-items: stretch;
+    flex-direction: column;
+    gap: 0.65rem;
+    width: auto;
+    margin-inline: 0;
+    padding: 0.85rem;
+  }
+
+  .analytics-consent button {
+    width: 100%;
+  }
+}
+
+/* Use a conventional collapsible mobile navigation instead of a horizontal
+   tab strip that forces users to scroll sideways. */
+.portfolio-nav-links {
+  display: contents;
+}
+
+.mobile-nav-toggle {
+  display: none;
+}
+
+@media (max-width: 50rem) {
+  nav[aria-label="Portfolio sections"] {
+    flex-wrap: wrap;
+    overflow: visible;
+    gap: 0.55rem;
+    padding: 0.7rem 0.8rem;
+  }
+
+  nav[aria-label="Portfolio sections"] .mobile-nav-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    min-height: 2.25rem;
+    margin-left: auto;
+    padding: 0.42rem 0.7rem;
+    border: 1px solid currentColor;
+    border-radius: 999px;
+    background: transparent;
+    color: inherit;
+    font-size: 0.8rem;
+    font-weight: 750;
+  }
+
+  nav[aria-label="Portfolio sections"] .portfolio-nav-links {
+    display: none;
+    flex-basis: 100%;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.15rem;
+    padding-top: 0.55rem;
+    border-top: 1px solid rgb(219 226 238 / 45%);
+  }
+
+  nav[aria-label="Portfolio sections"] .portfolio-nav-links.is-open {
+    display: flex;
+  }
+
+  nav[aria-label="Portfolio sections"] .portfolio-nav-links a,
+  nav[aria-label="Portfolio sections"] .portfolio-nav-links .theme-toggle {
+    display: flex;
+    width: 100%;
+    min-height: 2.35rem;
+    align-items: center;
+    padding: 0.5rem 0.65rem;
+    border-radius: 0.45rem;
+  }
+
+  nav[aria-label="Portfolio sections"] .portfolio-nav-links a:hover,
+  nav[aria-label="Portfolio sections"] .portfolio-nav-links .theme-toggle:hover {
+    background: rgb(103 232 249 / 12%);
+  }
+
+  nav[aria-label="Portfolio sections"] .portfolio-nav-links .owner-login {
+    margin-left: 0;
+  }
+
+  nav[aria-label="Portfolio sections"] .portfolio-nav-links .theme-toggle {
+    justify-content: flex-start;
   }
 }

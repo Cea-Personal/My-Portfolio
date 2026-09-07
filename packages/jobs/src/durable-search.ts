@@ -355,10 +355,13 @@ function adapterInput(config: Record<string, unknown>, profile: SearchProfile): 
   const fieldMapping = asStringRecord(config.field_mapping);
   const secretRef = asString(config.secret_ref);
   const secret = secretRef ? process.env[secretRef] : undefined;
+  const applicationIdRef = asString(config.application_id_ref);
+  const applicationId = applicationIdRef ? process.env[applicationIdRef] : undefined;
   return {
     ...(endpoint ? { endpoint } : {}),
     ...(Object.keys(fieldMapping).length ? { fieldMapping } : {}),
     ...(secret ? { headers: { authorization: `Bearer ${secret}` } } : {}),
+    ...(applicationId ? { credentials: { applicationId } } : {}),
     ...(Object.keys(query).length ? { query } : {})
   };
 }
@@ -409,7 +412,7 @@ async function loadSources(
     const configResult = await client
       .schema("app")
       .from("job_source_configs")
-      .select("endpoint,field_mapping,secret_ref")
+      .select("endpoint,field_mapping,secret_ref,application_id_ref")
       .eq("source_id", id)
       .maybeSingle();
     if (configResult.error) {

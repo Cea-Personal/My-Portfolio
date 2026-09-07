@@ -7,6 +7,7 @@ import { WorkspaceToast } from "@/components/ui/workspace-toast";
 interface SourceConfig {
   endpoint?: string;
   secret_ref?: string | null;
+  application_id_ref?: string | null;
   rate_limit_per_minute?: number;
   last_test_outcome?: string | null;
   discovery_frequency_minutes?: number;
@@ -159,6 +160,7 @@ export function JobSourcesWorkspace() {
         adapterType: form.get("adapterType"),
         endpoint: form.get("endpoint"),
         secretRef: form.get("secretRef"),
+        applicationIdRef: form.get("applicationIdRef"),
         rateLimitPerMinute: Number(form.get("rateLimit")),
         discoveryFrequencyMinutes: Number(form.get("frequency")),
         scheduleEligible: form.get("scheduleEligible") === "on",
@@ -194,6 +196,7 @@ export function JobSourcesWorkspace() {
         name: form.get("name"),
         endpoint: form.get("endpoint"),
         secretRef: form.get("secretRef"),
+        applicationIdRef: form.get("applicationIdRef"),
         rateLimitPerMinute: Number(form.get("rateLimit")),
         discoveryFrequencyMinutes: Number(form.get("frequency")),
         scheduleEligible: form.get("scheduleEligible") === "on",
@@ -308,9 +311,21 @@ export function JobSourcesWorkspace() {
               placeholder="JOB_SOURCE_API_TOKEN"
             />
             <small>
-              Enter a variable name, never an API key. Suggested names: ADZUNA_APP_KEY,
+            Enter a variable name, never an API key. Suggested names: ADZUNA_APP_KEY,
               JSEARCH_RAPIDAPI_KEY, FLYBYAPIS_RAPIDAPI_KEY, SERPAPI_API_KEY, THEIRSTACK_API_KEY, or
               JOBSPIPE_API_KEY.
+            </small>
+          </label>
+          <label>
+            Application ID environment variable (Adzuna only)
+            <input
+              name="applicationIdRef"
+              pattern="[A-Z][A-Z0-9_]{2,79}"
+              placeholder="ADZUNA_APP_ID"
+            />
+            <small>
+              Adzuna requires both credentials. Set the matching variable in the web server
+              environment; the value is never stored in Supabase.
             </small>
           </label>
           <label>
@@ -423,6 +438,15 @@ export function JobSourcesWorkspace() {
                         name="secretRef"
                         defaultValue={config.secret_ref ?? ""}
                         pattern="[A-Z][A-Z0-9_]{2,79}"
+                      />
+                    </label>
+                    <label>
+                      Application ID environment variable (Adzuna only)
+                      <input
+                        name="applicationIdRef"
+                        defaultValue={config.application_id_ref ?? ""}
+                        pattern="[A-Z][A-Z0-9_]{2,79}"
+                        placeholder="ADZUNA_APP_ID"
                       />
                     </label>
                     <label>

@@ -19,6 +19,11 @@ export interface CareerBrainContent {
   technicalSkills: CareerBrainItem[];
 }
 
+// Career Brain is a bounded synthesis job, not a health probe. Native Codex
+// subagents can need more time to reconcile multiple documents and produce the
+// complete structured profile requested by the schema.
+const CAREER_BRAIN_TIMEOUT_MS = 120_000;
+
 const text = (value: unknown, fallback = "") =>
   typeof value === "string" ? value.trim().slice(0, 10_000) : fallback;
 const strings = (value: unknown) =>
@@ -35,6 +40,104 @@ const records = (value: unknown) =>
         (item): item is Record<string, unknown> => Boolean(item) && typeof item === "object"
       )
     : [];
+
+const record = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+
+const firstRecord = (value: unknown) => records(Array.isArray(value) ? value : [value])[0] ?? null;
+
+function boundedRecords<T>(items: T[], maxItems: number, maxCharacters: number): T[] {
+  const bounded: T[] = [];
+  let characters = 0;
+  for (const item of items) {
+    if (bounded.length >= maxItems) break;
+    const size = JSON.stringify(item).length;
+    if (characters + size > maxCharacters) break;
+    bounded.push(item);
+    characters += size;
+  }
+  return bounded;
+}
+
+function compactCanonicalFacts(value: unknown) {
+  return boundedRecords(
+    records(value).map((item) => {
+      const version = firstRecord(item.currentVersion);
+      return {
+        id: item.id,
+        type: item.fact_type,
+        statement: text(version?.statement).slice(0, 2500),
+        structuredValue: record(version?.structured_value),
+        updatedAt: item.updated_at
+      };
+    }),
+    600,
+    70_000
+  );
+}
+
+function compactExtractedFacts(value: unknown) {
+  const seen = new Set<string>();
+  const compact = records(value).flatMap((item) => {
+    const statement = text(item.statement).slice(0, 2500);
+    const key = statement.toLocaleLowerCase().replace(/\s+/g, " ");
+    if (!key || seen.has(key)) return [];
+    seen.add(key);
+    const ingestion = firstRecord(item.ingestion_items);
+    const document = firstRecord(ingestion?.documents);
+    return [
+      {
+        id: item.id,
+        statement,
+        subject: record(item.subject_candidate),
+        confidence: item.confidence,
+        sourceName: text(document?.name),
+        documentKind: text(document?.document_kind, "other")
+      }
+    ];
+  });
+  return boundedRecords(compact, 750, 90_000);
+}
+
+function compactJournals(value: unknown) {
+  return boundedRecords(
+    records(value).map((entry) => {
+      const version = [...records(entry.journal_versions)].sort(
+        (left, right) => Number(right.version) - Number(left.version)
+      )[0];
+      return {
+        id: entry.id,
+        title: text(entry.title).slice(0, 500),
+        entryDate: entry.entry_date,
+        updatedAt: entry.updated_at,
+        text: text(version?.text).slice(0, 4000)
+      };
+    }),
+    100,
+    50_000
+  );
+}
+
+function compactApplications(value: unknown) {
+  return boundedRecords(
+    records(value).map((application) => {
+      const job = firstRecord(application.jobs);
+      return {
+        id: application.id,
+        status: application.status,
+        createdAt: application.created_at,
+        appliedAt: application.applied_at,
+        title: text(job?.canonical_title).slice(0, 500),
+        company: text(job?.canonical_company).slice(0, 500),
+        description: text(job?.current_description).slice(0, 2000)
+      };
+    }),
+    50,
+    35_000
+  );
+}
 
 function stableId(prefix: string, parts: string[]) {
   return `${prefix}:${createHash("sha256").update(parts.join("|").toLowerCase()).digest("hex").slice(0, 20)}`;
@@ -161,16 +264,14 @@ async function loadInputs(client: SupabaseClient, ownerId: string) {
   ]);
   for (const result of [facts, extracted, journals, applications])
     if (result.error) throw result.error;
+  // Provider prompts must contain career evidence, not the complete relational
+  // response. Compacting here prevents large document libraries from exceeding
+  // the orchestrator context or request timeout while retaining provenance.
   const source = {
-    facts: facts.data ?? [],
-    extracted: extracted.data ?? [],
-    journals: (journals.data ?? []).map((entry) => ({
-      ...entry,
-      journal_versions: [...entry.journal_versions]
-        .sort((a, b) => Number(b.version) - Number(a.version))
-        .slice(0, 1)
-    })),
-    recentApplications: applications.data ?? []
+    facts: compactCanonicalFacts(facts.data),
+    extracted: compactExtractedFacts(extracted.data),
+    journals: compactJournals(journals.data),
+    recentApplications: compactApplications(applications.data)
   };
   return { source, sourceHash: createHash("sha256").update(JSON.stringify(source)).digest("hex") };
 }
@@ -226,7 +327,9 @@ export async function synthesizeCareerBrain(
     content: text(item.content).slice(0, 2500),
     similarity: item.similarity
   }));
-  const providers = await resolveReasoningProviders(client, ownerId, "evidence_extraction");
+  const providers = (await resolveReasoningProviders(client, ownerId, "evidence_extraction")).map(
+    (provider) => ({ ...provider, timeoutMs: Math.max(provider.timeoutMs, CAREER_BRAIN_TIMEOUT_MS) })
+  );
   const generation = await generateReasoningJson(
     providers,
     `You maintain Basil Ogbonna's private Career Brain. Return JSON only. Synthesize, deduplicate and reconcile the supplied evidence without inventing facts. Recent applications affect ordering and emphasis only; they are not evidence of Basil's experience. Output: cvSummary (concise CV profile), portfolioSummary (human first-person portfolio profile), about (first-person About narrative), experiences[], projects[], education[], certifications[], technicalSkills[]. Each experience must represent one role at one organization and contain organization, role, period, summary, responsibilities[], achievements[] (include impact here), projects[], technologies[]. Projects contain title, summary, role, outcome, technologies[], url. Education contains qualification, institution, period, summary. Certifications contain name, issuer, date, summary. technicalSkills groups contain category, skills[], summary. Prefer corroborated specifics; omit uncertain entries rather than guessing.`,

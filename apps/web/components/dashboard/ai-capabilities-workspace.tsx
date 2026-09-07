@@ -14,6 +14,7 @@ interface Capability {
   provider_id: string;
   provider: string;
   model: string;
+  fallback_provider_id?: string | null;
   model_class: string;
   creativity: number;
   length_limit: number;
@@ -186,7 +187,7 @@ export function AiCapabilitiesWorkspace({ view = "agents" }: { view?: "agents" |
         `/api/v1/settings/ai-capabilities/${task}`,
         {
           providerId: form.get("providerId"),
-          fallbackProviderId: undefined,
+          fallbackProviderId: form.get("fallbackProviderId") || undefined,
           modelClass: form.get("modelClass") || "balanced",
           creativity: numberValue("creativity", 0.2),
           lengthLimit: numberValue("lengthLimit", 2000),
@@ -444,6 +445,7 @@ export function AiCapabilitiesWorkspace({ view = "agents" }: { view?: "agents" |
         const formKey = orchestrator
           ? [
               orchestrator.provider_id,
+              orchestrator.fallback_provider_id,
               orchestrator.enabled,
               orchestrator.creativity,
               orchestrator.length_limit,
@@ -474,6 +476,32 @@ export function AiCapabilitiesWorkspace({ view = "agents" }: { view?: "agents" |
                   </option>
                 ))}
               </select>
+            </label>
+            <label>
+              OpenAI live-search fallback (optional)
+              <select
+                name="fallbackProviderId"
+                defaultValue={orchestrator?.fallback_provider_id ?? ""}
+              >
+                <option value="">No fallback</option>
+                {providers
+                  .filter(
+                    (provider) =>
+                      provider.provider === "openai" &&
+                      provider.capabilities.some(
+                        (capability) => capability === "*" || capability === "reasoning"
+                      )
+                  )
+                  .map((provider) => (
+                    <option key={provider.id} value={provider.id}>
+                      {provider.provider} · {provider.model}
+                    </option>
+                  ))}
+              </select>
+              <small>
+                Live web discovery uses OpenAI&apos;s Responses web_search tool. Codex remains the
+                primary orchestrator for all other tasks.
+              </small>
             </label>
             <label>
               Model class

@@ -193,10 +193,11 @@ profile's `maxJobAgeDays` cutoff are discarded locally because the provider does
 filter. Unsupported or unknown provider values are retried without the structured filter and remain
 subject to local profile eligibility.
 
-The Jobs workspace also has an opt-in **Live web discovery** action. It uses the configured OpenAI
-orchestrator with the Responses API web-search tool, restricts retrieval to the domains entered in the
-form, optionally grounds the query with indexed private Career Brain evidence, and validates every
-returned HTTPS listing URL. Profile-eligible (PASS) listings are attached to the private opportunity
+The Jobs workspace also has an opt-in **Live web discovery** action. It uses an enabled OpenAI
+reasoning provider linked as the orchestrator fallback with the Responses API web-search tool. This
+allows Codex App Server to remain the primary orchestrator for the rest of the workspace. It restricts
+retrieval to the domains entered in the form, optionally grounds the query with indexed private Career
+Brain evidence, and validates every returned HTTPS listing URL. Profile-eligible (PASS) listings are attached to the private opportunity
 pipeline automatically with their search profile, run, source, discovery time, and match reasons.
 Existing opportunities are deduplicated by canonical URL/fingerprint. Listings whose requirements
 cannot be proven from the result are persisted as REVIEW events and shown in the review queue; FAIL

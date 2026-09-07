@@ -64,20 +64,25 @@ export function EngineeringProcesses() {
           process patterns—not performance claims.
         </span>
       </header>
-      <div className="process-switcher" role="tablist" aria-label="Engineering disciplines">
-        {(Object.keys(processes) as ProcessName[]).map((name) => (
-          <button
-            type="button"
-            role="tab"
-            aria-selected={active === name}
-            key={name}
-            onClick={() => {
-              setActive(name);
-            }}
-          >
-            {processes[name].label}
-          </button>
-        ))}
+      <div className="process-switcher-shell">
+        <div className="process-switcher" role="tablist" aria-label="Engineering disciplines">
+          {(Object.keys(processes) as ProcessName[]).map((name) => (
+            <button
+              type="button"
+              role="tab"
+              aria-selected={active === name}
+              key={name}
+              onClick={() => {
+                setActive(name);
+              }}
+            >
+              {processes[name].label}
+            </button>
+          ))}
+        </div>
+        <span className="process-scroll-cue" aria-hidden="true">
+          Swipe <span>→</span>
+        </span>
       </div>
       <article className="process-stage" key={active} role="tabpanel">
         <div className="process-flow">

@@ -12,7 +12,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const { data, error } = await client
       .schema("app")
       .from("job_sources")
-      .select("id,adapter_type,adapter_version,job_source_configs(endpoint,secret_ref)")
+      .select(
+        "id,adapter_type,adapter_version,job_source_configs(endpoint,secret_ref,application_id_ref)"
+      )
       .eq("id", id)
       .eq("owner_id", ownerId)
       .maybeSingle();
@@ -33,7 +35,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     else {
       try {
         const records = await adapter.collect(
-          connectionInput(endpoint, rawConfig?.secret_ref ?? null)
+          connectionInput(
+            endpoint,
+            rawConfig?.secret_ref ?? null,
+            rawConfig?.application_id_ref ?? null
+          )
         );
         healthy = true;
         code = "CONNECTED";

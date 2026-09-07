@@ -5,6 +5,10 @@ import {
   synthesizeCareerBrain
 } from "@/lib/server/career-brain-synthesis";
 
+// Career Brain invokes a native subagent and reconciles many private sources.
+// Allow the route to use the same two-minute budget as the server-side call.
+export const maxDuration = 120;
+
 async function readLatest(
   client: Parameters<Parameters<typeof withPrivateApi>[1]>[0]["client"],
   ownerId: string
@@ -39,11 +43,11 @@ export function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  return withPrivateApi(request, async ({ client, ownerId }) => {
+  return withPrivateApi(request, async ({ client, correlationId, ownerId }) => {
     try {
       const generated = await synthesizeCareerBrain(client, ownerId);
       const current = await readLatest(client, ownerId);
-      await recordAudit(client, ownerId, "career_brain.generated", null, {
+      await recordAudit(client, ownerId, correlationId, "career_brain.generated", null, {
         reused: generated.reused
       });
       return apiResponse(
@@ -58,7 +62,9 @@ export async function POST(request: Request) {
         error instanceof Error
           ? (error.message.split(":")[0] ?? "CAREER_BRAIN_FAILED")
           : "CAREER_BRAIN_FAILED";
-      await recordAudit(client, ownerId, "career_brain.failed", diagnostic, { code });
+      await recordAudit(client, ownerId, correlationId, "career_brain.failed", diagnostic, {
+        code
+      });
       if (/^(EMBEDDING|AI_CAPABILITY|AI_PROVIDER)/.test(code))
         return apiResponse(
           {
@@ -76,6 +82,7 @@ export async function POST(request: Request) {
 async function recordAudit(
   client: Parameters<Parameters<typeof withPrivateApi>[1]>[0]["client"],
   ownerId: string,
+  correlationId: string,
   action: string,
   reason: string | null,
   metadata: Record<string, unknown>
@@ -86,6 +93,7 @@ async function recordAudit(
       actor_type: "owner",
       action,
       target_type: "career_brain",
+      correlation_id: correlationId,
       reason,
       after_metadata: metadata
     });

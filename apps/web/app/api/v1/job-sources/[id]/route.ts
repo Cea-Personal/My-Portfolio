@@ -24,6 +24,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       body.endpoint === undefined ? undefined : validateJobSourceEndpoint(body.endpoint);
     const secretRef =
       body.secretRef === undefined ? undefined : validateSecretReference(body.secretRef);
+    const applicationIdRef =
+      body.applicationIdRef === undefined
+        ? undefined
+        : validateSecretReference(body.applicationIdRef);
     const rateLimit =
       body.rateLimitPerMinute === undefined ? undefined : Number(body.rateLimitPerMinute);
     const discoveryFrequency =
@@ -41,6 +45,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (
       (body.endpoint !== undefined && !endpoint) ||
       (body.secretRef !== undefined && secretRef === undefined) ||
+      (body.applicationIdRef !== undefined && applicationIdRef === undefined) ||
       (rateLimit !== undefined &&
         (!Number.isInteger(rateLimit) || rateLimit < 1 || rateLimit > 300)) ||
       (discoveryFrequency !== undefined &&
@@ -98,6 +103,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (
       endpoint !== undefined ||
       body.secretRef !== undefined ||
+      body.applicationIdRef !== undefined ||
       rateLimit !== undefined ||
       discoveryFrequency !== undefined ||
       extractionConfig !== undefined
@@ -108,6 +114,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         .update({
           endpoint,
           secret_ref: secretRef,
+          application_id_ref: applicationIdRef,
           rate_limit_per_minute: rateLimit,
           discovery_frequency_minutes: discoveryFrequency,
           extraction_config: extractionConfig ?? undefined,

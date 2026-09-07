@@ -123,7 +123,8 @@ export function InterviewsWorkspace() {
   }
   async function addStage(event: FormEvent<HTMLFormElement>, processId: string) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     try {
       await write(`/api/v1/interview-processes/${processId}/stages`, "POST", {
         name: form.get("name"),
@@ -133,7 +134,7 @@ export function InterviewsWorkspace() {
         displayOrder: Number(form.get("displayOrder")),
         source: "manual"
       });
-      event.currentTarget.reset();
+      formElement.reset();
       setMessage("Interview stage added with history.");
       await load();
     } catch (error) {
@@ -189,7 +190,8 @@ export function InterviewsWorkspace() {
   }
   async function addDebrief(event: FormEvent<HTMLFormElement>, stage: Stage) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     try {
       await write(`/api/v1/interview-stages/${stage.id}/debriefs`, "POST", {
         notes: form.get("notes"),
@@ -199,7 +201,7 @@ export function InterviewsWorkspace() {
         difficulties: comma(form.get("difficulties")),
         followUps: comma(form.get("followUps"))
       });
-      event.currentTarget.reset();
+      formElement.reset();
       setMessage("Original debrief preserved; derived learning awaits review.");
       await load();
     } catch (error) {

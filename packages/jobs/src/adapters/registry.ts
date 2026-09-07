@@ -31,6 +31,8 @@ export interface JobSourceInput {
   fieldMapping?: Record<string, string>;
   query?: Record<string, string | number | boolean>;
   headers?: Readonly<Record<string, string>>;
+  /** Server-side source credentials that are not sent as HTTP headers. */
+  credentials?: Readonly<Record<string, string>>;
   method?: "GET" | "POST";
   body?: unknown;
   fetcher?: typeof fetch;

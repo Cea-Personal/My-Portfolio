@@ -13,7 +13,7 @@ export function GET(request: Request) {
       .schema("app")
       .from("job_sources")
       .select(
-        "*, job_source_configs(endpoint,secret_ref,rate_limit_per_minute,schedule_eligible,discovery_frequency_minutes,extraction_config,last_test_outcome)"
+        "*, job_source_configs(endpoint,secret_ref,application_id_ref,rate_limit_per_minute,schedule_eligible,discovery_frequency_minutes,extraction_config,last_test_outcome)"
       )
       .eq("owner_id", ownerId)
       .order("created_at", { ascending: false });
@@ -29,6 +29,7 @@ export async function POST(request: Request) {
     const adapterVersion = typeof body.adapterVersion === "string" ? body.adapterVersion : "v1";
     const endpoint = validateJobSourceEndpoint(body.endpoint ?? defaultJobSourceEndpoint(adapterType));
     const secretRef = validateSecretReference(body.secretRef);
+    const applicationIdRef = validateSecretReference(body.applicationIdRef);
     const termsNote =
       typeof body.termsNote === "string" ? body.termsNote.trim().slice(0, 1000) : "";
     const rateLimit = Number(body.rateLimitPerMinute ?? 30);
@@ -44,6 +45,7 @@ export async function POST(request: Request) {
       !getJobSourceAdapter(adapterType, adapterVersion) ||
       !endpoint ||
       secretRef === undefined ||
+      applicationIdRef === undefined ||
       !Number.isInteger(rateLimit) ||
       rateLimit < 1 ||
       rateLimit > 300 ||
@@ -74,6 +76,7 @@ export async function POST(request: Request) {
         source_id: data.id,
         endpoint,
         secret_ref: secretRef,
+        application_id_ref: applicationIdRef,
         rate_limit_per_minute: rateLimit,
         schedule_eligible: body.scheduleEligible === true,
         discovery_frequency_minutes: discoveryFrequency,

@@ -137,7 +137,10 @@ export async function POST(request: Request) {
         }
       }
       const providers = await resolveReasoningProviders(client, ownerId, "job_search");
-      const provider = providers[0];
+      // The Responses web_search tool is an OpenAI capability. Keep the
+      // Codex App Server as the primary orchestrator for ordinary tasks, but
+      // select an enabled OpenAI fallback when live discovery is requested.
+      const provider = providers.find((candidate) => candidate.provider === "openai");
       if (!provider) throw new Error("AI_PROVIDER_NOT_AVAILABLE:job_search");
       const result = await searchLiveJobs(
         provider,
@@ -347,7 +350,9 @@ export async function POST(request: Request) {
           code,
           detail:
             code === "LIVE_WEB_SEARCH_REQUIRES_OPENAI_PROVIDER"
-              ? "Live web search currently requires the configured orchestrator to use OpenAI."
+              ? "Live web discovery uses OpenAI's Responses web_search tool. Keep Codex as the primary orchestrator and configure an enabled OpenAI provider as its fallback."
+              : code.startsWith("AI_PROVIDER_NOT_AVAILABLE")
+                ? "Configure an enabled OpenAI reasoning provider as the orchestrator fallback for live web discovery."
               : "Live web search could not be completed."
         },
         request,

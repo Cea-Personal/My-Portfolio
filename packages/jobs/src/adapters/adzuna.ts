@@ -1,13 +1,13 @@
 import { contractAdapter, fetchSourceJson, type JobSourceAdapter } from "./registry";
 import { bearerSecret, profileQuery, searchText } from "./api-utils";
 
-/** Adzuna search API. app_id is configured globally; app_key is supplied via secret_ref. */
+/** Adzuna search API. Both app_id and app_key are required by Adzuna. */
 export const adzunaAdapter: JobSourceAdapter = contractAdapter({
   type: "adzuna",
   version: "v1",
   capabilities: ["collect", "search", "pagination"],
   async collect(input) {
-    const appId = process.env.ADZUNA_APP_ID;
+    const appId = input.credentials?.applicationId ?? process.env.ADZUNA_APP_ID;
     const appKey = bearerSecret(input) ?? process.env.ADZUNA_APP_KEY;
     if (!appId || !appKey) throw new Error("SOURCE_CREDENTIALS_MISSING:ADZUNA_APP_ID/ADZUNA_APP_KEY");
     const country = String(input.query?.country ?? process.env.ADZUNA_COUNTRY ?? "gb").toLowerCase();

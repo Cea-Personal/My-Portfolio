@@ -142,10 +142,16 @@ export function validateSecretReference(value: unknown): string | null | undefin
   return value;
 }
 
-export function connectionInput(endpoint: string, secretRef: string | null): JobSourceInput {
+export function connectionInput(
+  endpoint: string,
+  secretRef: string | null,
+  applicationIdRef: string | null = null
+): JobSourceInput {
   const secret = secretRef ? process.env[secretRef] : undefined;
+  const applicationId = applicationIdRef ? process.env[applicationIdRef] : undefined;
   return {
     endpoint,
-    ...(secret ? { headers: { authorization: `Bearer ${secret}` } } : {})
+    ...(secret ? { headers: { authorization: `Bearer ${secret}` } } : {}),
+    ...(applicationId ? { credentials: { applicationId } } : {})
   };
 }
