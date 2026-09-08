@@ -523,7 +523,9 @@ export default function DocumentsPage() {
                 · {document.status}
               </span>
               {document.error ? <small>{document.error}</small> : null}
-              {["uploaded", "indexing failed"].includes(document.status) ? (
+              {(["uploaded", "indexing failed"].includes(document.status) ||
+                document.status.startsWith("parsing") ||
+                document.status.startsWith("indexing")) ? (
                 <button
                   disabled={reprocessingId === document.id}
                   onClick={() => void reprocessDocument(document.id)}

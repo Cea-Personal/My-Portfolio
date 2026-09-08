@@ -127,10 +127,35 @@ export const documentIngestion = inngest.createFunction(
     const parser = parserConfiguration();
     if (!ownerId || !documentId || !documentVersionId)
       return { status: "failed" as const, reason: "INVALID_DOCUMENT_EVENT" };
-    if (!client || !parser) throw new Error("DOCUMENT_WORKER_CONFIGURATION_MISSING");
+    if (!client || !parser) {
+      const detail = "DOCUMENT_WORKER_CONFIGURATION_MISSING";
+      const runId = typeof metadata.ingestionRunId === "string" ? metadata.ingestionRunId : null;
+      if (client && runId) {
+        await client
+          .schema("app")
+          .from("ingestion_items")
+          .update({
+            stage: "failed",
+            status: "failed",
+            sanitized_error: detail,
+            finished_at: new Date().toISOString()
+          })
+          .eq("run_id", runId)
+          .eq("document_id", documentId)
+          .eq("document_version_id", documentVersionId);
+        await client
+          .schema("app")
+          .from("ingestion_runs")
+          .update({ status: "failed", error_summary: detail, finished_at: new Date().toISOString() })
+          .eq("id", runId)
+          .eq("owner_id", ownerId);
+      }
+      throw new Error(detail);
+    }
 
     return step.run("parse-index-extract", async () => {
-      let activeRunId: string | null = null;
+      let activeRunId: string | null =
+        typeof metadata.ingestionRunId === "string" ? metadata.ingestionRunId : null;
       let activeItemId: string | null = null;
       try {
         const { data: document, error: documentError } = await client
@@ -490,13 +515,14 @@ export const documentIngestion = inngest.createFunction(
             );
           if (candidatesError) throw candidatesError;
         }
-        await client
+        const { error: documentVersionUpdateError } = await client
           .schema("app")
           .from("document_versions")
           .update({ evidence_version_id: evidenceVersion.id })
           .eq("id", documentVersionId)
           .eq("document_id", documentId);
-        await client
+        if (documentVersionUpdateError) throw documentVersionUpdateError;
+        const { error: ingestionItemCompleteError } = await client
           .schema("app")
           .from("ingestion_items")
           .update({
@@ -515,13 +541,19 @@ export const documentIngestion = inngest.createFunction(
             finished_at: new Date().toISOString()
           })
           .eq("id", item.id);
-        await client
+        if (ingestionItemCompleteError) throw ingestionItemCompleteError;
+        const { error: ingestionRunCompleteError } = await client
           .schema("app")
           .from("ingestion_runs")
-          .update({ status: "completed", document_count: 1, finished_at: new Date().toISOString() })
+          .update({
+            status: "completed",
+            document_count: 1,
+            finished_at: new Date().toISOString()
+          })
           .eq("id", runId)
           .eq("owner_id", ownerId)
           .neq("trigger", "drive");
+        if (ingestionRunCompleteError) throw ingestionRunCompleteError;
         await requestCareerBrainRefresh(ownerId, "document", documentVersionId).catch(
           () => undefined
         );
@@ -545,6 +577,23 @@ export const documentIngestion = inngest.createFunction(
                 finished_at: new Date().toISOString()
               })
               .eq("id", activeItemId);
+          } catch {
+            // Preserve the original ingestion failure if status finalization is unavailable.
+          }
+        } else if (activeRunId) {
+          try {
+            await client
+              .schema("app")
+              .from("ingestion_items")
+              .update({
+                stage: "failed",
+                status: "failed",
+                sanitized_error: sanitizedError,
+                finished_at: new Date().toISOString()
+              })
+              .eq("run_id", activeRunId)
+              .eq("document_id", documentId)
+              .eq("document_version_id", documentVersionId);
           } catch {
             // Preserve the original ingestion failure if status finalization is unavailable.
           }
