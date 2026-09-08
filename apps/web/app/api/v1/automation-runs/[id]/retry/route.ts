@@ -7,6 +7,7 @@ const eventForWorkflow: Record<string, string> = {
   job_search: "career/job-search.requested.v1",
   artifact_draft: "career/application.artifact.requested.v1",
   analytics_aggregate: "career/analytics.aggregate.requested.v1",
+  career_brain: "career/brain.refresh.requested.v1",
   export: "career/export.requested.v1",
   evidence_extraction: "career/facts.extract.requested.v1",
   document_composition: "career/application.artifact.requested.v1",
@@ -70,7 +71,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           resourceId: context.resourceId,
           operationKey,
           requestedBy: "owner",
-          metadata: { automationRunId: created.data.id }
+          metadata: { automationRunId: created.data.id },
+          ...(context.refreshRetrievalCache === true ? { refreshRetrievalCache: true } : {})
         }
       });
     } catch (error) {

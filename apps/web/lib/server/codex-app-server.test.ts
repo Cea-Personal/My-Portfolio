@@ -40,6 +40,7 @@ describe("native Codex orchestration", () => {
       "career_gap",
       "job_scoring",
       "document_composition",
+      "application_answers",
       "compensation",
       "interview_preparation",
       "writing_assistance"
@@ -58,6 +59,15 @@ describe("native Codex orchestration", () => {
     expect(questions?.type).toBe("array");
     expect(questions?.items?.required).toContain("answer");
     expect(questions?.items?.required).toContain("evidenceId");
+  });
+
+  it("keeps application documents and employer answers on separate contracts", () => {
+    expect(Object.keys(codexOutputSchemaForTask("document_composition").properties ?? {})).toEqual([
+      "documents"
+    ]);
+    expect(Object.keys(codexOutputSchemaForTask("application_answers").properties ?? {})).toEqual([
+      "answers"
+    ]);
   });
 
   it("reads nested app-server error messages", () => {

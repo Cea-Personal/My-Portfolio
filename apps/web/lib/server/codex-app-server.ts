@@ -30,6 +30,7 @@ const TASK_TO_NATIVE_ROLE = {
   career_gap: "career_gap_analyst",
   job_scoring: "job_matcher",
   document_composition: "application_writer",
+  application_answers: "application_writer",
   compensation: "compensation_analyst",
   interview_preparation: "interview_coach",
   writing_assistance: "writing_editor",
@@ -86,8 +87,10 @@ const TASK_OUTPUT_SCHEMAS: Readonly<Record<string, JsonSchema>> = {
       summary: textSchema(),
       responsibilities: textListSchema(),
       achievements: textListSchema(),
+      impact: textListSchema(),
       projects: textListSchema(),
-      technologies: textListSchema()
+      technologies: textListSchema(),
+      evidence: textListSchema()
     }),
     projects: objectListSchema({
       title: textSchema(),
@@ -95,7 +98,9 @@ const TASK_OUTPUT_SCHEMAS: Readonly<Record<string, JsonSchema>> = {
       role: textSchema(),
       outcome: textSchema(),
       technologies: textListSchema(),
-      url: textSchema()
+      url: textSchema(),
+      process: textListSchema(),
+      evidence: textListSchema()
     }),
     education: objectListSchema({
       qualification: textSchema(),
@@ -135,6 +140,14 @@ const TASK_OUTPUT_SCHEMAS: Readonly<Record<string, JsonSchema>> = {
     recommendations: textListSchema()
   }),
   document_composition: objectSchema({
+    documents: objectListSchema({
+      artifactType: textSchema(),
+      title: textSchema(),
+      content: textSchema(),
+      evidenceIds: textListSchema()
+    })
+  }),
+  application_answers: objectSchema({
     answers: objectListSchema({
       fieldId: textSchema(),
       answer: textSchema(),

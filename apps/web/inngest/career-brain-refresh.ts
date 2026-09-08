@@ -15,8 +15,46 @@ export const careerBrainRefresh = inngest.createFunction(
     if (!ownerId) throw new Error("CAREER_BRAIN_OWNER_REQUIRED");
     const client = workflowClient();
     if (!client) throw new Error("CAREER_BRAIN_WORKFLOW_CONFIGURATION_MISSING");
-    return step.run("synthesize-current-private-profile", () =>
-      synthesizeCareerBrain(client, ownerId, { serviceMode: true })
-    );
+    const automationRunId =
+      typeof event.data.automationRunId === "string" ? event.data.automationRunId : null;
+    const refreshRetrievalCache = event.data.refreshRetrievalCache === true;
+    try {
+      const result = await step.run("synthesize-current-private-profile", () =>
+        synthesizeCareerBrain(client, ownerId, {
+          serviceMode: true,
+          refreshRetrievalCache
+        })
+      );
+      if (automationRunId) {
+        await step.run("mark-career-brain-run-complete", async () => {
+          const update = await client
+            .schema("app")
+            .from("automation_runs")
+            .update({
+              status: "completed",
+              finished_at: new Date().toISOString(),
+              error_code: null
+            })
+            .eq("id", automationRunId)
+            .eq("owner_id", ownerId);
+          if (update.error) throw update.error;
+        });
+      }
+      return result;
+    } catch (error) {
+      if (automationRunId) {
+        await client
+          .schema("app")
+          .from("automation_runs")
+          .update({
+            status: "failed",
+            finished_at: new Date().toISOString(),
+            error_code: error instanceof Error ? error.message.slice(0, 120) : "CAREER_BRAIN_FAILED"
+          })
+          .eq("id", automationRunId)
+          .eq("owner_id", ownerId);
+      }
+      throw error;
+    }
   }
 );

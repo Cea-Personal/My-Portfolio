@@ -109,21 +109,32 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const { data: documents, error: documentsError } = await client
       .schema("app")
       .from("documents")
-      .select("id,name,evidence_sources(evidence_versions(evidence_chunks(content,visibility,deleted_at)))")
+      .select("id,name,document_kind,evidence_source_id")
       .eq("owner_id", ownerId)
       .is("removed_at", null);
     if (documentsError) throw documentsError;
+    const sourceIds = (documents ?? [])
+      .map((document) => document.evidence_source_id as string | null)
+      .filter((value): value is string => Boolean(value));
+    const sourcesResult = sourceIds.length
+      ? await client
+          .schema("app")
+          .from("evidence_sources")
+          .select("id,evidence_versions(evidence_chunks(content,visibility,deleted_at))")
+          .in("id", sourceIds)
+      : { data: [], error: null };
+    if (sourcesResult.error) throw sourcesResult.error;
+    const sourcesById = new Map(
+      (sourcesResult.data ?? []).map((source) => [String(source.id), source] as const)
+    );
     const privateDocuments = (documents ?? []).flatMap((document) => {
       const name = text(document.name, "Private document", 300);
-      if (!/cv|resume|cover.?letter|curriculum vitae/i.test(name)) return [];
-      const source = one(
-        document.evidence_sources as Record<string, unknown> | Record<string, unknown>[] | null
-      );
-      const versions = Array.isArray(source?.evidence_versions)
-        ? source.evidence_versions
-        : source?.evidence_versions
-          ? [source.evidence_versions]
-          : [];
+      const kind = text(document.document_kind).toLowerCase();
+      if (kind !== "resume" && kind !== "cover_letter" && !/cv|resume|cover.?letter|curriculum vitae/i.test(name)) return [];
+      const source = document.evidence_source_id
+        ? (sourcesById.get(String(document.evidence_source_id)) as Record<string, unknown> | undefined)
+        : undefined;
+      const versions = Array.isArray(source?.evidence_versions) ? source.evidence_versions : [];
       const chunks = versions.flatMap((version) => {
         const row = version as Record<string, unknown>;
         return Array.isArray(row.evidence_chunks) ? row.evidence_chunks : [];
@@ -137,33 +148,43 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         .filter(Boolean)
         .slice(0, 10)
         .join("\n\n");
-      return content ? [{ name, content }] : [];
+      return content ? [{ id: String(document.id), name, content }] : [];
     });
 
-    const providers = await resolveReasoningProviders(client, ownerId, "document_composition");
-    const generated = await generateReasoningJson(
-      providers,
-      `You are Basil Ogbonna's application writer. Return JSON only with a documents array containing exactly one resume and one cover_letter document. Tailor both to the supplied job description. Use only supplied profile, career facts, CV/cover-letter excerpts, and career snapshot; never invent employers, dates, technologies, metrics, education, authorization, sponsorship, or salary. Keep the CV concise and ATS-readable. Make the cover letter specific to the company and role. Each document must contain artifactType, title, content (plain text with headings and bullets), and evidenceIds containing only supplied career fact IDs. If evidence is insufficient, say so in content instead of fabricating it.`,
-      {
-        job: {
-          title: text(job?.canonical_title, "Selected role", 300),
-          company: text(job?.canonical_company, "Employer", 300),
-          description,
-          salary: {
-            min: job?.salary_min,
-            max: job?.salary_max,
-            currency: job?.salary_currency,
-            period: job?.salary_period
-          }
+    let generated: Awaited<ReturnType<typeof generateReasoningJson>>;
+    try {
+      const providers = await resolveReasoningProviders(client, ownerId, "document_composition");
+      generated = await generateReasoningJson(
+        providers,
+        `You are Basil Ogbonna's application writer. Return JSON only with a documents array containing exactly one resume and one cover_letter document. Tailor both to the supplied job description. Use only supplied profile, career facts, CV/cover-letter excerpts, and career snapshot; never invent employers, dates, technologies, metrics, education, authorization, sponsorship, or salary. Keep the CV concise and ATS-readable. Make the cover letter specific to the company and role. Each document must contain artifactType, title, content (plain text with headings and bullets), and evidenceIds containing only supplied career fact IDs when applicable. Private CV and cover-letter excerpts are also valid grounding even when no Career Brain fact IDs exist. If evidence is insufficient, say so in content instead of fabricating it.`,
+        {
+          job: {
+            title: text(job?.canonical_title, "Selected role", 300),
+            company: text(job?.canonical_company, "Employer", 300),
+            description,
+            salary: {
+              min: job?.salary_min,
+              max: job?.salary_max,
+              currency: job?.salary_currency,
+              period: job?.salary_period
+            }
+          },
+          applicationProfile: profileResult.data ?? null,
+          careerFacts: facts,
+          careerBrain: text(snapshotResult.data?.content, "", 20_000),
+          privateDocuments,
+          applicationId
         },
-        applicationProfile: profileResult.data ?? null,
-        careerFacts: facts,
-        careerBrain: text(snapshotResult.data?.content, "", 20_000),
-        privateDocuments,
-        applicationId
-      },
-      { task: "document_composition" }
-    );
+        { task: "document_composition" }
+      );
+    } catch (error) {
+      const detail = error instanceof Error ? error.message.slice(0, 500) : "APPLICATION_WRITER_FAILED";
+      return apiResponse(
+        { code: "APPLICATION_KIT_GENERATION_FAILED", detail },
+        request,
+        422
+      );
+    }
 
     const candidates = Array.isArray(generated.output.documents)
       ? generated.output.documents
@@ -172,7 +193,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const documentsToSave = candidates.flatMap((value) => {
       if (!value || typeof value !== "object") return [];
       const row = value as Record<string, unknown>;
-      const artifactType = row.artifactType === "cover_letter" ? "cover_letter" : row.artifactType === "resume" ? "resume" : null;
+      const artifactTypeValue = text(row.artifactType).toLowerCase().replace(/[ -]+/g, "_");
+      const artifactType =
+        artifactTypeValue === "cover_letter" || artifactTypeValue === "coverletter"
+          ? "cover_letter"
+          : artifactTypeValue === "resume" || artifactTypeValue === "cv" || artifactTypeValue === "curriculum_vitae"
+            ? "resume"
+            : null;
       const content = text(row.content, "", 40_000);
       if (!artifactType || !content) return [];
       const evidenceIds = Array.isArray(row.evidenceIds)
@@ -186,13 +213,28 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       }];
     });
     if (!documentsToSave.length) {
-      return apiResponse({ code: "APPLICATION_KIT_EMPTY", detail: "The application writer returned no grounded documents." }, request, 422);
+      return apiResponse(
+        { code: "APPLICATION_KIT_EMPTY", detail: "The application writer returned no document content." },
+        request,
+        422
+      );
+    }
+    const hasGrounding = Boolean(
+      facts.length || privateDocuments.length || snapshotResult.data?.content
+    );
+    if (!hasGrounding) {
+      return apiResponse(
+        {
+          code: "APPLICATION_KIT_SOURCE_REQUIRED",
+          detail: "Add or index a CV, cover letter, or Career Brain source before preparing this kit."
+        },
+        request,
+        422
+      );
     }
 
     const saved: Array<{ artifactType: string; artifactId: string; versionId: string }> = [];
     for (const document of documentsToSave) {
-      if (document.artifactType === "resume" && !document.evidenceIds.length) continue;
-      if (document.artifactType === "cover_letter" && !document.evidenceIds.length) continue;
       const existing = await client
         .schema("app")
         .from("generated_artifacts")
@@ -222,7 +264,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       const storageKey = `${ownerId}/${artifactId}/${String(version)}.pdf`;
       const upload = await client.storage.from("private-artifact").upload(storageKey, rendered.bytes, { contentType: "application/pdf", upsert: false });
       if (upload.error) throw upload.error;
-      const manifest = { artifactType: document.artifactType, title: document.title, content: document.content, generatedBy: generated.provider.model };
+      const manifest = {
+        artifactType: document.artifactType,
+        title: document.title,
+        content: document.content,
+        generatedBy: generated.provider.model,
+        careerFactEvidenceIds: document.evidenceIds,
+        privateSourceDocuments: privateDocuments.map((source) => source.name)
+      };
       const inserted = await client.schema("app").from("artifact_versions").insert({
         artifact_id: artifactId,
         version,

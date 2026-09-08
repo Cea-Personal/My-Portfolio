@@ -66,7 +66,17 @@ export const automationScheduler = inngest.createFunction(
             workflow_name: schedule.purpose,
             status: "pending",
             correlation_id: correlationId,
-            idempotency_key: operationKey
+            idempotency_key: operationKey,
+            ...(schedule.purpose === "career_brain"
+              ? {
+                  context_metadata: {
+                    resourceType: "career_brain",
+                    resourceId: schedule.owner_id,
+                    scheduleId: schedule.id,
+                    refreshRetrievalCache: true
+                  }
+                }
+              : {})
           })
           .select("id")
           .single();
@@ -74,6 +84,36 @@ export const automationScheduler = inngest.createFunction(
           throw automationRun.error ?? new Error("AUTOMATION_RUN_CREATE_FAILED");
 
         try {
+          if (schedule.purpose === "career_brain") {
+            const brainOperationKey = `schedule:${schedule.id}:${dueAt}`;
+            await inngest.send({
+              name: "career/brain.refresh.requested.v1",
+              id: brainOperationKey,
+              data: {
+                schemaVersion: 1,
+                ownerId: schedule.owner_id,
+                correlationId,
+                resourceType: "career_brain",
+                resourceId: schedule.owner_id,
+                operationKey: brainOperationKey,
+                requestedBy: "schedule",
+                metadata: {
+                  scheduleId: schedule.id,
+                  automationRunId: automationRun.data.id,
+                  refreshRetrievalCache: true
+                },
+                automationRunId: automationRun.data.id,
+                refreshRetrievalCache: true
+              }
+            });
+            await client
+              .schema("app")
+              .from("automation_runs")
+              .update({ status: "running", started_at: new Date().toISOString() })
+              .eq("id", automationRun.data.id);
+            outcomes.push({ scheduleId: schedule.id, status: "career_brain_dispatched" });
+            return;
+          }
           if (schedule.purpose === "job_search") {
             const weekday = new Intl.DateTimeFormat("en-US", {
               timeZone: String(schedule.timezone),

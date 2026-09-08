@@ -19,10 +19,16 @@ export interface CareerBrainContent {
   technicalSkills: CareerBrainItem[];
 }
 
+// Increment when the synthesis contract or prompt changes so an existing
+// snapshot cannot silently keep the older, summary-only shape.
+const CAREER_BRAIN_SYNTHESIS_VERSION = "career-brain.v3.human-voice";
+
 // Career Brain is a bounded synthesis job, not a health probe. Native Codex
 // subagents can need more time to reconcile multiple documents and produce the
 // complete structured profile requested by the schema.
 const CAREER_BRAIN_TIMEOUT_MS = 120_000;
+const CAREER_BRAIN_RAG_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+const CAREER_BRAIN_RAG_CACHE_VERSION = "rag.v1";
 
 const text = (value: unknown, fallback = "") =>
   typeof value === "string" ? value.trim().slice(0, 10_000) : fallback;
@@ -34,6 +40,52 @@ const strings = (value: unknown) =>
         .filter(Boolean)
         .slice(0, 100)
     : [];
+
+function uniqueStrings(value: unknown, limit = 100): string[] {
+  const seen = new Set<string>();
+  return strings(value).filter((entry) => {
+    const key = entry.toLocaleLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).slice(0, limit);
+}
+
+/** Keep a role useful for a CV without letting repeated source CV bullets take over. */
+function selectRolePoints(item: Record<string, unknown>) {
+  const buckets = [
+    { key: "achievements", values: uniqueStrings(item.achievements, 8) },
+    { key: "impact", values: uniqueStrings(item.impact, 8) },
+    { key: "responsibilities", values: uniqueStrings(item.responsibilities, 8) }
+  ] as const;
+  const selected = new Set<string>();
+  const selectedByKey = new Map<string, string[]>();
+  const add = (key: string, value: string) => {
+    const normalized = value.toLocaleLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    if (selected.size >= 7 || selected.has(normalized)) return;
+    selected.add(normalized);
+    selectedByKey.get(key)?.push(value);
+  };
+  for (const bucket of buckets) {
+    selectedByKey.set(bucket.key, []);
+  }
+  // Keep a representative responsibility, achievement, and impact when each
+  // category is available before filling the remaining slots by relevance.
+  for (const bucket of buckets) {
+    const first = bucket.values[0];
+    if (first) add(bucket.key, first);
+  }
+  for (const bucket of buckets) {
+    for (const value of bucket.values) {
+      add(bucket.key, value);
+    }
+  }
+  return {
+    responsibilities: selectedByKey.get("responsibilities") ?? [],
+    achievements: selectedByKey.get("achievements") ?? [],
+    impact: selectedByKey.get("impact") ?? []
+  };
+}
 const records = (value: unknown) =>
   Array.isArray(value)
     ? value.filter(
@@ -59,6 +111,136 @@ function boundedRecords<T>(items: T[], maxItems: number, maxCharacters: number):
     characters += size;
   }
   return bounded;
+}
+
+type RetrievedEvidence = {
+  id: string;
+  source?: string;
+  section?: unknown;
+  content: string;
+  similarity?: unknown;
+};
+
+type RetrievalCache = {
+  cacheKey: string;
+  queryEmbeddings: number[][];
+  evidence: RetrievedEvidence[];
+  sourceHash: string | null;
+  expiresAt: number;
+};
+
+function retrievalCacheKey(
+  ownerId: string,
+  provider: { provider: string; model: string; model_version: string | null | undefined },
+  queries: string[],
+  serviceMode: boolean
+) {
+  return createHash("sha256")
+    .update(
+      JSON.stringify({
+        version: CAREER_BRAIN_RAG_CACHE_VERSION,
+        ownerId,
+        provider: provider.provider,
+        model: provider.model,
+        modelVersion: provider.model_version ?? "",
+        queries,
+        serviceMode
+      })
+    )
+    .digest("hex");
+}
+
+function evidenceFromRows(value: unknown): RetrievedEvidence[] {
+  return records(value).flatMap((item) => {
+    const id = text(item.chunk_id || item.id);
+    const content = text(item.content).slice(0, 2500);
+    if (!id || !content) return [];
+    return [
+      {
+        id,
+        source: text(item.source_title || item.source),
+        section: item.section_path ?? item.section,
+        content,
+        similarity: item.similarity
+      }
+    ];
+  });
+}
+
+function mergeEvidence(...sets: RetrievedEvidence[][]): RetrievedEvidence[] {
+  const merged = new Map<string, RetrievedEvidence>();
+  for (const set of sets) {
+    for (const item of set) {
+      if (!merged.has(item.id)) merged.set(item.id, item);
+    }
+  }
+  return [...merged.values()].slice(0, 60);
+}
+
+async function readRetrievalCache(
+  client: SupabaseClient,
+  ownerId: string,
+  cacheKey: string
+): Promise<RetrievalCache | null> {
+  try {
+    const result = await client
+      .schema("app")
+      .from("career_brain_retrieval_cache")
+      .select("cache_key,query_embeddings,evidence,source_hash,expires_at")
+      .eq("owner_id", ownerId)
+      .eq("cache_key", cacheKey)
+      .maybeSingle();
+    if (result.error || !result.data) return null;
+    const embeddings = Array.isArray(result.data.query_embeddings)
+      ? result.data.query_embeddings.filter(
+          (vector: unknown): vector is number[] =>
+            Array.isArray(vector) && vector.every((value) => typeof value === "number")
+        )
+      : [];
+    const expiresAt = Date.parse(String(result.data.expires_at ?? ""));
+    return {
+      cacheKey: String(result.data.cache_key),
+      queryEmbeddings: embeddings,
+      evidence: evidenceFromRows(result.data.evidence),
+      sourceHash: typeof result.data.source_hash === "string" ? result.data.source_hash : null,
+      expiresAt: Number.isFinite(expiresAt) ? expiresAt : 0
+    };
+  } catch {
+    // The cache is an optimization. Career Brain must continue to work before
+    // the optional cache migration has been applied or during a cache outage.
+    return null;
+  }
+}
+
+async function writeRetrievalCache(
+  client: SupabaseClient,
+  ownerId: string,
+  cacheKey: string,
+  provider: { provider: string; model: string; model_version: string | null | undefined },
+  queryEmbeddings: number[][],
+  evidence: RetrievedEvidence[],
+  sourceHash: string
+) {
+  try {
+    await client.schema("app").from("career_brain_retrieval_cache").upsert(
+      {
+        owner_id: ownerId,
+        cache_key: cacheKey,
+        embedding_provider: provider.provider,
+        embedding_model: provider.model,
+        embedding_model_version: provider.model_version ?? "",
+        query_embeddings: queryEmbeddings,
+        evidence,
+        source_hash: sourceHash,
+        refreshed_at: new Date().toISOString(),
+        expires_at: new Date(Date.now() + CAREER_BRAIN_RAG_CACHE_TTL_MS).toISOString()
+      },
+      { onConflict: "owner_id,cache_key" }
+    );
+  } catch {
+    // Never turn a successful synthesis into a failure because cache storage
+    // is unavailable.
+  }
 }
 
 function compactCanonicalFacts(value: unknown) {
@@ -149,37 +331,103 @@ export function normalizeCareerBrainContent(value: unknown): CareerBrainContent 
     cvSummary: text(root.cvSummary),
     portfolioSummary: text(root.portfolioSummary),
     about: text(root.about),
-    experiences: records(root.experiences)
-      .slice(0, 30)
-      .map((item) => {
+    experiences: (() => {
+      const merged = new Map<string, Record<string, unknown>>();
+      for (const item of records(root.experiences).slice(0, 50)) {
         const organization = text(item.organization, "Organisation not identified");
         const role = text(item.role, "Role not identified");
-        return {
-          id: stableId("experience", [organization, role, text(item.period)]),
+        const key = `${organization}|${role}`.toLocaleLowerCase().replace(/\s+/g, " ");
+        const previous = merged.get(key);
+        const points = selectRolePoints(item);
+        const mergedItem = {
+          ...(previous ?? {}),
           organization,
           role,
+          period: text(previous?.period, text(item.period)),
+          summary: text(previous?.summary, text(item.summary)),
+          responsibilities: uniqueStrings([
+            ...strings(previous?.responsibilities),
+            ...points.responsibilities
+          ], 7),
+          achievements: uniqueStrings([
+            ...strings(previous?.achievements),
+            ...points.achievements
+          ], 7),
+          impact: uniqueStrings([
+            ...strings(previous?.impact),
+            ...points.impact
+          ], 7),
+          projects: uniqueStrings([
+            ...strings(previous?.projects),
+            ...strings(item.projects)
+          ], 8),
+          technologies: uniqueStrings([
+            ...strings(previous?.technologies),
+            ...strings(item.technologies)
+          ], 30),
+          evidence: uniqueStrings([
+            ...strings(previous?.evidence),
+            ...strings(item.evidence)
+          ], 12)
+        };
+        merged.set(key, mergedItem);
+      }
+      return [...merged.values()].slice(0, 30).map((item) => {
+        const points = selectRolePoints(item);
+        return {
+          id: stableId("experience", [text(item.organization), text(item.role), text(item.period)]),
+          organization: text(item.organization, "Organisation not identified"),
+          role: text(item.role, "Role not identified"),
           period: text(item.period),
           summary: text(item.summary),
-          responsibilities: strings(item.responsibilities),
-          achievements: strings(item.achievements),
-          projects: strings(item.projects),
-          technologies: strings(item.technologies)
+          responsibilities: points.responsibilities,
+          achievements: points.achievements,
+          impact: points.impact,
+          projects: uniqueStrings(item.projects, 8),
+          technologies: uniqueStrings(item.technologies, 30),
+          evidence: uniqueStrings(item.evidence, 12)
         };
-      }),
-    projects: records(root.projects)
-      .slice(0, 30)
-      .map((item) => {
+      });
+    })(),
+    projects: (() => {
+      const merged = new Map<string, Record<string, unknown>>();
+      for (const item of records(root.projects).slice(0, 50)) {
         const title = text(item.title, "Untitled project");
-        return {
-          id: stableId("project", [title]),
+        const key = title.toLocaleLowerCase().replace(/\s+/g, " ");
+        const previous = merged.get(key);
+        merged.set(key, {
+          ...(previous ?? {}),
           title,
-          summary: text(item.summary),
-          role: text(item.role),
-          outcome: text(item.outcome),
-          technologies: strings(item.technologies),
-          url: text(item.url)
-        };
-      }),
+          summary: text(previous?.summary, text(item.summary)),
+          role: text(previous?.role, text(item.role)),
+          outcome: text(previous?.outcome, text(item.outcome)),
+          technologies: uniqueStrings([
+            ...strings(previous?.technologies),
+            ...strings(item.technologies)
+          ], 30),
+          url: text(previous?.url, text(item.url)),
+          process: uniqueStrings([
+            ...strings(previous?.process),
+            ...strings(item.process)
+          ], 8),
+          evidence: uniqueStrings([
+            ...strings(previous?.evidence),
+            ...strings(item.evidence)
+          ], 12)
+        });
+      }
+      return [...merged.values()].slice(0, 30).map((item) => ({
+        id: stableId("project", [text(item.title)]),
+        title: text(item.title, "Untitled project"),
+        summary: text(item.summary),
+        role: text(item.role),
+        outcome: text(item.outcome),
+        technologies: uniqueStrings(item.technologies, 30),
+        url: text(item.url),
+        process: uniqueStrings(item.process, 8),
+        evidence: uniqueStrings(item.evidence, 12)
+      }));
+    })(),
     education: records(root.education)
       .slice(0, 30)
       .map((item) => {
@@ -273,13 +521,77 @@ async function loadInputs(client: SupabaseClient, ownerId: string) {
     journals: compactJournals(journals.data),
     recentApplications: compactApplications(applications.data)
   };
-  return { source, sourceHash: createHash("sha256").update(JSON.stringify(source)).digest("hex") };
+  return {
+    source,
+    sourceHash: createHash("sha256")
+      .update(JSON.stringify({ version: CAREER_BRAIN_SYNTHESIS_VERSION, source }))
+      .digest("hex")
+  };
+}
+
+async function refreshCareerBrainRetrievalCache(
+  client: SupabaseClient,
+  ownerId: string,
+  sourceHash: string,
+  serviceMode = false
+) {
+  const embeddingProviders = await resolveEmbeddingProviders(client, ownerId);
+  const queries = [
+    "employment history organisations roles dates responsibilities achievements measurable impact",
+    "selected personal and professional software data artificial intelligence projects outcomes",
+    "technical skills programming languages platforms tools frameworks data and AI technologies",
+    "education certifications credentials courses issuers dates",
+    "professional profile strengths leadership working style and portfolio about biography"
+  ];
+  const embeddingProvider = embeddingProviders[0];
+  if (!embeddingProvider) throw new Error("EMBEDDING_PROVIDER_NOT_CONFIGURED");
+  const cacheKey = retrievalCacheKey(ownerId, embeddingProvider, queries, serviceMode);
+  const cached = await readRetrievalCache(client, ownerId, cacheKey);
+  const cacheMatchesSource = Boolean(cached && cached.sourceHash === sourceHash);
+  const cacheFresh = Boolean(
+    cacheMatchesSource && cached && cached.expiresAt > Date.now() && cached.queryEmbeddings.length
+  );
+  const embedded = cached?.queryEmbeddings.length
+    ? { vectors: cached.queryEmbeddings, provider: embeddingProvider }
+    : await embedWithFallback(embeddingProviders, queries);
+  const freshLimit = cacheFresh ? 6 : 20;
+  const retrievalResults = await Promise.all(
+    embedded.vectors.map((vector) =>
+      client
+        .schema("app")
+        .rpc(serviceMode ? "match_owner_private_evidence" : "match_private_evidence", {
+          ...(serviceMode ? { requested_owner: ownerId } : {}),
+          requested_embedding: `[${vector.join(",")}]`,
+          requested_provider: embedded.provider.provider,
+          requested_model: embedded.provider.model,
+          requested_model_version: embedded.provider.model_version,
+          requested_kinds: ["resume", "cover_letter", "other"],
+          requested_limit: freshLimit,
+          requested_min_similarity: 0.12
+        })
+    )
+  );
+  const freshEvidence = retrievalResults.flatMap((result) => {
+    if (result.error) throw result.error;
+    return evidenceFromRows(result.data);
+  });
+  const evidence = mergeEvidence(freshEvidence, cached?.evidence ?? []);
+  await writeRetrievalCache(
+    client,
+    ownerId,
+    retrievalCacheKey(ownerId, embedded.provider, queries, serviceMode),
+    embedded.provider,
+    embedded.vectors,
+    evidence,
+    sourceHash
+  );
+  return { evidence, cacheHit: Boolean(cached), freshCount: freshEvidence.length };
 }
 
 export async function synthesizeCareerBrain(
   client: SupabaseClient,
   ownerId: string,
-  options: { serviceMode?: boolean } = {}
+  options: { serviceMode?: boolean; refreshRetrievalCache?: boolean } = {}
 ) {
   const { source, sourceHash } = await loadInputs(client, ownerId);
   const existing = await client
@@ -291,48 +603,25 @@ export async function synthesizeCareerBrain(
     .maybeSingle();
   if (existing.error) throw existing.error;
   const existingSnapshot = existing.data as unknown as Record<string, unknown> | null;
-  if (existingSnapshot) return { snapshot: existingSnapshot, reused: true };
-
-  const embeddingProviders = await resolveEmbeddingProviders(client, ownerId);
-  const queries = [
-    "employment history organisations roles dates responsibilities achievements measurable impact",
-    "selected personal and professional software data artificial intelligence projects outcomes",
-    "technical skills programming languages platforms tools frameworks data and AI technologies",
-    "education certifications credentials courses issuers dates",
-    "professional profile strengths leadership working style and portfolio about biography"
-  ];
-  const embedded = await embedWithFallback(embeddingProviders, queries);
-  const retrieved = new Map<string, Record<string, unknown>>();
-  for (const vector of embedded.vectors) {
-    const result = await client
-      .schema("app")
-      .rpc(options.serviceMode ? "match_owner_private_evidence" : "match_private_evidence", {
-        ...(options.serviceMode ? { requested_owner: ownerId } : {}),
-        requested_embedding: `[${vector.join(",")}]`,
-        requested_provider: embedded.provider.provider,
-        requested_model: embedded.provider.model,
-        requested_model_version: embedded.provider.model_version,
-        requested_kinds: ["resume", "cover_letter", "other"],
-        requested_limit: 20,
-        requested_min_similarity: 0.12
-      });
-    if (result.error) throw result.error;
-    for (const item of (result.data ?? []) as Record<string, unknown>[])
-      retrieved.set(String(item.chunk_id), item);
+  if (existingSnapshot) {
+    if (options.refreshRetrievalCache) {
+      await refreshCareerBrainRetrievalCache(client, ownerId, sourceHash, options.serviceMode);
+    }
+    return { snapshot: existingSnapshot, reused: true };
   }
-  const evidence = [...retrieved.values()].slice(0, 60).map((item) => ({
-    id: item.chunk_id,
-    source: item.source_title,
-    section: item.section_path,
-    content: text(item.content).slice(0, 2500),
-    similarity: item.similarity
-  }));
+
+  const { evidence } = await refreshCareerBrainRetrievalCache(
+    client,
+    ownerId,
+    sourceHash,
+    options.serviceMode
+  );
   const providers = (await resolveReasoningProviders(client, ownerId, "evidence_extraction")).map(
     (provider) => ({ ...provider, timeoutMs: Math.max(provider.timeoutMs, CAREER_BRAIN_TIMEOUT_MS) })
   );
   const generation = await generateReasoningJson(
     providers,
-    `You maintain Basil Ogbonna's private Career Brain. Return JSON only. Synthesize, deduplicate and reconcile the supplied evidence without inventing facts. Recent applications affect ordering and emphasis only; they are not evidence of Basil's experience. Output: cvSummary (concise CV profile), portfolioSummary (human first-person portfolio profile), about (first-person About narrative), experiences[], projects[], education[], certifications[], technicalSkills[]. Each experience must represent one role at one organization and contain organization, role, period, summary, responsibilities[], achievements[] (include impact here), projects[], technologies[]. Projects contain title, summary, role, outcome, technologies[], url. Education contains qualification, institution, period, summary. Certifications contain name, issuer, date, summary. technicalSkills groups contain category, skills[], summary. Prefer corroborated specifics; omit uncertain entries rather than guessing.`,
+    `You maintain Basil Ogbonna's private Career Brain. Return JSON only. Synthesize, deduplicate and reconcile all supplied CVs, extracted facts, journals, and evidence without inventing facts. The recentApplicationFocus input contains target job descriptions: use those descriptions only to rank which verified bullets are most useful for the roles Basil is pursuing; never treat a job description as proof that Basil did something. Preserve useful detail instead of collapsing evidence into generic summaries. Write like a thoughtful senior engineer speaking plainly: specific, warm, confident, and grounded in real work. Use natural sentence structure and varied wording; avoid keyword stuffing, corporate clichés, exaggerated claims, empty phrases such as "results-driven" or "passionate professional", and repetitive AI-style openings. Keep the CV profile concise and professional, but make portfolioSummary and about sound like Basil's own first-person voice. Output cvSummary (concise CV profile), portfolioSummary (human first-person portfolio profile), about (first-person About narrative), experiences[], projects[], education[], certifications[], technicalSkills[]. Each experience must represent exactly one role at one organization. Merge repeated versions of the same organization and role into one record, even when the same bullet appears in several CVs. For each role select the strongest 6-7 combined points across responsibilities[], achievements[], and impact[]; do not return 6-7 in every list. Prefer points that match the target job descriptions while retaining important role-defining work. Responsibilities are action-and-scope bullets, achievements are specific accomplishments, and impact is measurable or observable outcomes such as scale, reliability, speed, cost, quality, users, or business effect; do not duplicate the same point across lists. Also include projects[] (named initiatives carried out in that role), technologies[] (exact tools, platforms, languages, and methods), and evidence[] (short source-grounded details or source labels explaining where the role and outcomes came from). Keep dates, scope, metrics, and technical names when present. Projects contain title, summary, role, outcome, technologies[], url, process[] (important design/build/engineering steps), and evidence[] (source-grounded details). Education contains qualification, institution, period, summary. Certifications contain name, issuer, date, summary. technicalSkills groups contain category, skills[], summary. Prefer corroborated specifics; omit uncertain entries rather than guessing, but do not omit a supported detail merely because it is lengthy.`,
     {
       semanticEvidence: evidence,
       canonicalPrivateFacts: source.facts,

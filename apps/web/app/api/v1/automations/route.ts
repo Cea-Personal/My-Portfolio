@@ -40,7 +40,7 @@ export async function POST(request: Request) {
     const body = await request.json().catch(() => ({}));
     if (
       typeof body.purpose !== "string" ||
-      !["drive_sync", "job_search", "analytics_aggregate"].includes(body.purpose) ||
+      !["drive_sync", "job_search", "analytics_aggregate", "career_brain"].includes(body.purpose) ||
       typeof body.cronExpression !== "string" ||
       !parseCronExpression(body.cronExpression)
     )

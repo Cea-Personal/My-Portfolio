@@ -12,6 +12,7 @@ export type ReasoningTask =
   | "career_gap"
   | "job_scoring"
   | "document_composition"
+  | "application_answers"
   | "compensation"
   | "interview_preparation"
   | "writing_assistance";
@@ -55,6 +56,11 @@ export const subagentRoles: ReadonlyArray<{
     description: "Drafts CVs, cover letters, and application answers."
   },
   {
+    task: "application_answers",
+    label: "Application answer writer",
+    description: "Answers the exact employer questions for one application."
+  },
+  {
     task: "compensation",
     label: "Compensation analyst",
     description: "Summarizes compensation evidence and trade-offs."
@@ -92,6 +98,7 @@ const reasoning = new Set<ReasoningTask>([
   "career_gap",
   "job_scoring",
   "document_composition",
+  "application_answers",
   "compensation",
   "interview_preparation",
   "writing_assistance"
@@ -110,7 +117,7 @@ export function coordinateTask(task: string) {
       delegation: "subagent" as const,
       orchestrator: "single_model" as const,
       subagent: subagentForTask(task),
-      consequential: ["document_composition"].includes(task)
+      consequential: ["document_composition", "application_answers"].includes(task)
     };
   throw new Error("COORDINATED_TASK_NOT_ALLOWED");
 }

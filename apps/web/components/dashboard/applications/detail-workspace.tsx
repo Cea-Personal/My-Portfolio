@@ -21,6 +21,8 @@ interface Answer {
   final_text?: string | null;
   status: string;
   evidence_ids: string[];
+  generation_status?: string | null;
+  generation_error?: string | null;
   created_at: string;
 }
 interface Field {
@@ -222,7 +224,10 @@ export function ApplicationDetailWorkspace({ id }: { id: string }) {
   useEffect(() => void load(), [load]);
   useEffect(() => {
     if (state !== "ready" || !application || autoPrepareAttempted) return;
-    if (application.generated_artifacts?.length) {
+    const artifactTypes = new Set(
+      (application.generated_artifacts ?? []).map((artifact) => artifact.artifact_type)
+    );
+    if (artifactTypes.has("resume") && artifactTypes.has("cover_letter")) {
       setAutoPrepareAttempted(true);
       return;
     }
@@ -283,7 +288,7 @@ export function ApplicationDetailWorkspace({ id }: { id: string }) {
         generatedCount?: number;
         status?: string;
       };
-      if (!silent || result.generatedCount) {
+      if (!silent || result.generatedCount || result.status === "ready") {
         setMessage(
           result.generatedCount
             ? `AI prepared ${String(result.generatedCount)} application document(s) from this job and your private career data.`
@@ -292,9 +297,7 @@ export function ApplicationDetailWorkspace({ id }: { id: string }) {
       }
       await load();
     } catch (error) {
-      if (!silent) {
-        setMessage(error instanceof Error ? error.message : "Could not prepare the application kit.");
-      }
+      setMessage(error instanceof Error ? error.message : "Could not prepare the application kit.");
     } finally {
       setPreparingKit(false);
     }
@@ -343,10 +346,23 @@ export function ApplicationDetailWorkspace({ id }: { id: string }) {
         category: form.get("category"),
         charLimit: Number(form.get("charLimit")) || null,
         wordLimit: Number(form.get("wordLimit")) || null
-      })) as { addedQuestionCount?: number; generation?: { generatedCount?: number } };
+      })) as {
+        addedQuestionCount?: number;
+        generation?: {
+          status?: string;
+          generatedCount?: number;
+          needsOwnerInput?: number;
+          error?: string;
+        };
+      };
       target.reset();
+      const generation = result.generation;
+      const generatedCount = generation?.generatedCount ?? 0;
+      const needsOwnerInput = generation?.needsOwnerInput ?? 0;
       setMessage(
-        `${String(result.addedQuestionCount ?? 0)} job-specific question(s) captured. ${String(result.generation?.generatedCount ?? 0)} answer(s) generated.`
+        generation?.error
+          ? `${String(result.addedQuestionCount ?? 0)} question(s) captured, but AI answer generation is unavailable: ${generation.error}`
+          : `${String(result.addedQuestionCount ?? 0)} question(s) captured. ${String(generatedCount)} answer(s) generated${needsOwnerInput ? `; ${String(needsOwnerInput)} need explicit owner input or more evidence` : ""}.`
       );
       await load();
     } catch (error) {
@@ -359,9 +375,12 @@ export function ApplicationDetailWorkspace({ id }: { id: string }) {
         status?: string;
         generatedCount?: number;
         needsOwnerInput?: number;
+        error?: string;
       };
       setMessage(
-        `Answers regenerated: ${String(result.generatedCount ?? 0)} generated, ${String(result.needsOwnerInput ?? 0)} need explicit owner input.`
+        result.error
+          ? `Answer generation is unavailable: ${result.error}`
+          : `Answers regenerated: ${String(result.generatedCount ?? 0)} generated, ${String(result.needsOwnerInput ?? 0)} need explicit owner input.`
       );
       await load();
     } catch (error) {
@@ -539,8 +558,12 @@ export function ApplicationDetailWorkspace({ id }: { id: string }) {
         )}
       </section>
       <section>
-        <h2>Readiness and required materials</h2>
-        <p>The AI kit does not require this checklist. Add an employer-specific requirement only when one is provided.</p>
+        <h2>Optional employer requirements</h2>
+        <p>
+          This is only a checklist for materials an employer explicitly asks for. It does not
+          generate your application kit or block answers; leave it empty unless the job posting
+          names an extra requirement.
+        </p>
         <details>
           <summary>Add a requirement (optional)</summary>
           <form className="knowledge-entry-form" onSubmit={(event) => void addMaterial(event)}>
@@ -695,12 +718,21 @@ export function ApplicationDetailWorkspace({ id }: { id: string }) {
                     </button>
                   </div>
                   {latest ? (
-                    <p>
-                      Latest: version {String(latest.version)} · {latest.status} ·{" "}
-                      {latest.evidence_ids.length
+                    <>
+                      <p>
+                        Latest: version {String(latest.version)} · {latest.status} ·{" "}
+                        {latest.evidence_ids.length
                         ? `${String(latest.evidence_ids.length)} evidence links`
                         : "owner/profile input; no evidence links"}
-                    </p>
+                      </p>
+                      {!latest.draft_text && latest.generation_error ? (
+                        <p role="status">
+                          Answer not generated yet: {latest.generation_error} Use “Regenerate AI
+                          answers” after configuring the orchestrator, or enter and save an owner
+                          answer below.
+                        </p>
+                      ) : null}
+                    </>
                   ) : (
                     <p>No saved answer.</p>
                   )}
@@ -729,7 +761,10 @@ export function ApplicationDetailWorkspace({ id }: { id: string }) {
         ) : null}
         <details>
           <summary>Advanced: compose a document manually</summary>
-          <p>Manual composition is optional and is not required to prepare an application.</p>
+          <p>
+            This is an optional override for a private PDF draft. It does not update Career Brain,
+            your source CV, or your answers, and you can ignore it when using the AI-prepared kit.
+          </p>
           <form className="knowledge-entry-form" onSubmit={(event) => void composeArtifact(event)}>
           <label>
             Artifact type
@@ -760,12 +795,12 @@ export function ApplicationDetailWorkspace({ id }: { id: string }) {
             </select>
           </label>
           <label>
-            Editable structured content
+            Optional manual draft content
             <textarea
               name="content"
               rows={14}
               required
-              placeholder="Write or edit sections and bullets here. The renderer controls document layout."
+              placeholder="Only use this to override the AI draft with your own sections and bullets."
             />
           </label>
           <fieldset>

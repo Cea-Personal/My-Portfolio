@@ -273,6 +273,11 @@ export function CareerBrain() {
             <header>
               <p className="eyebrow">Experience</p>
               <h2 id="career-experiences-title">Roles, organisations, and the work within them.</h2>
+              <p>
+                Repeated CV entries for the same role are merged. For each role, Career Brain
+                keeps the strongest six or seven verified responsibility, achievement, and impact
+                points, ranked against your recent target job descriptions.
+              </p>
             </header>
             <div className="career-synthesis-list">
               {content.experiences.map((item) => (
@@ -287,10 +292,16 @@ export function CareerBrain() {
                     <em>{value(item, "summary")}</em>
                   </summary>
                   <div className="career-synthesis-detail">
-                    {(["responsibilities", "achievements", "projects"] as const).map((key) =>
+                    {(["responsibilities", "achievements", "impact", "projects"] as const).map((key) =>
                       list(item, key).length ? (
                         <section key={key}>
-                          <h3>{key === "achievements" ? "Achievements and impact" : key}</h3>
+                          <h3>
+                            {key === "achievements"
+                              ? "Achievements"
+                              : key === "impact"
+                                ? "Impact and outcomes"
+                                : key.charAt(0).toUpperCase() + key.slice(1)}
+                          </h3>
                           <ul>
                             {list(item, key).map((entry) => (
                               <li key={entry}>{entry}</li>
@@ -303,6 +314,16 @@ export function CareerBrain() {
                       <p>
                         <strong>Technical skills:</strong> {list(item, "technologies").join(", ")}
                       </p>
+                    ) : null}
+                    {list(item, "evidence").length ? (
+                      <details>
+                        <summary>Source details</summary>
+                        <ul>
+                          {list(item, "evidence").map((entry) => (
+                            <li key={entry}>{entry}</li>
+                          ))}
+                        </ul>
+                      </details>
                     ) : null}
                     <PublishChoice
                       itemKey={item.id}
@@ -332,7 +353,27 @@ export function CareerBrain() {
                       <strong>Outcome:</strong> {value(item, "outcome")}
                     </p>
                   ) : null}
+                  {list(item, "process").length ? (
+                    <div>
+                      <strong>How it was built</strong>
+                      <ul>
+                        {list(item, "process").map((entry) => (
+                          <li key={entry}>{entry}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
                   <small>{list(item, "technologies").join(" · ")}</small>
+                  {list(item, "evidence").length ? (
+                    <details>
+                      <summary>Source details</summary>
+                      <ul>
+                        {list(item, "evidence").map((entry) => (
+                          <li key={entry}>{entry}</li>
+                        ))}
+                      </ul>
+                    </details>
+                  ) : null}
                   <PublishChoice
                     itemKey={item.id}
                     itemType="project"

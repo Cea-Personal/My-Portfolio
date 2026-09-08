@@ -176,6 +176,7 @@ export function AutomationsWorkspace() {
           <select name="purpose">
             <option value="job_search">Job search</option>
             <option value="drive_sync">Drive sync</option>
+            <option value="career_brain">Career Brain synthesis</option>
             <option value="analytics_aggregate">Analytics aggregate</option>
           </select>
         </label>

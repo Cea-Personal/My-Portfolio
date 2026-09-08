@@ -14,7 +14,7 @@ describe("central task coordinator", () => {
     expect(() => coordinateTask("browse_everything")).toThrow("COORDINATED_TASK_NOT_ALLOWED");
   });
   it("registers every reasoning task as a subagent role", () => {
-    expect(subagentRoles).toHaveLength(9);
+    expect(subagentRoles).toHaveLength(10);
     expect(subagentForTask("role_fit")?.label).toBe("Role-fit analyst");
     expect(subagentForTask("unknown")).toBeNull();
   });
