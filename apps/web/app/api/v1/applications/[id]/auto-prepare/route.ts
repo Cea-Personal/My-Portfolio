@@ -14,6 +14,29 @@ function one<T>(value: T | T[] | null | undefined): T | null {
   return Array.isArray(value) ? (value[0] ?? null) : (value ?? null);
 }
 
+const RELEVANCE_STOP_WORDS = new Set(
+  "the and for with from that this role your our their have will are into about into what where when how all any not but you a an to of in on by as is be or we it at do can may more their".split(
+    " "
+  )
+);
+
+function relevanceTokens(value: string): Set<string> {
+  return new Set(
+    value
+      .toLocaleLowerCase()
+      .replace(/[^a-z0-9+#.]+/g, " ")
+      .split(/\s+/)
+      .filter((token) => token.length >= 3 && !RELEVANCE_STOP_WORDS.has(token))
+  );
+}
+
+function relevanceScore(value: string, targetTokens: Set<string>): number {
+  const tokens = relevanceTokens(value);
+  let score = 0;
+  for (const token of tokens) if (targetTokens.has(token)) score += 1;
+  return score;
+}
+
 /**
  * Prepare the application kit from the selected job and private career data.
  * The owner does not have to write CV/cover-letter content in the workspace;
@@ -105,6 +128,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         422
       );
     }
+    const jobRelevanceText = `${text(job?.canonical_title)} ${text(job?.canonical_company)} ${description}`;
+    const jobTokens = relevanceTokens(jobRelevanceText);
+    const rankedFacts = [...facts]
+      .sort(
+        (left, right) =>
+          relevanceScore(`${right.fact_type} ${right.statement}`, jobTokens) -
+          relevanceScore(`${left.fact_type} ${left.statement}`, jobTokens)
+      )
+      .slice(0, 160);
 
     const { data: documents, error: documentsError } = await client
       .schema("app")
@@ -146,6 +178,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         })
         .map((chunk) => text((chunk as Record<string, unknown>).content, "", 2_500))
         .filter(Boolean)
+        .sort(
+          (left, right) => relevanceScore(right, jobTokens) - relevanceScore(left, jobTokens)
+        )
         .slice(0, 10)
         .join("\n\n");
       return content ? [{ id: String(document.id), name, content }] : [];
@@ -156,6 +191,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       const providers = await resolveReasoningProviders(client, ownerId, "document_composition");
       generated = await generateReasoningJson(
         providers,
+        "Treat the supplied job description as the primary selector for every CV bullet and cover-letter point: choose evidence because it matches the role's responsibilities, requirements, tools, and outcomes; omit unrelated evidence rather than producing a generic career summary. Do not mention Thames Water or close variants; use supported work from that source only with an anonymized employer reference. Prioritize concrete data-engineering and data-platform evidence when tailoring materials. " +
         `You are Basil Ogbonna's application writer. Return JSON only with a documents array containing exactly one resume and one cover_letter document. Tailor both to the supplied job description. Use only supplied profile, career facts, CV/cover-letter excerpts, and career snapshot; never invent employers, dates, technologies, metrics, education, authorization, sponsorship, or salary. Keep the CV concise and ATS-readable. Make the cover letter specific to the company and role. Each document must contain artifactType, title, content (plain text with headings and bullets), and evidenceIds containing only supplied career fact IDs when applicable. Private CV and cover-letter excerpts are also valid grounding even when no Career Brain fact IDs exist. If evidence is insufficient, say so in content instead of fabricating it.`,
         {
           job: {
@@ -170,7 +206,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
             }
           },
           applicationProfile: profileResult.data ?? null,
-          careerFacts: facts,
+          selectionPolicy: {
+            jobDescriptionIsPrimarySelector: true,
+            onlyIncludeEvidenceRelevantToRole: true,
+            prioritizeDataEngineering: true,
+            instruction: "Use the job description to decide which private evidence belongs in each document; omit unrelated experience rather than filling space."
+          },
+          careerFacts: rankedFacts,
           careerBrain: text(snapshotResult.data?.content, "", 20_000),
           privateDocuments,
           applicationId

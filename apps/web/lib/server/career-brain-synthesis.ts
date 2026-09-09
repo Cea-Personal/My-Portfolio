@@ -98,6 +98,19 @@ const record = (value: unknown): Record<string, unknown> | null =>
     ? (value as Record<string, unknown>)
     : null;
 
+function anonymizePrivateEmployer(value: unknown): unknown {
+  if (typeof value === "string") {
+    return value.replace(/\bthames\s+water\b/gi, "a utilities organisation");
+  }
+  if (Array.isArray(value)) return value.map((item) => anonymizePrivateEmployer(item));
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [key, anonymizePrivateEmployer(item)])
+    );
+  }
+  return value;
+}
+
 const firstRecord = (value: unknown) => records(Array.isArray(value) ? value : [value])[0] ?? null;
 
 function boundedRecords<T>(items: T[], maxItems: number, maxCharacters: number): T[] {
@@ -327,7 +340,7 @@ function stableId(prefix: string, parts: string[]) {
 
 export function normalizeCareerBrainContent(value: unknown): CareerBrainContent {
   const root = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
-  return {
+  const normalized: CareerBrainContent = {
     cvSummary: text(root.cvSummary),
     portfolioSummary: text(root.portfolioSummary),
     about: text(root.about),
@@ -454,18 +467,33 @@ export function normalizeCareerBrainContent(value: unknown): CareerBrainContent 
           summary: text(item.summary)
         };
       }),
-    technicalSkills: records(root.technicalSkills)
-      .slice(0, 30)
-      .map((item) => {
+    technicalSkills: (() => {
+      const merged = new Map<string, Record<string, unknown>>();
+      for (const item of records(root.technicalSkills).slice(0, 30)) {
+        const category = text(item.category, "Technical skills");
+        const key = category.toLocaleLowerCase().replace(/\s+/g, " ").trim();
+        const previous = merged.get(key);
+        merged.set(key, {
+          category,
+          skills: uniqueStrings([
+            ...strings(previous?.skills),
+            ...strings(item.skills)
+          ], 50),
+          summary: text(previous?.summary, text(item.summary))
+        });
+      }
+      return [...merged.values()].map((item) => {
         const category = text(item.category, "Technical skills");
         return {
           id: stableId("skill", [category]),
           category,
-          skills: strings(item.skills),
+          skills: uniqueStrings(item.skills, 50),
           summary: text(item.summary)
         };
-      })
+      });
+    })()
   };
+  return anonymizePrivateEmployer(normalized) as CareerBrainContent;
 }
 
 async function loadInputs(client: SupabaseClient, ownerId: string) {
@@ -621,6 +649,10 @@ export async function synthesizeCareerBrain(
   );
   const generation = await generateReasoningJson(
     providers,
+    [
+      "Do not mention Thames Water or close variants in generated output; use work from that source as evidence but anonymize the employer.",
+      "Prioritize data-engineering and data-platform experience such as pipelines, warehouses, modelling, orchestration, quality, governance, reliability, scale, and delivery tools over generic software responsibilities."
+    ].join(" ") + " " +
     `You maintain Basil Ogbonna's private Career Brain. Return JSON only. Synthesize, deduplicate and reconcile all supplied CVs, extracted facts, journals, and evidence without inventing facts. The recentApplicationFocus input contains target job descriptions: use those descriptions only to rank which verified bullets are most useful for the roles Basil is pursuing; never treat a job description as proof that Basil did something. Preserve useful detail instead of collapsing evidence into generic summaries. Write like a thoughtful senior engineer speaking plainly: specific, warm, confident, and grounded in real work. Use natural sentence structure and varied wording; avoid keyword stuffing, corporate clichés, exaggerated claims, empty phrases such as "results-driven" or "passionate professional", and repetitive AI-style openings. Keep the CV profile concise and professional, but make portfolioSummary and about sound like Basil's own first-person voice. Output cvSummary (concise CV profile), portfolioSummary (human first-person portfolio profile), about (first-person About narrative), experiences[], projects[], education[], certifications[], technicalSkills[]. Each experience must represent exactly one role at one organization. Merge repeated versions of the same organization and role into one record, even when the same bullet appears in several CVs. For each role select the strongest 6-7 combined points across responsibilities[], achievements[], and impact[]; do not return 6-7 in every list. Prefer points that match the target job descriptions while retaining important role-defining work. Responsibilities are action-and-scope bullets, achievements are specific accomplishments, and impact is measurable or observable outcomes such as scale, reliability, speed, cost, quality, users, or business effect; do not duplicate the same point across lists. Also include projects[] (named initiatives carried out in that role), technologies[] (exact tools, platforms, languages, and methods), and evidence[] (short source-grounded details or source labels explaining where the role and outcomes came from). Keep dates, scope, metrics, and technical names when present. Projects contain title, summary, role, outcome, technologies[], url, process[] (important design/build/engineering steps), and evidence[] (source-grounded details). Education contains qualification, institution, period, summary. Certifications contain name, issuer, date, summary. technicalSkills groups contain category, skills[], summary. Prefer corroborated specifics; omit uncertain entries rather than guessing, but do not omit a supported detail merely because it is lengthy.`,
     {
       semanticEvidence: evidence,
@@ -648,7 +680,27 @@ export async function synthesizeCareerBrain(
     })
     .select("*")
     .single();
-  if (insert.error || !insert.data) throw insert.error ?? new Error("CAREER_BRAIN_SAVE_FAILED");
+  if (insert.error || !insert.data) {
+    // Two refresh requests can synthesize the same source hash concurrently.
+    // The first insert wins; the other request should reuse that durable result
+    // rather than surface a false generation failure to the owner.
+    if (insert.error?.code === "23505") {
+      const concurrent = await client
+        .schema("app")
+        .from("career_brain_snapshots")
+        .select("*")
+        .eq("owner_id", ownerId)
+        .eq("source_hash", sourceHash)
+        .maybeSingle();
+      if (!concurrent.error && concurrent.data) {
+        return {
+          snapshot: concurrent.data as unknown as Record<string, unknown>,
+          reused: true
+        };
+      }
+    }
+    throw insert.error ?? new Error("CAREER_BRAIN_SAVE_FAILED");
+  }
   const snapshot = insert.data as unknown as Record<string, unknown>;
   return { snapshot, reused: false };
 }

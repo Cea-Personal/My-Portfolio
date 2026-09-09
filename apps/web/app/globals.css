@@ -5057,6 +5057,12 @@ nav[aria-label="Portfolio sections"] .owner-login::after {
   border-bottom: 1px solid #29303d;
 }
 
+.assistant-turn + .assistant-turn {
+  margin-top: 0.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid #29303d;
+}
+
 .assistant-user-message {
   justify-self: end;
   max-width: 80%;

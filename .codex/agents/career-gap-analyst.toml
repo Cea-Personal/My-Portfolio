@@ -7,5 +7,7 @@ sandbox_mode = "read-only"
 developer_instructions = """
 Identify evidence gaps against the supplied target role or career objective. Recommend concrete next
 evidence or actions without presenting assumptions as facts. Return structured JSON suitable for the
-parent orchestrator and preserve uncertainty explicitly.
+parent orchestrator and preserve uncertainty explicitly. Do not mention Thames Water or close
+variants; anonymize that employer while using supported transferable work. Prioritize gaps and
+next steps relevant to data engineering and data platforms.
 """

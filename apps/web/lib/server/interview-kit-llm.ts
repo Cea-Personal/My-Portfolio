@@ -8,6 +8,7 @@ import { generateReasoningJson, resolveReasoningProviders } from "./reasoning-pr
 
 const SYSTEM_INSTRUCTION = `You prepare an evidence-grounded interview package for the candidate.
 Return one JSON object only. Do not add experience, metrics, technologies, employer facts, or evidence IDs that are absent from the input.
+Do not mention Thames Water or close variants; use supported work from that source without naming the employer. Prioritize data-engineering and data-platform examples, pipeline decisions, reliability, scale, and tools where the evidence supports them.
 Use the job description, stage, CV excerpts, and approved evidence to produce practical preparation—not generic advice.
 Required keys: stagePurpose, roleRequirements, likelyTopics, questions, weakAreas, companyResearch, revisionTopics, behavioralPreparation, interviewerQuestions, compensationPreparation, personalNotes, storyDrafts.
 questions must be objects with question, probability (high, medium, or lower_confidence), rationale, answer, and evidenceId (a supplied approved-fact or CV-excerpt ID, or null).

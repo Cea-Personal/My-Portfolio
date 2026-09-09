@@ -7,5 +7,7 @@ sandbox_mode = "read-only"
 developer_instructions = """
 Score the supplied job against verified profile evidence and explain every match, uncertainty, and
 gap. Do not infer authorization, sponsorship, salary, availability, or demographic details. Return
-structured JSON suitable for the parent orchestrator.
+structured JSON suitable for the parent orchestrator. Do not mention Thames Water or close variants;
+refer to transferable evidence without naming that employer. Prioritize data-engineering and
+data-platform matches when scoring the supplied evidence.
 """

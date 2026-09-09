@@ -5,9 +5,11 @@ export function answerPublicQuestion(
   question: string,
   evidence: readonly { handle: string; text: string; source?: string }[]
 ): { answer: string; citations: string[]; abstained: boolean } {
+  const insufficientEvidence = () =>
+    "I couldn't find enough information to answer that yet.";
   if (hostilePublicInput(question))
     return {
-      answer: "I don't have enough approved public evidence to answer that.",
+      answer: insufficientEvidence(),
       citations: [],
       abstained: true
     };
@@ -35,7 +37,7 @@ export function answerPublicQuestion(
     ).verified
   )
     return {
-      answer: "I don't have enough approved public evidence to answer that.",
+      answer: insufficientEvidence(),
       citations: [],
       abstained: true
     };

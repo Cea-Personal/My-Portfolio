@@ -83,9 +83,6 @@ export default async function PublicPortfolioPage() {
   const writingItems = items.filter(
     (item) => item.section === "blog" || item.source_entity_type === "post"
   );
-  const aboutItems = items.filter(
-    (item) => item.section === "about" || item.source_entity_type === "profile"
-  );
   const text = (value: unknown, fallback = "") => (typeof value === "string" ? value : fallback);
   const list = (value: unknown) =>
     Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
@@ -175,13 +172,26 @@ export default async function PublicPortfolioPage() {
   // Use the included local portrait when a deployment does not supply an external image URL.
   const profileImage =
     process.env.NEXT_PUBLIC_PROFILE_IMAGE_URL?.trim() || "/images/basil-ogbonna.jpg";
-  const portfolioSummary = text(
-    aboutItems.find((item) => item.source_entity_type === "portfolio_summary")?.public_summary
-  );
-  const bio = text(
-    aboutItems.find((item) => item.source_entity_type === "about")?.public_summary,
-    text(aboutItems[0]?.public_summary)
-  );
+  // Keep the two profile narratives independent. A portfolio summary belongs in
+  // the fixed profile rail; the About section should only use the dedicated About
+  // narrative (or the publication bio), never whichever profile item happens to
+  // appear first in the publication ordering.
+  const portfolioSummaryItem = items.find((item) => {
+    const title = text(item.title).trim().toLowerCase();
+    return item.source_entity_type === "portfolio_summary" || title === "portfolio summary";
+  });
+  const aboutItem = items.find((item) => {
+    const title = text(item.title).trim().toLowerCase();
+    return (
+      item.source_entity_type === "about" ||
+      title === "about" ||
+      (item.section === "about" && item.source_entity_type !== "portfolio_summary")
+    );
+  });
+  // The publication bio is the resilient fallback for the portfolio summary;
+  // it is separate from the About narrative below.
+  const portfolioSummary = text(portfolioSummaryItem?.public_summary, text(profile?.bio));
+  const bio = text(aboutItem?.public_summary, text(profile?.bio));
   const safeHref = (value: unknown) => {
     const href = text(value).trim();
     return /^(?:https?:\/\/|mailto:)/i.test(href) ? href : "";
@@ -259,7 +269,7 @@ export default async function PublicPortfolioPage() {
             {...(profileImage ? { photoSrc: profileImage } : {})}
             links={profileLinks}
             className="desktop-profile-rail"
-            {...(portfolioSummary || bio ? { statement: portfolioSummary || bio } : {})}
+            {...(portfolioSummary ? { statement: portfolioSummary } : {})}
           />
           <div className="portfolio-stream">
             <Hero name={displayName} headline={headline} />
@@ -268,7 +278,7 @@ export default async function PublicPortfolioPage() {
                 name={displayName}
                 {...(profileImage ? { photoSrc: profileImage } : {})}
                 links={profileLinks}
-                {...(portfolioSummary || bio ? { statement: portfolioSummary || bio } : {})}
+                {...(portfolioSummary ? { statement: portfolioSummary } : {})}
               />
             </div>
             <About {...(bio ? { bio } : {})} />

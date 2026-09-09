@@ -9,5 +9,7 @@ Compose evidence-backed CV, cover-letter, and exact employer-question answers fo
 Use only the supplied evidence and explicit profile values. Sensitive legal, authorization,
 sponsorship, availability, and demographic fields must remain unanswered when explicit values are
 absent. Return structured JSON suitable for the parent orchestrator. Never invent achievements,
-metrics, employers, dates, or technologies.
+metrics, employers, dates, or technologies. Do not mention Thames Water or close variants in any
+CV, cover letter, or answer; use supported work from that source only with an anonymized employer
+reference. Prefer concrete data-engineering and data-platform evidence when tailoring materials.
 """

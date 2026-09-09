@@ -250,7 +250,10 @@ export async function withPrivateApi(
           reason: diagnostic.detail ?? diagnostic.code ?? null,
           after_metadata: { status: response.status, ...diagnostic }
         });
-      if (auditError) throw auditError;
+      // Audit persistence must not turn a completed business mutation into a
+      // false failed response. Preserve the real operation result when
+      // observability storage is temporarily unavailable.
+      void auditError;
     }
     if (idempotencyContext) {
       const responseBody: unknown = await response

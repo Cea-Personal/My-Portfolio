@@ -10,24 +10,37 @@ const suggestions = [
   "What makes this portfolio a working product?"
 ] as const;
 
+type ConversationTurn = {
+  id: string;
+  question: string;
+  answer?: string;
+  citations: string[];
+  unavailable: boolean;
+  status: "loading" | "complete" | "error";
+};
+
 export function AskShell() {
   const [mode, setMode] = useState<"question" | "fit">("question");
   const [question, setQuestion] = useState("");
-  const [submittedQuestion, setSubmittedQuestion] = useState<string | null>(null);
-  const [answer, setAnswer] = useState<string | null>(null);
-  const [citations, setCitations] = useState<string[]>([]);
-  const [unavailable, setUnavailable] = useState(false);
-  const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
+  const [conversation, setConversation] = useState<ConversationTurn[]>([]);
+  const latestTurn = conversation[conversation.length - 1];
+  const status = latestTurn?.status ?? "idle";
 
   async function ask(nextQuestion = question) {
     const normalizedQuestion = nextQuestion.trim();
     if (!normalizedQuestion) return;
-    setQuestion(normalizedQuestion);
-    setSubmittedQuestion(normalizedQuestion);
-    setStatus("loading");
-    setAnswer(null);
-    setCitations([]);
-    setUnavailable(false);
+    const turnId = `${String(Date.now())}-${Math.random().toString(36).slice(2)}`;
+    setQuestion("");
+    setConversation((current) => [
+      ...current,
+      {
+        id: turnId,
+        question: normalizedQuestion,
+        citations: [],
+        unavailable: false,
+        status: "loading"
+      }
+    ]);
     try {
       const response = await fetch("/api/v1/public/chat", {
         method: "POST",
@@ -38,14 +51,23 @@ export function AskShell() {
         data?: { answer?: string; citations?: string[]; unavailable?: boolean };
       };
       if (!response.ok) throw new Error("request failed");
-      setAnswer(
-        payload.data?.answer ?? "I don't have enough portfolio facts to answer that."
+      setConversation((current) =>
+        current.map((turn) =>
+          turn.id === turnId
+            ? {
+                ...turn,
+                answer: payload.data?.answer ?? "I don't have enough portfolio facts to answer that.",
+                citations: payload.data?.citations ?? [],
+                unavailable: payload.data?.unavailable === true,
+                status: "complete"
+              }
+            : turn
+        )
       );
-      setCitations(payload.data?.citations ?? []);
-      setUnavailable(payload.data?.unavailable === true);
-      setStatus("idle");
     } catch {
-      setStatus("error");
+      setConversation((current) =>
+        current.map((turn) => (turn.id === turnId ? { ...turn, status: "error" } : turn))
+      );
     }
   }
 
@@ -108,58 +130,82 @@ export function AskShell() {
         <details className="assistant-trace">
           <summary>
             Tool trace{" "}
-            <span>{status === "loading" ? "running" : answer ? "complete" : "waiting"}</span>
+            <span>
+              {status === "loading"
+                ? "running"
+                : latestTurn?.answer
+                  ? "complete"
+                  : latestTurn?.status === "error"
+                    ? "failed"
+                    : "waiting"}
+            </span>
           </summary>
           <ol>
-            <li data-state={submittedQuestion ? "complete" : "waiting"}>
+            <li data-state={latestTurn ? "complete" : "waiting"}>
               <span>01</span>
               <code>classify_question</code>
-              <small>{submittedQuestion ? "intent resolved" : "awaiting question"}</small>
+              <small>{latestTurn ? "intent resolved" : "awaiting question"}</small>
             </li>
-            <li data-state={status === "loading" ? "running" : answer ? "complete" : "waiting"}>
+            <li
+              data-state={
+                status === "loading"
+                  ? "running"
+                  : latestTurn?.answer
+                    ? "complete"
+                    : "waiting"
+              }
+            >
               <span>02</span>
               <code>retrieve_portfolio_facts</code>
               <small>
-                {status === "loading" ? "searching" : answer ? "context returned" : "idle"}
+                {status === "loading"
+                  ? "searching"
+                  : latestTurn?.answer
+                    ? "context returned"
+                    : "idle"}
               </small>
             </li>
-            <li data-state={answer ? "complete" : "waiting"}>
+            <li data-state={latestTurn?.answer ? "complete" : "waiting"}>
               <span>03</span>
               <code>compose_grounded_answer</code>
-              <small>{answer ? "facts checked" : "idle"}</small>
+              <small>{latestTurn?.answer ? "facts checked" : "idle"}</small>
             </li>
           </ol>
         </details>
 
-        {submittedQuestion ? (
-          <div className="assistant-conversation">
-            <p className="assistant-user-message">{submittedQuestion}</p>
-            {status === "loading" ? (
-              <p className="assistant-thinking">Retrieving portfolio facts…</p>
-            ) : null}
-            {status === "error" ? (
-              <p role="alert">The public assistant is unavailable. Try again.</p>
-            ) : null}
-            {unavailable ? (
-              <p className="assistant-unavailable" role="status">
-                Portfolio facts are reconnecting. Ask Basil will resume when the published portfolio
-                data is available.
-              </p>
-            ) : null}
-            {answer ? (
-              <div className="assistant-answer">
-                <p>{answer}</p>
-                {citations.length ? (
-                  <ul aria-label="Supporting facts">
-                    {citations.map((citation) => (
-                      <li key={citation}>{citation}</li>
-                    ))}
-                  </ul>
-                ) : (
-                  <small>No supporting facts were returned.</small>
-                )}
-              </div>
-            ) : null}
+        {conversation.length ? (
+          <div className="assistant-conversation" aria-label="Ask Basil conversation">
+            {conversation.map((turn) => (
+              <article className="assistant-turn" key={turn.id}>
+                <p className="assistant-user-message">{turn.question}</p>
+                {turn.status === "loading" ? (
+                  <p className="assistant-thinking">Retrieving portfolio facts…</p>
+                ) : null}
+                {turn.status === "error" ? (
+                  <p role="alert">The public assistant is unavailable. Try again.</p>
+                ) : null}
+                {turn.unavailable ? (
+                  <p className="assistant-unavailable" role="status">
+                    Portfolio facts are reconnecting. Ask Basil will resume when the published
+                    portfolio data is available.
+                  </p>
+                ) : null}
+                {turn.answer ? (
+                  <div className="assistant-answer">
+                    <p>{turn.answer}</p>
+                    {turn.citations.length ? (
+                      <ul aria-label="Supporting facts">
+                        {turn.citations.map((citation, citationIndex) => (
+                          <li key={`${turn.id}-citation-${String(citationIndex)}`}>{citation}</li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <small>No supporting facts were returned.</small>
+                    )}
+                  </div>
+                ) : null}
+              </article>
+            ))}
           </div>
         ) : null}
 

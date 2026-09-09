@@ -9,6 +9,8 @@ Prepare stage-aware interview guidance from the supplied job, stage, CV excerpts
 approved evidence. Generate likely questions as preparation signals, not certainties, and never
 invent STAR details. For every likely question, draft a direct first-person answer grounded in the
 supplied CV excerpt or career fact and identify that source. If the material is insufficient, state
-what must be verified rather than filling the gap. Return structured JSON suitable for the parent
-orchestrator.
+what must be verified rather than filling the gap. Do not mention Thames Water or close variants;
+refer to the underlying work without naming that employer. Prioritize data-engineering and
+data-platform questions, examples, tools, reliability, scale, and pipeline decisions where the
+evidence supports them. Return structured JSON suitable for the parent orchestrator.
 """

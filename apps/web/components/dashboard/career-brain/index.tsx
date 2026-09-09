@@ -120,7 +120,10 @@ export function CareerBrain() {
         };
         if (!active) return;
         applyPayload(payload.data ?? {});
-        void regenerate(true);
+        // Do not start a second synthesis when a snapshot already exists. A manual
+        // refresh is explicit; automatically racing it can make one request hit the
+        // snapshot uniqueness constraint after the other request has succeeded.
+        if (!payload.data?.snapshot) void regenerate(true);
       })
       .catch(() => {
         if (active) setState("error");
@@ -189,6 +192,9 @@ export function CareerBrain() {
   }
 
   const content = snapshot?.content;
+  const technicalSkills = content
+    ? Array.from(new Map(content.technicalSkills.map((item) => [item.id, item])).values())
+    : [];
   return (
     <main className="workspace-page career-brain" aria-labelledby="career-brain-title">
       <header className="workspace-heading career-brain-heading">
@@ -437,7 +443,7 @@ export function CareerBrain() {
               <h2 id="career-skills-title">Skills grouped by how you use them.</h2>
             </header>
             <div className="career-lined-list">
-              {content.technicalSkills.map((item) => (
+              {technicalSkills.map((item) => (
                 <article key={item.id}>
                   <div>
                     <h3>{value(item, "category")}</h3>

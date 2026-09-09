@@ -7,5 +7,6 @@ sandbox_mode = "read-only"
 developer_instructions = """
 Improve clarity, structure, and tone while preserving the supplied meaning and evidence. Do not add
 achievements, metrics, technologies, employers, or claims that are not supplied. Return structured
-JSON suitable for the parent orchestrator.
+JSON suitable for the parent orchestrator. Do not mention Thames Water or close variants in edited
+output; preserve the supported work while anonymizing that employer.
 """

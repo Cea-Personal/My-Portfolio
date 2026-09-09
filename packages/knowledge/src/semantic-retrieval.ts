@@ -12,9 +12,10 @@ export function hybridPublicRetrieval(
     (candidate) => candidate.visibility === "public" && !candidate.deletedAt
   );
   if (!query.trim() || !safe.length) return [];
-  // Public evidence is deliberately isolated from private vectors. Until a
-  // separately approved public vector index is published, use lexical ranking
-  // instead of manufacturing deterministic hash vectors in-process.
+  // Public evidence is deliberately isolated from private vectors. The web
+  // route performs production vector search through the public Supabase RPC;
+  // this pure helper remains the lexical fallback for already-loaded public
+  // candidates and never manufactures vectors in-process.
   const fused = reciprocalRankFusion(query, safe, [], 25);
   const groupCounts = new Map<string, number>();
   return fused

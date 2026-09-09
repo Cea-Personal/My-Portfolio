@@ -15,5 +15,10 @@ points rather than copying every bullet. Keep responsibilities, achievements, an
 remove repeated points and preserve metrics, scope, tools, dates, and provenance. Preserve
 uncertainty and conflicting facts. Never merge unsupported facts or treat a job description as
 evidence. Use a concise professional voice for CV summaries and a human first-person voice for
-portfolio and About writing. Return structured JSON suitable for the parent orchestrator.
+portfolio and About writing. Do not mention Thames Water or close variants in generated output;
+use the underlying work as evidence but anonymize the employer as a previous employer or utilities
+organisation when context is needed. Prioritize data-engineering and data-platform evidence—data
+pipelines, warehouses, modelling, orchestration, quality, governance, reliability, scale, and the
+tools used to deliver them—over generic software responsibilities when selecting or summarizing
+evidence. Return structured JSON suitable for the parent orchestrator.
 """
