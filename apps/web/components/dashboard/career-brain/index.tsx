@@ -77,7 +77,7 @@ export function CareerBrain() {
   );
 
   const regenerate = useCallback(
-    async (quiet = false) => {
+    async (quiet = false, mode: "resynthesize" | "refresh" = "resynthesize") => {
       setGenerating(true);
       if (!quiet) setNotice(null);
       const response = await fetch("/api/v1/career/brain", {
@@ -86,7 +86,7 @@ export function CareerBrain() {
           "content-type": "application/json",
           "idempotency-key": `career-brain-${crypto.randomUUID()}`
         },
-        body: "{}"
+        body: JSON.stringify({ mode })
       });
       const payload = (await response.json().catch(() => ({}))) as {
         data?: {
@@ -205,9 +205,19 @@ export function CareerBrain() {
           and the jobs you have recently pursued. Nothing becomes public until you select it and
           activate a portfolio snapshot.
         </p>
-        <button disabled={generating} type="button" onClick={() => void regenerate()}>
-          {generating ? "Reading and synthesizing…" : "Refresh from all private sources"}
-        </button>
+        <div className="career-brain-actions">
+          <button disabled={generating} type="button" onClick={() => void regenerate()}>
+            {generating ? "Re-synthesizing Career Brain…" : "Re-synthesize Career Brain"}
+          </button>
+          <button
+            className="button-secondary"
+            disabled={generating}
+            type="button"
+            onClick={() => void regenerate(false, "refresh")}
+          >
+            Refresh cached profile
+          </button>
+        </div>
         {snapshot ? (
           <small>
             Last generated {new Date(snapshot.generated_at).toLocaleString()} · {snapshot.provider}{" "}
@@ -280,9 +290,9 @@ export function CareerBrain() {
               <p className="eyebrow">Experience</p>
               <h2 id="career-experiences-title">Roles, organisations, and the work within them.</h2>
               <p>
-                Repeated CV entries for the same role are merged. For each role, Career Brain
-                keeps the strongest six or seven verified responsibility, achievement, and impact
-                points, ranked against your recent target job descriptions.
+                Repeated CV entries for the same role are merged. For each role, Career Brain keeps
+                the strongest six or seven verified responsibility, achievement, and impact points,
+                ranked against your recent target job descriptions.
               </p>
             </header>
             <div className="career-synthesis-list">
@@ -298,23 +308,24 @@ export function CareerBrain() {
                     <em>{value(item, "summary")}</em>
                   </summary>
                   <div className="career-synthesis-detail">
-                    {(["responsibilities", "achievements", "impact", "projects"] as const).map((key) =>
-                      list(item, key).length ? (
-                        <section key={key}>
-                          <h3>
-                            {key === "achievements"
-                              ? "Achievements"
-                              : key === "impact"
-                                ? "Impact and outcomes"
-                                : key.charAt(0).toUpperCase() + key.slice(1)}
-                          </h3>
-                          <ul>
-                            {list(item, key).map((entry) => (
-                              <li key={entry}>{entry}</li>
-                            ))}
-                          </ul>
-                        </section>
-                      ) : null
+                    {(["responsibilities", "achievements", "impact", "projects"] as const).map(
+                      (key) =>
+                        list(item, key).length ? (
+                          <section key={key}>
+                            <h3>
+                              {key === "achievements"
+                                ? "Achievements"
+                                : key === "impact"
+                                  ? "Impact and outcomes"
+                                  : key.charAt(0).toUpperCase() + key.slice(1)}
+                            </h3>
+                            <ul>
+                              {list(item, key).map((entry) => (
+                                <li key={entry}>{entry}</li>
+                              ))}
+                            </ul>
+                          </section>
+                        ) : null
                     )}
                     {list(item, "technologies").length ? (
                       <p>

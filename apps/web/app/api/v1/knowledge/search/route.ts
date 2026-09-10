@@ -2,6 +2,7 @@ import { createServiceSupabaseClient } from "@career-os/database/service";
 import { apiResponse } from "@/lib/api/response";
 import { withPrivateApi } from "@/lib/api/private";
 import { embedWithFallback, resolveEmbeddingProviders } from "@/lib/server/embedding-provider";
+import { rerankCandidates } from "@/lib/server/reranker-provider";
 
 export async function POST(request: Request) {
   return withPrivateApi(request, async ({ client, ownerId }) => {
@@ -33,9 +34,17 @@ export async function POST(request: Request) {
       requested_min_similarity: Math.min(Math.max(Number(body.minSimilarity) || 0.2, 0), 1)
     });
     if (error) throw error;
+    const rows = Array.isArray(data)
+      ? (data as Array<Record<string, unknown>>).flatMap((row) =>
+          typeof row.content === "string" && row.content.trim()
+            ? [{ ...row, content: row.content }]
+            : []
+        )
+      : [];
+    const reranked = await rerankCandidates(client, ownerId, query, rows, rows.length);
     return apiResponse(
       {
-        results: data ?? [],
+        results: reranked,
         provider: provider.provider,
         model: provider.model,
         modelVersion: provider.model_version

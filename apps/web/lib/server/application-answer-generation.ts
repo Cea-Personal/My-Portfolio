@@ -2,6 +2,12 @@ import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { embedWithFallback, resolveEmbeddingProviders } from "./embedding-provider";
 import { generateReasoningJson, resolveReasoningProviders } from "./reasoning-provider";
+import { rerankCandidates } from "./reranker-provider";
+import {
+  CAREER_DOCUMENT_KINDS,
+  CAREER_FACT_TYPES,
+  CAREER_OUTPUT_SCOPE_INSTRUCTION
+} from "./retrieval-policy";
 
 type ApplicationField = {
   id: string;
@@ -120,13 +126,13 @@ async function retrieveEvidence(
       requested_provider: embedded.provider.provider,
       requested_model: embedded.provider.model,
       requested_model_version: embedded.provider.model_version,
-      requested_kinds: ["resume", "cover_letter", "other"],
+      requested_kinds: [...CAREER_DOCUMENT_KINDS],
       requested_limit: 24,
       requested_min_similarity: 0.12
     });
     if (result.error) return [];
     const rows: unknown[] = Array.isArray(result.data) ? (result.data as unknown[]) : [];
-    return rows.flatMap((item: unknown) => {
+    const candidates = rows.flatMap((item: unknown) => {
       if (!item || typeof item !== "object") return [];
       const row = item as Record<string, unknown>;
       const id = stringValue(row.chunk_id);
@@ -135,6 +141,7 @@ async function retrieveEvidence(
       const source = stringValue(row.source_title);
       return [{ id, content: content.slice(0, 2400), ...(source ? { source } : {}) }];
     });
+    return await rerankCandidates(client, ownerId, query, candidates, 24);
   } catch {
     return [];
   }
@@ -157,7 +164,9 @@ async function retrieveDirectDocumentEvidence(
       .eq("owner_id", ownerId)
       .is("removed_at", null);
     if (documentsResult.error) return [];
-    const documents = Array.isArray(documentsResult.data) ? (documentsResult.data as unknown[]) : [];
+    const documents = Array.isArray(documentsResult.data)
+      ? (documentsResult.data as unknown[])
+      : [];
     const sourceIds = documents.flatMap((rawDocument) => {
       if (!rawDocument || typeof rawDocument !== "object") return [];
       const sourceId = (rawDocument as Record<string, unknown>).evidence_source_id;
@@ -173,41 +182,49 @@ async function retrieveDirectDocumentEvidence(
     const sourcesById = new Map(
       sourcesResult.data.map((source) => [String(source.id), source] as const)
     );
-    return documents.flatMap((rawDocument) => {
-      if (!rawDocument || typeof rawDocument !== "object") return [];
-      const document = rawDocument as Record<string, unknown>;
-      const name = typeof document.name === "string" ? document.name : "";
-      const kind = typeof document.document_kind === "string" ? document.document_kind : "";
-      if (kind !== "resume" && kind !== "cover_letter" && !/cv|resume|cover.?letter|curriculum vitae/i.test(name)) return [];
-      const sourceId = document.evidence_source_id;
-      const source = typeof sourceId === "string" ? sourcesById.get(sourceId) : undefined;
-      if (!source || typeof source !== "object") return [];
-      const versionsValue = (source as Record<string, unknown>).evidence_versions;
-      const versions = Array.isArray(versionsValue) ? versionsValue : [];
-      return versions.flatMap((rawVersion) => {
-        if (!rawVersion || typeof rawVersion !== "object") return [];
-        const version = rawVersion as Record<string, unknown>;
-        const chunksValue = version.evidence_chunks;
-        const chunks = Array.isArray(chunksValue) ? chunksValue : [];
-        return chunks.flatMap((rawChunk) => {
-          if (!rawChunk || typeof rawChunk !== "object") return [];
-          const chunk = rawChunk as Record<string, unknown>;
-          if (
-            typeof chunk.id !== "string" ||
-            typeof chunk.content !== "string" ||
-            chunk.deleted_at != null ||
-            chunk.visibility === "public"
-          ) return [];
-          return [
-            {
-              id: chunk.id,
-              source: name || "Private CV source",
-              content: chunk.content.slice(0, 2400)
-            }
-          ];
+    return documents
+      .flatMap((rawDocument) => {
+        if (!rawDocument || typeof rawDocument !== "object") return [];
+        const document = rawDocument as Record<string, unknown>;
+        const name = typeof document.name === "string" ? document.name : "";
+        const kind = typeof document.document_kind === "string" ? document.document_kind : "";
+        if (
+          kind !== "resume" &&
+          kind !== "cover_letter" &&
+          !/cv|resume|cover.?letter|curriculum vitae/i.test(name)
+        )
+          return [];
+        const sourceId = document.evidence_source_id;
+        const source = typeof sourceId === "string" ? sourcesById.get(sourceId) : undefined;
+        if (!source || typeof source !== "object") return [];
+        const versionsValue = (source as Record<string, unknown>).evidence_versions;
+        const versions = Array.isArray(versionsValue) ? versionsValue : [];
+        return versions.flatMap((rawVersion) => {
+          if (!rawVersion || typeof rawVersion !== "object") return [];
+          const version = rawVersion as Record<string, unknown>;
+          const chunksValue = version.evidence_chunks;
+          const chunks = Array.isArray(chunksValue) ? chunksValue : [];
+          return chunks.flatMap((rawChunk) => {
+            if (!rawChunk || typeof rawChunk !== "object") return [];
+            const chunk = rawChunk as Record<string, unknown>;
+            if (
+              typeof chunk.id !== "string" ||
+              typeof chunk.content !== "string" ||
+              chunk.deleted_at != null ||
+              chunk.visibility === "public"
+            )
+              return [];
+            return [
+              {
+                id: chunk.id,
+                source: name || "Private CV source",
+                content: chunk.content.slice(0, 2400)
+              }
+            ];
+          });
         });
-      });
-    }).slice(0, 24);
+      })
+      .slice(0, 24);
   } catch {
     return [];
   }
@@ -293,6 +310,7 @@ export async function generateApplicationAnswers(
       )
       .eq("owner_id", ownerId)
       .neq("review_status", "rejected")
+      .in("fact_type", [...CAREER_FACT_TYPES])
       .limit(1_000),
     client
       .schema("app")
@@ -348,9 +366,12 @@ export async function generateApplicationAnswers(
     `${jobContext.title} ${jobContext.company} ${jobContext.description} ${fields.map((field) => field.label).join(" ")}`
   );
   const directEvidence = await retrieveDirectDocumentEvidence(client, ownerId);
-  const evidence = [...semanticEvidence, ...directEvidence.filter(
-    (candidate) => !semanticEvidence.some((item) => item.id === candidate.id)
-  )].slice(0, 32);
+  const evidence = [
+    ...semanticEvidence,
+    ...directEvidence.filter(
+      (candidate) => !semanticEvidence.some((item) => item.id === candidate.id)
+    )
+  ].slice(0, 32);
   const evidenceContext = evidence.map((item) => ({
     id: item.id,
     source: item.source,
@@ -444,8 +465,8 @@ export async function generateApplicationAnswers(
       providerVersion = providers[0]?.model_version;
       const response = await generateReasoningJson(
         providers,
-        "Do not mention Thames Water or close variants; use supported work from that source only with an anonymized employer reference. Prioritize data-engineering and data-platform evidence when answering experience questions. " +
-        `You generate private job-application answers for Basil Ogbonna. Return JSON only with an answers array. Answer the exact employer questions supplied; do not produce generic application advice. Use only the job, approved profile values, Career Brain, and evidence context. Never invent employers, dates, technologies, metrics, authorization, sponsorship, salary numbers, or achievements. For sensitive, legal, demographic, authorization, sponsorship, and availability fields, return an empty answer unless an explicit profile value is supplied. If evidence is insufficient, return an empty answer and explain that owner input is required. Each answer must include fieldId, answer, evidenceIds (only supplied evidence IDs), and a short explanation. Respect field type, choices, character limits, and word limits. Motivation answers must be specific to the company and role.`,
+        `${CAREER_OUTPUT_SCOPE_INSTRUCTION} Do not mention Thames Water or close variants; use supported work from that source only with an anonymized employer reference. Prioritize data-engineering and data-platform evidence when answering experience questions. ` +
+          `You generate private job-application answers for Basil Ogbonna. Return JSON only with an answers array. Answer the exact employer questions supplied; do not produce generic application advice. Use only the job, approved profile values, Career Brain, and evidence context. Never invent employers, dates, technologies, metrics, authorization, sponsorship, salary numbers, or achievements. For sensitive, legal, demographic, authorization, sponsorship, and availability fields, return an empty answer unless an explicit profile value is supplied. If evidence is insufficient, return an empty answer and explain that owner input is required. Each answer must include fieldId, answer, evidenceIds (only supplied evidence IDs), and a short explanation. Respect field type, choices, character limits, and word limits. Motivation answers must be specific to the company and role.`,
         {
           applicationId,
           job: jobContext,

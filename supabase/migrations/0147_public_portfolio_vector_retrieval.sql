@@ -47,6 +47,11 @@ as $$
       'journal', 'journal_entry', 'personal_note', 'analytics', 'analytics_event',
       'audit', 'audit_event', 'application', 'interview', 'compensation', 'compensation_research'
     )
+    and lower(coalesce(evidence.evidence_type, '')) in (
+      'resume', 'cv', 'cover_letter', 'document', 'document_extraction', 'manual',
+      'manual_fact', 'experience', 'project', 'skill', 'education', 'certification',
+      'achievement', 'blog', 'article', 'technical_knowledge', 'upload', 'drive', 'google_drive'
+    )
     and embedding.provider = requested_provider
     and embedding.model = requested_model
     and embedding.model_version = requested_model_version

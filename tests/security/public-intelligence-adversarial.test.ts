@@ -27,7 +27,7 @@ describe("public intelligence adversarial boundaries", () => {
       { handle: "public-1", text: "Built retail data pipelines." }
     ]);
     expect(result).toEqual({
-      answer: "I don't have enough approved public evidence to answer that.",
+      answer: "I couldn't find enough information to answer that yet.",
       citations: [],
       abstained: true
     });

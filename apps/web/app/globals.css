@@ -1188,6 +1188,17 @@ body {
   justify-self: start;
 }
 
+.career-brain-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.career-brain-actions button {
+  justify-self: auto;
+}
+
 .career-brain-heading small {
   display: block;
   color: var(--muted);

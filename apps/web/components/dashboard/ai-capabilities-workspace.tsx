@@ -173,7 +173,10 @@ export function AiCapabilitiesWorkspace({ view = "agents" }: { view?: "agents" |
       setMessage(error instanceof Error ? error.message : "Provider removal failed");
     }
   }
-  async function configure(event: FormEvent<HTMLFormElement>, task: "orchestrator" | "embedding") {
+  async function configure(
+    event: FormEvent<HTMLFormElement>,
+    task: "orchestrator" | "embedding" | "reranker"
+  ) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const numberValue = (name: string, fallback: number) => {
@@ -197,7 +200,9 @@ export function AiCapabilitiesWorkspace({ view = "agents" }: { view?: "agents" |
         },
         "PATCH"
       );
-      setMessage(`${task === "embedding" ? "Embedding" : "Orchestrator"} configuration saved.`);
+      setMessage(
+        `${task === "embedding" ? "Embedding" : task === "reranker" ? "Reranker" : "Orchestrator"} configuration saved.`
+      );
       await load();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Configuration failed");
@@ -216,6 +221,15 @@ export function AiCapabilitiesWorkspace({ view = "agents" }: { view?: "agents" |
       await load();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Orchestrator deletion failed");
+    }
+  }
+  async function deleteReranker() {
+    try {
+      await remove("/api/v1/settings/ai-capabilities/reranker");
+      setMessage("Reranker configuration removed.");
+      await load();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Reranker removal failed");
     }
   }
   async function testOrchestrator() {
@@ -327,6 +341,9 @@ export function AiCapabilitiesWorkspace({ view = "agents" }: { view?: "agents" |
           <label>
             Supported capabilities
             <input name="capabilities" required defaultValue="embeddings" />
+            <small>
+              Use <code>reranker</code> for Cohere Rerank.
+            </small>
           </label>
           <button type="submit">Register reference</button>
         </form>
@@ -334,7 +351,8 @@ export function AiCapabilitiesWorkspace({ view = "agents" }: { view?: "agents" |
           <h2>Registered providers</h2>
           <p>
             For non-OpenAI providers, set a server variable named like
-            <code> PROVIDER_EMBEDDINGS_URL</code> for embeddings and
+            <code> PROVIDER_EMBEDDINGS_URL</code> for embeddings,
+            <code> PROVIDER_RERANK_URL</code> for reranking, and
             <code> PROVIDER_CHAT_COMPLETIONS_URL</code> for reasoning tasks. Endpoints must accept
             the corresponding OpenAI-compatible request shape. For the native Codex App Server
             adapter, use provider <code>codex_app_server</code>, model <code>server-default</code>,
@@ -377,9 +395,7 @@ export function AiCapabilitiesWorkspace({ view = "agents" }: { view?: "agents" |
                         <input
                           name="modelVersion"
                           defaultValue={
-                            provider.model_version === "unversioned"
-                              ? ""
-                              : provider.model_version
+                            provider.model_version === "unversioned" ? "" : provider.model_version
                           }
                         />
                       </label>
@@ -694,6 +710,75 @@ export function AiCapabilitiesWorkspace({ view = "agents" }: { view?: "agents" |
           </div>
         );
       })()}
+      {(() => {
+        const reranker = capabilities.find((capability) => capability.task_type === "reranker");
+        const rerankerProviders = providers.filter((provider) =>
+          provider.capabilities.some(
+            (capability) => capability === "*" || /^(rerank|reranker)$/i.test(capability)
+          )
+        );
+        return (
+          <form
+            key={`reranker-${reranker?.provider_id ?? "new"}-${String(reranker?.enabled ?? false)}`}
+            className="knowledge-entry-form"
+            onSubmit={(event) => void configure(event, "reranker")}
+          >
+            <h2>{reranker ? "Edit reranker" : "Configure reranker"}</h2>
+            <p>
+              Reranking improves RAG precision after Supabase vector retrieval. Register Cohere with
+              capability <code>reranker</code>, set its secret reference to{" "}
+              <code>COHERE_API_KEY</code>, and select it below.
+            </p>
+            <label>
+              Reranker provider
+              <select name="providerId" required defaultValue={reranker?.provider_id ?? ""}>
+                <option value="">Select provider</option>
+                {rerankerProviders.map((provider) => (
+                  <option key={provider.id} value={provider.id}>
+                    {provider.provider} · {provider.model}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Fallback reranker (optional)
+              <select name="fallbackProviderId" defaultValue={reranker?.fallback_provider_id ?? ""}>
+                <option value="">No fallback</option>
+                {rerankerProviders
+                  .filter((provider) => provider.id !== reranker?.provider_id)
+                  .map((provider) => (
+                    <option key={provider.id} value={provider.id}>
+                      {provider.provider} · {provider.model}
+                    </option>
+                  ))}
+              </select>
+            </label>
+            <label>
+              <input name="enabled" type="checkbox" defaultChecked={reranker?.enabled ?? false} />{" "}
+              Enable reranking
+            </label>
+            <div className="workspace-actions">
+              <button type="submit" disabled={!rerankerProviders.length}>
+                {reranker ? "Save reranker changes" : "Enable reranker"}
+              </button>
+              {reranker ? (
+                <button
+                  type="button"
+                  className="button-secondary"
+                  onClick={() => void deleteReranker()}
+                >
+                  Disable reranker
+                </button>
+              ) : null}
+            </div>
+            {!rerankerProviders.length ? (
+              <p role="note">
+                Register a provider with capability <code>reranker</code> above first.
+              </p>
+            ) : null}
+          </form>
+        );
+      })()}
       <section>
         <h2>Active orchestrator configuration</h2>
         {capabilities.filter((capability) => capability.task_type === "orchestrator").length ? (
@@ -736,7 +821,9 @@ export function AiCapabilitiesWorkspace({ view = "agents" }: { view?: "agents" |
           <p>No orchestrator has been configured yet. Save one above before running agents.</p>
         )}
       </section>
-      {capabilities.some((capability) => capability.task_type !== "orchestrator") ? (
+      {capabilities.some(
+        (capability) => !["orchestrator", "embedding", "reranker"].includes(capability.task_type)
+      ) ? (
         <p role="note">
           Older task-specific configurations still exist for migration visibility. They are ignored
           once the orchestrator is enabled and can be removed after verification.

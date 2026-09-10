@@ -7,6 +7,12 @@ import { loadPublicBlogPostsWithStatus, loadPublicPortfolio } from "@/lib/api/pu
 import { publicApiResponse } from "@/lib/api/response";
 import { embedWithFallback, resolveEmbeddingProviders } from "@/lib/server/embedding-provider";
 import { generateReasoningJson, resolveReasoningProviders } from "@/lib/server/reasoning-provider";
+import { rerankCandidates } from "@/lib/server/reranker-provider";
+import {
+  CAREER_OUTPUT_SCOPE_INSTRUCTION,
+  PUBLIC_ASSISTANT_ALLOWED_SOURCE_TYPES,
+  PUBLIC_ASSISTANT_BLOCKED_SOURCE_TYPES
+} from "@/lib/server/retrieval-policy";
 
 export const maxDuration = 120;
 
@@ -20,20 +26,6 @@ function publicRuntimeClient() {
     auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false }
   });
 }
-
-const blockedPublicAssistantEvidence = new Set([
-  "journal",
-  "journal_entry",
-  "personal_note",
-  "analytics",
-  "analytics_event",
-  "audit",
-  "audit_event",
-  "application",
-  "interview",
-  "compensation",
-  "compensation_research"
-]);
 
 async function retrievePublicVectorEvidence(
   ownerId: string,
@@ -54,27 +46,34 @@ async function retrievePublicVectorEvidence(
       requested_min_similarity: 0.2
     });
     if (error || !Array.isArray(data)) return [];
-    return data.flatMap((row: unknown) => {
+    const candidates = data.flatMap((row: unknown) => {
       if (!row || typeof row !== "object") return [];
       const item = row as Record<string, unknown>;
       const publicEvidenceId =
         typeof item.public_evidence_id === "string" ? item.public_evidence_id : "";
-      const excerpt = typeof item.sanitized_excerpt === "string" ? item.sanitized_excerpt.trim() : "";
+      const excerpt =
+        typeof item.sanitized_excerpt === "string" ? item.sanitized_excerpt.trim() : "";
       if (!publicEvidenceId || !excerpt) return [];
-      const handle = issueEvidenceHandle({
-        chunkId: publicEvidenceId,
-        sourceVersionHash:
-          typeof item.source_version_hash === "string" ? item.source_version_hash : "public",
-        start: 0,
-        end: excerpt.length
-      });
       return [
         {
-          handle,
-          text: excerpt,
-          source: typeof item.safe_title === "string" ? item.safe_title : publicEvidenceId
+          publicEvidenceId,
+          excerpt,
+          sourceVersionHash:
+            typeof item.source_version_hash === "string" ? item.source_version_hash : "public",
+          source: typeof item.safe_title === "string" ? item.safe_title : publicEvidenceId,
+          content: excerpt
         }
       ];
+    });
+    const reranked = await rerankCandidates(client, ownerId, question, candidates, 8);
+    return reranked.flatMap((item) => {
+      const handle = issueEvidenceHandle({
+        chunkId: item.publicEvidenceId,
+        sourceVersionHash: item.sourceVersionHash,
+        start: 0,
+        end: item.excerpt.length
+      });
+      return [{ handle, text: item.excerpt, source: item.source }];
     });
   } catch {
     // Public item retrieval and lexical retrieval remain available when the
@@ -100,12 +99,17 @@ async function composeGroundedAnswer(
       ...evidence.filter((item) => !cited.has(item.handle))
     ]
       .slice(0, 12)
-      .map((item) => ({ handle: item.handle, source: item.source ?? "Portfolio", text: item.text }));
+      .map((item) => ({
+        handle: item.handle,
+        source: item.source ?? "Portfolio",
+        text: item.text
+      }));
     if (!context.length) return result;
     const generated = await generateReasoningJson(
       providers,
       [
         "You are Ask Basil, a public portfolio assistant.",
+        CAREER_OUTPUT_SCOPE_INSTRUCTION,
         "Answer the visitor's question using only the supplied published portfolio context.",
         "Synthesize a clear, human answer from multiple context entries when useful; do not copy one entry blindly.",
         "Do not invent employers, dates, metrics, tools, projects, or personal details.",
@@ -116,7 +120,8 @@ async function composeGroundedAnswer(
       { question, context },
       { task: "public_qa" }
     );
-    const answer = typeof generated.output.answer === "string" ? generated.output.answer.trim() : "";
+    const answer =
+      typeof generated.output.answer === "string" ? generated.output.answer.trim() : "";
     const sources = Array.isArray(generated.output.sources)
       ? generated.output.sources.filter(
           (value): value is string => typeof value === "string" && cited.has(value)
@@ -204,8 +209,13 @@ export async function POST(request: Request) {
     return publicApiResponse(unavailable, request, 200);
   }
   const evidence = snapshot.evidence.flatMap((item) => {
-    const evidenceType = typeof item.evidence_type === "string" ? item.evidence_type.trim().toLowerCase() : "";
-    if (blockedPublicAssistantEvidence.has(evidenceType)) return [];
+    const evidenceType =
+      typeof item.evidence_type === "string" ? item.evidence_type.trim().toLowerCase() : "";
+    if (
+      !PUBLIC_ASSISTANT_ALLOWED_SOURCE_TYPES.has(evidenceType) ||
+      PUBLIC_ASSISTANT_BLOCKED_SOURCE_TYPES.has(evidenceType)
+    )
+      return [];
     const text = typeof item.sanitized_excerpt === "string" ? item.sanitized_excerpt : "";
     if (!text || typeof item.public_evidence_id !== "string") return [];
     const handle = issueEvidenceHandle({
@@ -289,9 +299,10 @@ export async function POST(request: Request) {
     ? [...vectorEvidence, ...publishedItemEvidence, ...publishedBlogEvidence, ...evidence]
     : [...publishedItemEvidence, ...publishedBlogEvidence, ...evidence];
   const retrieved = answerPublicQuestion(question, allEvidence);
-  const result = ownerId && vectorEvidence.length
-    ? await composeGroundedAnswer(question, retrieved, allEvidence, ownerId)
-    : retrieved;
+  const result =
+    ownerId && vectorEvidence.length
+      ? await composeGroundedAnswer(question, retrieved, allEvidence, ownerId)
+      : retrieved;
   if (request.headers.get("accept")?.includes("text/event-stream"))
     return streamResponse(result, request, request.headers.get("last-event-id"));
   return publicApiResponse(result, request, result.abstained ? 200 : 201);

@@ -103,6 +103,14 @@ no enabled embedding capability or server-side credential is available; determin
 are not generated. Existing legacy vectors are ignored because retrieval filters by the selected
 provider, model, and model version. Reprocess an existing document to create production embeddings.
 
+RAG retrieval can optionally use Cohere as a second-stage reranker. Add `COHERE_API_KEY` to the
+server environment, open **Settings → AI providers**, register provider `cohere` with model
+`rerank-v3.5`, capability `reranker`, and secret reference `COHERE_API_KEY`, then open
+**Settings → Agents** and enable **Configure reranker**. Supabase first retrieves a broad set of
+private or published candidates; Cohere then reorders the candidates for the exact question or job
+description before the orchestrator receives them. If reranking is disabled or unavailable, the
+system safely falls back to the vector ranking.
+
 All reasoning agents run as subagents under one owner-configured orchestrator model. In **Settings →
 AI providers**, register the chat/generation model with a reasoning capability (or `*`), then in
 **Settings → Agents** select it once and enable **Save orchestrator**. Portfolio Q&A, role fit,

@@ -45,10 +45,22 @@ export function GET(request: Request) {
 export async function POST(request: Request) {
   return withPrivateApi(request, async ({ client, correlationId, ownerId }) => {
     try {
-      const generated = await synthesizeCareerBrain(client, ownerId);
+      const body = await request.json().catch(() => ({}));
+      const mode =
+        body && typeof body === "object" && "mode" in body && body.mode === "refresh"
+          ? "refresh"
+          : "resynthesize";
+      const generated = await synthesizeCareerBrain(client, ownerId, {
+        // Manual re-synthesis is explicitly cache-bypassing. The refresh mode
+        // is retained for scheduled/background refreshes and can reuse a fresh
+        // retrieval cache entry.
+        forceFresh: mode === "resynthesize",
+        refreshRetrievalCache: mode === "refresh"
+      });
       const current = await readLatest(client, ownerId);
       await recordAudit(client, ownerId, correlationId, "career_brain.generated", null, {
-        reused: generated.reused
+        reused: generated.reused,
+        mode
       });
       return apiResponse(
         { ...current, reused: generated.reused },

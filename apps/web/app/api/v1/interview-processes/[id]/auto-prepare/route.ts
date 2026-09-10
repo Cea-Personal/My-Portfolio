@@ -3,6 +3,8 @@ import { createServiceSupabaseClient } from "@career-os/database/service";
 import { apiResponse } from "@/lib/api/response";
 import { withPrivateApi } from "@/lib/api/private";
 import { generateInterviewKitWithLlm } from "@/lib/server/interview-kit-llm";
+import { CAREER_FACT_TYPES } from "@/lib/server/retrieval-policy";
+import { rerankCandidates } from "@/lib/server/reranker-provider";
 
 export const maxDuration = 300;
 
@@ -161,6 +163,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       .select("id,fact_type,current_version_id")
       .eq("owner_id", ownerId)
       .eq("verified_by_owner", true)
+      .in("fact_type", [...CAREER_FACT_TYPES])
       .in("review_status", ["approved", "edited_approved"]);
     if (factsError) throw factsError;
     const versionIds = (facts ?? [])
@@ -237,6 +240,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           content: String(chunk.content).slice(0, 4000)
         }));
     });
+    const rankedDocumentContext = await rerankCandidates(
+      serviceClient,
+      ownerId,
+      `${title}\n${company}\n${description}`,
+      documentContext,
+      24
+    );
     const generated: Array<{ stageId: string; kit: unknown; limitations: string[] }> = [];
     for (const stage of stages ?? []) {
       const generation = await generateInterviewKitWithLlm(serviceClient, ownerId, {
@@ -246,7 +256,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         stage: { id: stage.id, name: stage.name, stageType: stage.stage_type ?? "unknown" },
         evidence,
         stories: (stories ?? []) as InterviewStory[],
-        documentContext
+        documentContext: rankedDocumentContext
       });
       const kit = generation.kit;
       const previous = await client
