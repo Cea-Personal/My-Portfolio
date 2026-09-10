@@ -6,7 +6,8 @@ import { rerankCandidates } from "./reranker-provider";
 import {
   CAREER_DOCUMENT_KINDS,
   CAREER_FACT_TYPES,
-  CAREER_OUTPUT_SCOPE_INSTRUCTION
+  CAREER_OUTPUT_SCOPE_INSTRUCTION,
+  EMPLOYER_PRIVACY_INSTRUCTION
 } from "./retrieval-policy";
 
 type ApplicationField = {
@@ -465,7 +466,7 @@ export async function generateApplicationAnswers(
       providerVersion = providers[0]?.model_version;
       const response = await generateReasoningJson(
         providers,
-        `${CAREER_OUTPUT_SCOPE_INSTRUCTION} Do not mention Thames Water or close variants; use supported work from that source only with an anonymized employer reference. Prioritize data-engineering and data-platform evidence when answering experience questions. ` +
+        `${CAREER_OUTPUT_SCOPE_INSTRUCTION} ${EMPLOYER_PRIVACY_INSTRUCTION} Prioritize data-engineering and data-platform evidence when answering experience questions. ` +
           `You generate private job-application answers for Basil Ogbonna. Return JSON only with an answers array. Answer the exact employer questions supplied; do not produce generic application advice. Use only the job, approved profile values, Career Brain, and evidence context. Never invent employers, dates, technologies, metrics, authorization, sponsorship, salary numbers, or achievements. For sensitive, legal, demographic, authorization, sponsorship, and availability fields, return an empty answer unless an explicit profile value is supplied. If evidence is insufficient, return an empty answer and explain that owner input is required. Each answer must include fieldId, answer, evidenceIds (only supplied evidence IDs), and a short explanation. Respect field type, choices, character limits, and word limits. Motivation answers must be specific to the company and role.`,
         {
           applicationId,

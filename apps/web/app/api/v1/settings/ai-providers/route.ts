@@ -19,8 +19,13 @@ export async function POST(request: Request) {
       typeof body.modelVersion === "string" && body.modelVersion.trim()
         ? body.modelVersion.trim().slice(0, 80)
         : "unversioned";
-    const provider = typeof body.provider === "string" ? body.provider.trim() : "";
-    const model = typeof body.model === "string" ? body.model.trim() : "";
+    const provider =
+      typeof body.provider === "string" ? body.provider.trim().toLocaleLowerCase() : "";
+    const requestedModel = typeof body.model === "string" ? body.model.trim() : "";
+    const isCohereReranker =
+      provider === "cohere" &&
+      capabilities.some((capability: string) => /^(rerank|reranker)$/i.test(capability));
+    const model = requestedModel || (isCohereReranker ? "rerank-v3.5" : "");
     const secretRef = typeof body.secretRef === "string" ? body.secretRef.trim() : null;
     if (
       !provider ||

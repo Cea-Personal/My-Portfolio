@@ -9,8 +9,9 @@ import {
 
 describe("native Codex orchestration", () => {
   it("maps application tasks to native custom agent names", () => {
-    expect(codexAgentRoleForTask("document_composition")).toBe("application_writer");
-    expect(codexAgentRoleForTask("role_fit")).toBe("role_fit_analyst");
+    expect(codexAgentRoleForTask("document_composition")).toBe("application-writer");
+    expect(codexAgentRoleForTask("role_fit")).toBe("role-fit-analyst");
+    expect(codexAgentRoleForTask("image_generation")).toBe("image-generator");
   });
 
   it("rejects tasks without a native role", () => {
@@ -22,7 +23,8 @@ describe("native Codex orchestration", () => {
   it("instructs one parent thread to delegate through native spawn_agent", () => {
     const prompt = buildOrchestratorPrompt("writing_assistance", { text: "hello" });
     expect(prompt).toContain("spawn_agent");
-    expect(prompt).toContain("writing_editor");
+    expect(prompt).toContain("writing-editor");
+    expect(prompt).toContain("Never mention Thames Water");
     expect(prompt).toContain('"text":"hello"');
   });
 
@@ -43,7 +45,8 @@ describe("native Codex orchestration", () => {
       "application_answers",
       "compensation",
       "interview_preparation",
-      "writing_assistance"
+      "writing_assistance",
+      "image_generation"
     ]) {
       const schema = codexOutputSchemaForTask(task);
       expect(schema.type).toBe("object");

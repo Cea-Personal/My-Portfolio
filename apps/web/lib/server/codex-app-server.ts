@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import { EMPLOYER_PRIVACY_INSTRUCTION } from "./retrieval-policy";
 
 type JsonRpcResponse = {
   id?: number;
@@ -24,17 +25,18 @@ export type CodexTurnResult = {
 };
 
 const TASK_TO_NATIVE_ROLE = {
-  public_qa: "portfolio_assistant",
-  role_fit: "role_fit_analyst",
-  evidence_extraction: "career_synthesizer",
-  career_gap: "career_gap_analyst",
-  job_scoring: "job_matcher",
-  document_composition: "application_writer",
-  application_answers: "application_writer",
-  compensation: "compensation_analyst",
-  interview_preparation: "interview_coach",
-  writing_assistance: "writing_editor",
-  portfolio_analytics: "portfolio_analytics"
+  public_qa: "portfolio-assistant",
+  role_fit: "role-fit-analyst",
+  evidence_extraction: "career-synthesizer",
+  career_gap: "career-gap-analyst",
+  job_scoring: "job-matcher",
+  document_composition: "application-writer",
+  application_answers: "application-writer",
+  compensation: "compensation-analyst",
+  interview_preparation: "interview-coach",
+  writing_assistance: "writing-editor",
+  portfolio_analytics: "portfolio-analytics",
+  image_generation: "image-generator"
 } as const;
 
 type JsonSchema = {
@@ -85,20 +87,26 @@ const TASK_OUTPUT_SCHEMAS: Readonly<Record<string, JsonSchema>> = {
       role: textSchema(),
       period: textSchema(),
       summary: textSchema(),
-      responsibilities: textListSchema(),
-      achievements: textListSchema(),
-      impact: textListSchema(),
+      experience: textListSchema(),
       projects: textListSchema(),
       technologies: textListSchema(),
       evidence: textListSchema()
     }),
     projects: objectListSchema({
       title: textSchema(),
+      category: textSchema(),
       summary: textSchema(),
+      description: textSchema(),
+      problem: textSchema(),
+      approach: textSchema(),
       role: textSchema(),
       outcome: textSchema(),
+      highlights: textListSchema(),
       technologies: textListSchema(),
       url: textSchema(),
+      liveUrl: textSchema(),
+      githubUrl: textSchema(),
+      videoUrl: textSchema(),
       process: textListSchema(),
       evidence: textListSchema()
     }),
@@ -207,6 +215,10 @@ const TASK_OUTPUT_SCHEMAS: Readonly<Record<string, JsonSchema>> = {
       confidence: textSchema()
     }),
     nextSteps: textListSchema()
+  }),
+  image_generation: objectSchema({
+    prompt: textSchema(),
+    altText: textSchema()
   })
 };
 
@@ -301,6 +313,7 @@ export function buildOrchestratorPrompt(
     `Delegate this request to exactly one native Codex custom agent named ${nativeRole} using the native spawn_agent tool.`,
     "Do not answer the request yourself. Wait for the child agent to finish, then return the child's JSON object unchanged.",
     "Use only the supplied evidence and follow the child agent's privacy and grounding instructions.",
+    EMPLOYER_PRIVACY_INSTRUCTION,
     "The caller requires a JSON object and will reject prose outside JSON.",
     `Return every one of these top-level output keys: ${outputKeys}. Use an empty string, empty array, or null where the schema permits it when evidence does not support a value.`,
     JSON.stringify({ task, nativeRole, request: input })
@@ -338,6 +351,7 @@ const ORCHESTRATOR_DEVELOPER_INSTRUCTIONS = [
   "For every request, use the native Codex spawn_agent collaboration tool exactly once.",
   "Select the named native custom agent from the project's .codex/agents directory.",
   "Wait for the child to finish and return its JSON result without adding claims or private data.",
+  EMPLOYER_PRIVACY_INSTRUCTION,
   "Do not request approvals or access the filesystem for this web request."
 ].join(" ");
 

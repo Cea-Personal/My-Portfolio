@@ -1,37 +1,42 @@
 import { apiResponse } from "@/lib/api/response";
 import { withPrivateApi } from "@/lib/api/private";
 import {
+  hasMeaningfulCareerBrainContent,
   normalizeCareerBrainContent,
   synthesizeCareerBrain
 } from "@/lib/server/career-brain-synthesis";
 
 // Career Brain invokes a native subagent and reconciles many private sources.
-// Allow the route to use the same two-minute budget as the server-side call.
-export const maxDuration = 120;
+// Retrieval, reranking, native Codex startup, and structured synthesis can all
+// take longer than a normal API request. Keep the HTTP budget above the native
+// call budget so the route does not terminate first.
+export const maxDuration = 300;
 
 async function readLatest(
   client: Parameters<Parameters<typeof withPrivateApi>[1]>[0]["client"],
   ownerId: string
 ) {
-  const [snapshot, selections] = await Promise.all([
+  const [snapshots, selections] = await Promise.all([
     client
       .schema("app")
       .from("career_brain_snapshots")
       .select("*")
       .eq("owner_id", ownerId)
       .order("generated_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+      .limit(20),
     client
       .schema("app")
       .from("career_brain_public_selections")
       .select("item_key,item_type,public_eligible")
       .eq("owner_id", ownerId)
   ]);
-  if (snapshot.error) throw snapshot.error;
+  if (snapshots.error) throw snapshots.error;
   if (selections.error) throw selections.error;
-  const current = snapshot.data
-    ? { ...snapshot.data, content: normalizeCareerBrainContent(snapshot.data.content) }
+  const snapshot = (snapshots.data ?? []).find((candidate) =>
+    hasMeaningfulCareerBrainContent(normalizeCareerBrainContent(candidate.content))
+  );
+  const current = snapshot
+    ? { ...snapshot, content: normalizeCareerBrainContent(snapshot.content) }
     : null;
   return { snapshot: current, selections: selections.data ?? [] };
 }

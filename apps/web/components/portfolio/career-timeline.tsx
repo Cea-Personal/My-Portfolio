@@ -14,6 +14,8 @@ export interface CareerTimelineStage {
   company?: string;
   period?: string;
   projects?: readonly CareerTimelineProject[];
+  experience?: readonly string[];
+  /** Legacy published shape; retained so older publications still render. */
   impacts?: readonly string[];
   skills?: readonly string[];
 }
@@ -76,15 +78,17 @@ export function CareerTimeline({ stages = [] }: { stages?: readonly CareerTimeli
                       )}
                     </section>
                     <section className="career-unfold-panel career-impact">
-                      <h4>Impact</h4>
-                      {stage.impacts?.length ? (
+                      <h4>Experience</h4>
+                      {stage.experience?.length || stage.impacts?.length ? (
                         <ul>
-                          {stage.impacts.map((impact) => (
-                            <li key={impact}>{impact}</li>
+                          {(stage.experience ?? stage.impacts ?? []).map((detail) => (
+                            <li key={detail}>{detail}</li>
                           ))}
                         </ul>
                       ) : (
-                        <p className="career-detail-empty">Verified outcomes will appear here.</p>
+                        <p className="career-detail-empty">
+                          Verified experience details will appear here.
+                        </p>
                       )}
                     </section>
                     <section className="career-unfold-panel career-tools role-toolkit">

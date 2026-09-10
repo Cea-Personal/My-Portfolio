@@ -87,6 +87,15 @@ For troubleshooting, the web app and workflow runner can still be started separa
 - Inngest development server/UI: <http://127.0.0.1:8288>
 - Document parser/indexer: <http://127.0.0.1:8081>
 
+### Project video demonstrations
+
+Published project media can include a YouTube link. Add an entry such as
+`{"type":"youtube","url":"https://youtu.be/<video-id>","label":"Watch demo"}` to the
+project's sanitized media, or keep the link in the project's published structured content as
+`url`, `videoUrl`, or `youtubeUrl`. The public project chapter and project detail page convert
+supported YouTube links to privacy-enhanced embeds; arbitrary hosts are ignored. Videos are never
+autoplayed.
+
 Document vectors are stored in the `app.chunk_embeddings.embedding` column, not in the `public`
 schema. In Supabase Studio, select the `app` schema and open `chunk_embeddings`; source text chunks
 are in `app.evidence_chunks`. The `vector` extension may appear under `public` in Studio—this is the
@@ -109,7 +118,10 @@ server environment, open **Settings → AI providers**, register provider `coher
 **Settings → Agents** and enable **Configure reranker**. Supabase first retrieves a broad set of
 private or published candidates; Cohere then reorders the candidates for the exact question or job
 description before the orchestrator receives them. If reranking is disabled or unavailable, the
-system safely falls back to the vector ranking.
+system safely falls back to the vector ranking. After enabling it, use **Test reranker connection**
+in the same section to send a small synthetic query and verify the provider, model, result count,
+and latency. The test does not send career evidence or expose the API key; failures are recorded in
+the sanitized AI run diagnostics.
 
 All reasoning agents run as subagents under one owner-configured orchestrator model. In **Settings →
 AI providers**, register the chat/generation model with a reasoning capability (or `*`), then in
@@ -157,6 +169,25 @@ from Application Kit (or the CV/Cover Letters history pages). Application profil
 place; deleting one archives it, clears any application selections, and removes it from future
 dropdowns without destroying the audit history. Search profiles support the same edit/archive flow
 under **Settings → Search profiles**.
+
+Journal entries are private knowledge-base sources. Saving or revising an entry automatically queues
+immutable text chunking and embedding; the journal source is available to private Career Brain
+synthesis and semantic search, but is never published or used as evidence by the public portfolio
+assistant. The former derived-insight endpoints remain only as retired compatibility routes.
+
+Project covers can be uploaded or generated from **Career Brain → Selected projects**. When generating,
+you can optionally add up to four reference images and written art direction; references are sent to
+the provider as visual input and are not copied into the portfolio. Register an image provider under
+**Settings → AI providers** with capability `image_generation`, then configure it under **Settings →
+Agents → Project image generation**. OpenAI uses
+`https://api.openai.com/v1/images/generations` by default; OpenAI-compatible gateways can set
+`<PROVIDER>_IMAGES_URL`. A generated or uploaded image remains a private draft until approved, and
+only the approved cover is copied into the next public portfolio snapshot.
+
+The public project index uses the approved cover and a short summary. Each project’s **View project**
+page uses an approved YouTube demo as its hero video when one is published, then presents the project
+description, problem/approach, points, build process, skills, and safe live/GitHub links from the
+published project details. Rebuild and activate the portfolio snapshot after changing project details.
 
 ### LinkedIn job intake and interview packages
 

@@ -8,6 +8,7 @@ import {
   type AnalyticsEventRow,
   visitDetails
 } from "@/lib/server/portfolio-analytics";
+import { EMPLOYER_PRIVACY_INSTRUCTION } from "@/lib/server/retrieval-policy";
 
 // The insight request waits for the orchestrator and its native child agent.
 // Allow enough time for that round trip while keeping the client bounded.
@@ -27,16 +28,22 @@ interface InsightInput {
   eventCounts: Record<string, number>;
   pageViews: Record<string, number>;
   sectionViews: Record<string, number>;
-  pageEngagement: Record<string, {
-    samples: number;
-    totalSeconds: number;
-    averageSeconds: number;
-  }>;
-  sectionEngagement: Record<string, {
-    samples: number;
-    totalSeconds: number;
-    averageSeconds: number;
-  }>;
+  pageEngagement: Record<
+    string,
+    {
+      samples: number;
+      totalSeconds: number;
+      averageSeconds: number;
+    }
+  >;
+  sectionEngagement: Record<
+    string,
+    {
+      samples: number;
+      totalSeconds: number;
+      averageSeconds: number;
+    }
+  >;
   visitDurationsSeconds: number[];
 }
 
@@ -111,6 +118,7 @@ export async function POST(request: Request) {
         [
           "You are the public portfolio analytics subagent.",
           "Analyze only the supplied aggregate metrics.",
+          EMPLOYER_PRIVACY_INSTRUCTION,
           "Return JSON with summary, insights, and nextSteps.",
           "Each insight must include title, observation, implication, action, and confidence.",
           "Limit insights to five and nextSteps to four.",
@@ -195,7 +203,8 @@ function fallbackInsights(input: InsightInput, reason: string) {
     insights.push({
       title: "Portfolio activity",
       observation: `${String(input.totalVisits)} visit${input.totalVisits === 1 ? "" : "s"} generated ${String(input.totalEvents)} tracked event${input.totalEvents === 1 ? "" : "s"}.`,
-      implication: "The current sample is enough to monitor movement, but not to claim broad audience preferences.",
+      implication:
+        "The current sample is enough to monitor movement, but not to claim broad audience preferences.",
       action: "Continue collecting privacy-safe visits before making major content decisions.",
       confidence: "Descriptive only"
     });
@@ -204,7 +213,8 @@ function fallbackInsights(input: InsightInput, reason: string) {
     insights.push({
       title: "Most measured attention",
       observation: `${topSection[0]} has the highest recorded section dwell time at ${String(topSection[1].totalSeconds)} seconds across ${String(topSection[1].samples)} sample${topSection[1].samples === 1 ? "" : "s"}.`,
-      implication: "This section currently receives the strongest measured attention in the available sample.",
+      implication:
+        "This section currently receives the strongest measured attention in the available sample.",
       action: "Keep its explanation clear and connect it to a useful next action.",
       confidence: topSection[1].samples >= 3 ? "Moderate" : "Low volume"
     });
@@ -213,7 +223,8 @@ function fallbackInsights(input: InsightInput, reason: string) {
     insights.push({
       title: "Visit duration",
       observation: `Measured visits average ${String(averageVisit)} seconds in the available session sample.`,
-      implication: "Session duration is a directional engagement signal, not a measure of visitor intent.",
+      implication:
+        "Session duration is a directional engagement signal, not a measure of visitor intent.",
       action: "Compare this trend over time with section dwell rather than judging a single visit.",
       confidence: input.visitDurationsSeconds.length >= 3 ? "Moderate" : "Low volume"
     });

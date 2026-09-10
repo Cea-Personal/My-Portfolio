@@ -57,6 +57,17 @@ interface EmbeddingHealth {
   detail?: string;
   checkedAt: string;
 }
+interface RerankerHealth {
+  ok: boolean;
+  status: "healthy" | "unhealthy";
+  provider?: string;
+  model?: string;
+  resultCount?: number;
+  topScore?: number;
+  elapsedMs?: number;
+  detail?: string;
+  checkedAt: string;
+}
 const formText = (value: FormDataEntryValue | null) => (typeof value === "string" ? value : "");
 async function post(endpoint: string, body: unknown, method: "POST" | "PATCH" = "POST") {
   const response = await fetch(endpoint, {
@@ -92,6 +103,8 @@ export function AiCapabilitiesWorkspace({ view = "agents" }: { view?: "agents" |
   const [healthRunning, setHealthRunning] = useState(false);
   const [embeddingHealth, setEmbeddingHealth] = useState<EmbeddingHealth | null>(null);
   const [embeddingHealthRunning, setEmbeddingHealthRunning] = useState(false);
+  const [rerankerHealth, setRerankerHealth] = useState<RerankerHealth | null>(null);
+  const [rerankerHealthRunning, setRerankerHealthRunning] = useState(false);
   const load = useCallback(async () => {
     const response = await fetch("/api/v1/settings/ai-capabilities", { cache: "no-store" });
     if (!response.ok) throw new Error();
@@ -175,7 +188,7 @@ export function AiCapabilitiesWorkspace({ view = "agents" }: { view?: "agents" |
   }
   async function configure(
     event: FormEvent<HTMLFormElement>,
-    task: "orchestrator" | "embedding" | "reranker"
+    task: "orchestrator" | "embedding" | "reranker" | "image_generation"
   ) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -201,7 +214,7 @@ export function AiCapabilitiesWorkspace({ view = "agents" }: { view?: "agents" |
         "PATCH"
       );
       setMessage(
-        `${task === "embedding" ? "Embedding" : task === "reranker" ? "Reranker" : "Orchestrator"} configuration saved.`
+        `${task === "embedding" ? "Embedding" : task === "reranker" ? "Reranker" : task === "image_generation" ? "Image generation" : "Orchestrator"} configuration saved.`
       );
       await load();
     } catch (error) {
@@ -302,6 +315,40 @@ export function AiCapabilitiesWorkspace({ view = "agents" }: { view?: "agents" |
       setEmbeddingHealthRunning(false);
     }
   }
+  async function testReranker() {
+    setRerankerHealthRunning(true);
+    setRerankerHealth(null);
+    try {
+      const response = await fetch("/api/v1/settings/ai-capabilities/reranker/health", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "idempotency-key": `reranker-health-${crypto.randomUUID()}`
+        },
+        body: JSON.stringify({})
+      });
+      const payload = (await response.json().catch(() => ({}))) as { data?: RerankerHealth };
+      if (!payload.data) throw new Error("The reranker health check returned no diagnostic.");
+      setRerankerHealth(payload.data);
+      setMessage(
+        payload.data.ok
+          ? "Reranker health check completed."
+          : (payload.data.detail ?? "Reranker health check failed.")
+      );
+      await load();
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : "Reranker health check failed.";
+      setRerankerHealth({
+        ok: false,
+        status: "unhealthy",
+        detail,
+        checkedAt: new Date().toISOString()
+      });
+      setMessage(detail);
+    } finally {
+      setRerankerHealthRunning(false);
+    }
+  }
   if (view === "providers") {
     return (
       <main className="workspace-page">
@@ -320,8 +367,12 @@ export function AiCapabilitiesWorkspace({ view = "agents" }: { view?: "agents" |
             <input name="provider" required placeholder="openai" />
           </label>
           <label>
-            Model
-            <input name="model" required placeholder="text-embedding-3-small or server-default" />
+            Model (optional for Cohere Rerank)
+            <input name="model" placeholder="rerank-v3.5 for Cohere · server-default for Codex" />
+            <small>
+              Cohere Rerank defaults to <code>rerank-v3.5</code> when left blank. Other providers
+              must supply their model identifier.
+            </small>
           </label>
           <label>
             Model version (optional)
@@ -353,6 +404,7 @@ export function AiCapabilitiesWorkspace({ view = "agents" }: { view?: "agents" |
             For non-OpenAI providers, set a server variable named like
             <code> PROVIDER_EMBEDDINGS_URL</code> for embeddings,
             <code> PROVIDER_RERANK_URL</code> for reranking, and
+            <code> PROVIDER_IMAGES_URL</code> for image generation, and
             <code> PROVIDER_CHAT_COMPLETIONS_URL</code> for reasoning tasks. Endpoints must accept
             the corresponding OpenAI-compatible request shape. For the native Codex App Server
             adapter, use provider <code>codex_app_server</code>, model <code>server-default</code>,
@@ -761,6 +813,14 @@ export function AiCapabilitiesWorkspace({ view = "agents" }: { view?: "agents" |
               <button type="submit" disabled={!rerankerProviders.length}>
                 {reranker ? "Save reranker changes" : "Enable reranker"}
               </button>
+              <button
+                type="button"
+                className="button-secondary"
+                disabled={!reranker?.enabled || rerankerHealthRunning}
+                onClick={() => void testReranker()}
+              >
+                {rerankerHealthRunning ? "Testing…" : "Test reranker connection"}
+              </button>
               {reranker ? (
                 <button
                   type="button"
@@ -774,6 +834,100 @@ export function AiCapabilitiesWorkspace({ view = "agents" }: { view?: "agents" |
             {!rerankerProviders.length ? (
               <p role="note">
                 Register a provider with capability <code>reranker</code> above first.
+              </p>
+            ) : null}
+            {rerankerHealth ? (
+              <div
+                className={`ai-health-result ${rerankerHealth.ok ? "is-healthy" : "is-unhealthy"}`}
+                aria-live="polite"
+              >
+                <strong>{rerankerHealth.ok ? "Healthy" : "Unhealthy"}</strong>
+                <span>
+                  {rerankerHealth.provider
+                    ? `${rerankerHealth.provider} · ${rerankerHealth.model ?? "server-selected model"}${typeof rerankerHealth.resultCount === "number" ? ` · ${String(rerankerHealth.resultCount)} results` : ""}`
+                    : rerankerHealth.detail}
+                  {typeof rerankerHealth.elapsedMs === "number"
+                    ? ` · ${String(rerankerHealth.elapsedMs)}ms`
+                    : ""}
+                </span>
+                <small>Checked {new Date(rerankerHealth.checkedAt).toLocaleString()}</small>
+              </div>
+            ) : null}
+          </form>
+        );
+      })()}
+      {(() => {
+        const imageGeneration = capabilities.find(
+          (capability) => capability.task_type === "image_generation"
+        );
+        const imageProviders = providers.filter((provider) =>
+          provider.capabilities.some(
+            (capability) => capability === "*" || /^(image|images|image_generation)$/i.test(capability)
+          )
+        );
+        return (
+          <form
+            key={`image-generation-${imageGeneration?.provider_id ?? "new"}-${String(imageGeneration?.enabled ?? false)}`}
+            className="knowledge-entry-form"
+            onSubmit={(event) => void configure(event, "image_generation")}
+          >
+            <h2>{imageGeneration ? "Edit project image generation" : "Configure project image generation"}</h2>
+            <p>
+              Choose the model used to create optional project cover images. Generated images stay
+              private until you approve one for a project; approving a replacement supersedes the
+              previous cover in the next portfolio snapshot.
+            </p>
+            <label>
+              Image generation provider
+              <select name="providerId" required defaultValue={imageGeneration?.provider_id ?? ""}>
+                <option value="">Select provider</option>
+                {imageProviders.map((provider) => (
+                  <option key={provider.id} value={provider.id}>
+                    {provider.provider} · {provider.model}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Fallback image provider (optional)
+              <select
+                name="fallbackProviderId"
+                defaultValue={imageGeneration?.fallback_provider_id ?? ""}
+              >
+                <option value="">No fallback</option>
+                {imageProviders
+                  .filter((provider) => provider.id !== imageGeneration?.provider_id)
+                  .map((provider) => (
+                    <option key={provider.id} value={provider.id}>
+                      {provider.provider} · {provider.model}
+                    </option>
+                  ))}
+              </select>
+            </label>
+            <label>
+              Request timeout (ms)
+              <input
+                name="timeoutMs"
+                type="number"
+                min="1000"
+                max="120000"
+                defaultValue={imageGeneration?.timeout_ms ?? 120000}
+              />
+            </label>
+            <label>
+              <input
+                name="enabled"
+                type="checkbox"
+                defaultChecked={imageGeneration?.enabled ?? false}
+              /> Enable project image generation
+            </label>
+            <button type="submit" disabled={!imageProviders.length}>
+              {imageGeneration ? "Save image generation changes" : "Enable image generation"}
+            </button>
+            {!imageProviders.length ? (
+              <p role="note">
+                Register a provider with capability <code>image_generation</code> above first. OpenAI
+                uses <code>OPENAI_IMAGES_URL</code> when set, otherwise its Images API endpoint.
               </p>
             ) : null}
           </form>
@@ -822,7 +976,10 @@ export function AiCapabilitiesWorkspace({ view = "agents" }: { view?: "agents" |
         )}
       </section>
       {capabilities.some(
-        (capability) => !["orchestrator", "embedding", "reranker"].includes(capability.task_type)
+        (capability) =>
+          !["orchestrator", "embedding", "reranker", "image_generation"].includes(
+            capability.task_type
+          )
       ) ? (
         <p role="note">
           Older task-specific configurations still exist for migration visibility. They are ignored

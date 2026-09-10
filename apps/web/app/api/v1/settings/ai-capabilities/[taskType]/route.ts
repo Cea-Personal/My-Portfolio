@@ -13,6 +13,7 @@ const taskTypes = new Set([
   "portfolio_analytics",
   "embedding",
   "reranker",
+  "image_generation",
   "orchestrator"
 ]);
 interface AvailableProvider {
@@ -63,6 +64,7 @@ export async function PATCH(
             capability === taskType ||
             (taskType === "embedding" && capability === "embeddings") ||
             (taskType === "reranker" && /^(rerank|reranker)$/i.test(capability)) ||
+            (taskType === "image_generation" && /^(image|images|image_generation)$/i.test(capability)) ||
             (taskType !== "embedding" && taskType !== "reranker" && capability === "reasoning") ||
             (taskType === "orchestrator" && capability !== "embeddings")
         )

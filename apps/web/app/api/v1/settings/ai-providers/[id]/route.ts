@@ -5,9 +5,15 @@ function providerInput(body: Record<string, unknown>) {
   const capabilities = Array.isArray(body.capabilities)
     ? body.capabilities.filter((value): value is string => typeof value === "string")
     : [];
+  const provider =
+    typeof body.provider === "string" ? body.provider.trim().toLocaleLowerCase() : "";
+  const requestedModel = typeof body.model === "string" ? body.model.trim() : "";
+  const isCohereReranker =
+    provider === "cohere" &&
+    capabilities.some((capability) => /^(rerank|reranker)$/i.test(capability));
   return {
-    provider: typeof body.provider === "string" ? body.provider.trim() : "",
-    model: typeof body.model === "string" ? body.model.trim() : "",
+    provider,
+    model: requestedModel || (isCohereReranker ? "rerank-v3.5" : ""),
     modelVersion:
       typeof body.modelVersion === "string" && body.modelVersion.trim()
         ? body.modelVersion.trim().slice(0, 80)
@@ -17,13 +23,12 @@ function providerInput(body: Record<string, unknown>) {
   };
 }
 
-export async function PATCH(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   return withPrivateApi(request, async ({ client }) => {
     const { id } = await params;
-    const input = providerInput((await request.json().catch(() => ({}))) as Record<string, unknown>);
+    const input = providerInput(
+      (await request.json().catch(() => ({}))) as Record<string, unknown>
+    );
     if (!input.provider || !input.model || !input.capabilities.length) {
       return apiResponse({ code: "INVALID_PROVIDER_CONFIGURATION" }, request, 400);
     }
@@ -51,10 +56,7 @@ export async function PATCH(
   });
 }
 
-export async function DELETE(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
   return withPrivateApi(request, async ({ client }) => {
     const { id } = await params;
     const { data, error } = await client.schema("app").rpc("remove_ai_provider", {

@@ -2,19 +2,12 @@
 import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { WorkspaceToast } from "@/components/ui/workspace-toast";
-interface Insight {
-  id: string;
-  text: string;
-  kind?: string | null;
-  status: string;
-}
 interface Entry {
   id: string;
   title?: string | null;
   entry_date?: string | null;
   related_type?: string | null;
   journal_versions?: Array<{ id: string; version: number; text: string; created_at: string }>;
-  journal_insights?: Insight[];
 }
 async function write(endpoint: string, method: "POST" | "PATCH", body: unknown) {
   const response = await fetch(endpoint, {
@@ -82,7 +75,7 @@ export function JournalWorkspace() {
             : []
       });
       target.reset();
-      setMessage("Original journal entry preserved as version 1.");
+      setMessage("Journal entry saved to your private knowledge base. Indexing queued.");
       await load();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not save entry.");
@@ -97,7 +90,7 @@ export function JournalWorkspace() {
         text: form.get("text")
       });
       setEditingId(null);
-      setMessage("New journal version preserved; the original remains unchanged.");
+      setMessage("New journal version preserved. Knowledge-base indexing queued.");
       await load();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not save revision.");
@@ -105,7 +98,7 @@ export function JournalWorkspace() {
   }
   async function remove(entry: Entry) {
     if (
-      !window.confirm("Delete this journal entry and its derived insights? This cannot be undone.")
+      !window.confirm("Delete this journal entry? Its version history will be retained privately.")
     )
       return;
     try {
@@ -117,30 +110,12 @@ export function JournalWorkspace() {
       setMessage(error instanceof Error ? error.message : "Could not delete entry.");
     }
   }
-  async function derive(entry: Entry) {
-    try {
-      await write(`/api/v1/journal-entries/${entry.id}/insight-runs`, "POST", {});
-      setMessage("Candidate insights created separately from your original text.");
-      await load();
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not derive insights.");
-    }
-  }
-  async function review(insight: Insight, decision: "approved" | "rejected") {
-    try {
-      await write(`/api/v1/journal-insights/${insight.id}/review`, "POST", { decision });
-      setMessage(`Insight ${decision}.`);
-      await load();
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not review insight.");
-    }
-  }
   return (
     <main className="workspace-page">
       <header className="workspace-heading">
         <p className="eyebrow">Private learning record</p>
         <h1>Journal</h1>
-        <p>Keep original reflections immutable and review derived learning separately.</p>
+        <p>Save private reflections directly to your knowledge base. Each version is preserved and indexed automatically.</p>
       </header>
       <section>
         <h2>New entry</h2>
@@ -183,7 +158,7 @@ export function JournalWorkspace() {
             Original notes
             <textarea name="text" rows={10} required />
           </label>
-          <button type="submit">Save immutable entry</button>
+          <button type="submit">Save to knowledge base</button>
         </form>
       </section>
       {state === "loading" ? <p role="status">Loading journal…</p> : null}
@@ -231,33 +206,10 @@ export function JournalWorkspace() {
                 </form>
               </details>
             ) : null}
-            <div className="workspace-actions">
-              <button type="button" onClick={() => void derive(entry)}>
-                Derive candidate insights
-              </button>
-            </div>
-            {entry.journal_insights?.length ? (
-              <ul className="workspace-list">
-                {entry.journal_insights.map((insight) => (
-                  <li key={insight.id}>
-                    <strong>{insight.kind ?? "theme"}</strong> · {insight.status}
-                    <p>{insight.text}</p>
-                    {insight.status === "candidate" ? (
-                      <div className="workspace-actions">
-                        <button type="button" onClick={() => void review(insight, "approved")}>
-                          Approve
-                        </button>
-                        <button type="button" onClick={() => void review(insight, "rejected")}>
-                          Reject
-                        </button>
-                      </div>
-                    ) : null}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p>No derived insights.</p>
-            )}
+            <p className="muted-copy">
+              This entry is private knowledge-base material. It is available to private career
+              synthesis and retrieval; nothing is published automatically.
+            </p>
           </section>
         );
       })}

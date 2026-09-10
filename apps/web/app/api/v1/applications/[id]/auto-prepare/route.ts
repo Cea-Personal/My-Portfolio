@@ -3,6 +3,7 @@ import { renderPdf } from "@career-os/applications";
 import { apiResponse } from "@/lib/api/response";
 import { withPrivateApi } from "@/lib/api/private";
 import { generateReasoningJson, resolveReasoningProviders } from "@/lib/server/reasoning-provider";
+import { EMPLOYER_PRIVACY_INSTRUCTION } from "@/lib/server/retrieval-policy";
 
 type Fact = { id: string; fact_type: string; statement: string };
 
@@ -123,7 +124,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const description = text(job?.current_description);
     if (!description) {
       return apiResponse(
-        { code: "JOB_DESCRIPTION_REQUIRED", detail: "This job has no description to prepare against." },
+        {
+          code: "JOB_DESCRIPTION_REQUIRED",
+          detail: "This job has no description to prepare against."
+        },
         request,
         422
       );
@@ -162,9 +166,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const privateDocuments = (documents ?? []).flatMap((document) => {
       const name = text(document.name, "Private document", 300);
       const kind = text(document.document_kind).toLowerCase();
-      if (kind !== "resume" && kind !== "cover_letter" && !/cv|resume|cover.?letter|curriculum vitae/i.test(name)) return [];
+      if (
+        kind !== "resume" &&
+        kind !== "cover_letter" &&
+        !/cv|resume|cover.?letter|curriculum vitae/i.test(name)
+      )
+        return [];
       const source = document.evidence_source_id
-        ? (sourcesById.get(String(document.evidence_source_id)) as Record<string, unknown> | undefined)
+        ? (sourcesById.get(String(document.evidence_source_id)) as
+            | Record<string, unknown>
+            | undefined)
         : undefined;
       const versions = Array.isArray(source?.evidence_versions) ? source.evidence_versions : [];
       const chunks = versions.flatMap((version) => {
@@ -174,13 +185,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       const content = chunks
         .filter((chunk) => {
           const row = chunk as Record<string, unknown>;
-          return typeof row.content === "string" && row.deleted_at == null && row.visibility !== "public";
+          return (
+            typeof row.content === "string" && row.deleted_at == null && row.visibility !== "public"
+          );
         })
         .map((chunk) => text((chunk as Record<string, unknown>).content, "", 2_500))
         .filter(Boolean)
-        .sort(
-          (left, right) => relevanceScore(right, jobTokens) - relevanceScore(left, jobTokens)
-        )
+        .sort((left, right) => relevanceScore(right, jobTokens) - relevanceScore(left, jobTokens))
         .slice(0, 10)
         .join("\n\n");
       return content ? [{ id: String(document.id), name, content }] : [];
@@ -191,8 +202,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       const providers = await resolveReasoningProviders(client, ownerId, "document_composition");
       generated = await generateReasoningJson(
         providers,
-        "Treat the supplied job description as the primary selector for every CV bullet and cover-letter point: choose evidence because it matches the role's responsibilities, requirements, tools, and outcomes; omit unrelated evidence rather than producing a generic career summary. Do not mention Thames Water or close variants; use supported work from that source only with an anonymized employer reference. Prioritize concrete data-engineering and data-platform evidence when tailoring materials. " +
-        `You are Basil Ogbonna's application writer. Return JSON only with a documents array containing exactly one resume and one cover_letter document. Tailor both to the supplied job description. Use only supplied profile, career facts, CV/cover-letter excerpts, and career snapshot; never invent employers, dates, technologies, metrics, education, authorization, sponsorship, or salary. Keep the CV concise and ATS-readable. Make the cover letter specific to the company and role. Each document must contain artifactType, title, content (plain text with headings and bullets), and evidenceIds containing only supplied career fact IDs when applicable. Private CV and cover-letter excerpts are also valid grounding even when no Career Brain fact IDs exist. If evidence is insufficient, say so in content instead of fabricating it.`,
+        "Treat the supplied job description as the primary selector for every CV bullet and cover-letter point: choose evidence because it matches the role's responsibilities, requirements, tools, and outcomes; omit unrelated evidence rather than producing a generic career summary. " +
+          `${EMPLOYER_PRIVACY_INSTRUCTION} Prioritize concrete data-engineering and data-platform evidence when tailoring materials. ` +
+          `You are Basil Ogbonna's application writer. Return JSON only with a documents array containing exactly one resume and one cover_letter document. Tailor both to the supplied job description. Use only supplied profile, career facts, CV/cover-letter excerpts, and career snapshot; never invent employers, dates, technologies, metrics, education, authorization, sponsorship, or salary. Keep the CV concise and ATS-readable. Make the cover letter specific to the company and role. Each document must contain artifactType, title, content (plain text with headings and bullets), and evidenceIds containing only supplied career fact IDs when applicable. Private CV and cover-letter excerpts are also valid grounding even when no Career Brain fact IDs exist. If evidence is insufficient, say so in content instead of fabricating it.`,
         {
           job: {
             title: text(job?.canonical_title, "Selected role", 300),
@@ -210,7 +222,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
             jobDescriptionIsPrimarySelector: true,
             onlyIncludeEvidenceRelevantToRole: true,
             prioritizeDataEngineering: true,
-            instruction: "Use the job description to decide which private evidence belongs in each document; omit unrelated experience rather than filling space."
+            instruction:
+              "Use the job description to decide which private evidence belongs in each document; omit unrelated experience rather than filling space."
           },
           careerFacts: rankedFacts,
           careerBrain: text(snapshotResult.data?.content, "", 20_000),
@@ -220,17 +233,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         { task: "document_composition" }
       );
     } catch (error) {
-      const detail = error instanceof Error ? error.message.slice(0, 500) : "APPLICATION_WRITER_FAILED";
-      return apiResponse(
-        { code: "APPLICATION_KIT_GENERATION_FAILED", detail },
-        request,
-        422
-      );
+      const detail =
+        error instanceof Error ? error.message.slice(0, 500) : "APPLICATION_WRITER_FAILED";
+      return apiResponse({ code: "APPLICATION_KIT_GENERATION_FAILED", detail }, request, 422);
     }
 
-    const candidates = Array.isArray(generated.output.documents)
-      ? generated.output.documents
-      : [];
+    const candidates = Array.isArray(generated.output.documents) ? generated.output.documents : [];
     const validFactIds = new Set(facts.map((fact) => fact.id));
     const documentsToSave = candidates.flatMap((value) => {
       if (!value || typeof value !== "object") return [];
@@ -239,24 +247,39 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       const artifactType =
         artifactTypeValue === "cover_letter" || artifactTypeValue === "coverletter"
           ? "cover_letter"
-          : artifactTypeValue === "resume" || artifactTypeValue === "cv" || artifactTypeValue === "curriculum_vitae"
+          : artifactTypeValue === "resume" ||
+              artifactTypeValue === "cv" ||
+              artifactTypeValue === "curriculum_vitae"
             ? "resume"
             : null;
       const content = text(row.content, "", 40_000);
       if (!artifactType || !content) return [];
       const evidenceIds = Array.isArray(row.evidenceIds)
-        ? row.evidenceIds.filter((value): value is string => typeof value === "string" && validFactIds.has(value)).slice(0, 100)
+        ? row.evidenceIds
+            .filter(
+              (value): value is string => typeof value === "string" && validFactIds.has(value)
+            )
+            .slice(0, 100)
         : [];
-      return [{
-        artifactType,
-        title: text(row.title, artifactType === "resume" ? "Tailored CV" : "Tailored cover letter", 200),
-        content,
-        evidenceIds
-      }];
+      return [
+        {
+          artifactType,
+          title: text(
+            row.title,
+            artifactType === "resume" ? "Tailored CV" : "Tailored cover letter",
+            200
+          ),
+          content,
+          evidenceIds
+        }
+      ];
     });
     if (!documentsToSave.length) {
       return apiResponse(
-        { code: "APPLICATION_KIT_EMPTY", detail: "The application writer returned no document content." },
+        {
+          code: "APPLICATION_KIT_EMPTY",
+          detail: "The application writer returned no document content."
+        },
         request,
         422
       );
@@ -268,7 +291,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return apiResponse(
         {
           code: "APPLICATION_KIT_SOURCE_REQUIRED",
-          detail: "Add or index a CV, cover letter, or Career Brain source before preparing this kit."
+          detail:
+            "Add or index a CV, cover letter, or Career Brain source before preparing this kit."
         },
         request,
         422
@@ -290,21 +314,36 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       if (existing.error) throw existing.error;
       let artifactId = existing.data?.id as string | undefined;
       if (!artifactId) {
-        const artifact = await client.schema("app").from("generated_artifacts").insert({
-          owner_id: ownerId,
-          application_id: applicationId,
-          artifact_type: document.artifactType,
-          title: document.title
-        }).select("id").single();
-        if (artifact.error || !artifact.data) throw artifact.error ?? new Error("ARTIFACT_CREATE_FAILED");
+        const artifact = await client
+          .schema("app")
+          .from("generated_artifacts")
+          .insert({
+            owner_id: ownerId,
+            application_id: applicationId,
+            artifact_type: document.artifactType,
+            title: document.title
+          })
+          .select("id")
+          .single();
+        if (artifact.error || !artifact.data)
+          throw artifact.error ?? new Error("ARTIFACT_CREATE_FAILED");
         artifactId = artifact.data.id;
       }
-      const previous = await client.schema("app").from("artifact_versions").select("version").eq("artifact_id", artifactId).order("version", { ascending: false }).limit(1).maybeSingle();
+      const previous = await client
+        .schema("app")
+        .from("artifact_versions")
+        .select("version")
+        .eq("artifact_id", artifactId)
+        .order("version", { ascending: false })
+        .limit(1)
+        .maybeSingle();
       if (previous.error) throw previous.error;
       const version = typeof previous.data?.version === "number" ? previous.data.version + 1 : 1;
       const rendered = renderPdf(document.content, "technical");
       const storageKey = `${ownerId}/${artifactId}/${String(version)}.pdf`;
-      const upload = await client.storage.from("private-artifact").upload(storageKey, rendered.bytes, { contentType: "application/pdf", upsert: false });
+      const upload = await client.storage
+        .from("private-artifact")
+        .upload(storageKey, rendered.bytes, { contentType: "application/pdf", upsert: false });
       if (upload.error) throw upload.error;
       const manifest = {
         artifactType: document.artifactType,
@@ -314,25 +353,54 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         careerFactEvidenceIds: document.evidenceIds,
         privateSourceDocuments: privateDocuments.map((source) => source.name)
       };
-      const inserted = await client.schema("app").from("artifact_versions").insert({
-        artifact_id: artifactId,
-        version,
-        status: "draft",
-        storage_key: storageKey,
-        media_type: "application/pdf",
-        binary_hash: rendered.hash,
-        content_manifest_hash: createHash("sha256").update(JSON.stringify(manifest)).digest("hex"),
-        renderer_version: rendered.rendererVersion,
-        evidence_ids: document.evidenceIds,
-        structured_content: manifest,
-        provenance: { applicationId, jobId: application.job_id, generatedAt: new Date().toISOString(), provider: generated.provider.provider, model: generated.provider.model }
-      }).select("id").single();
-      if (inserted.error || !inserted.data) throw inserted.error ?? new Error("ARTIFACT_VERSION_CREATE_FAILED");
+      const inserted = await client
+        .schema("app")
+        .from("artifact_versions")
+        .insert({
+          artifact_id: artifactId,
+          version,
+          status: "draft",
+          storage_key: storageKey,
+          media_type: "application/pdf",
+          binary_hash: rendered.hash,
+          content_manifest_hash: createHash("sha256")
+            .update(JSON.stringify(manifest))
+            .digest("hex"),
+          renderer_version: rendered.rendererVersion,
+          evidence_ids: document.evidenceIds,
+          structured_content: manifest,
+          provenance: {
+            applicationId,
+            jobId: application.job_id,
+            generatedAt: new Date().toISOString(),
+            provider: generated.provider.provider,
+            model: generated.provider.model
+          }
+        })
+        .select("id")
+        .single();
+      if (inserted.error || !inserted.data)
+        throw inserted.error ?? new Error("ARTIFACT_VERSION_CREATE_FAILED");
       if (!artifactId) throw new Error("ARTIFACT_CREATE_FAILED");
-      const current = await client.schema("app").from("generated_artifacts").update({ title: document.title, current_version_id: inserted.data.id }).eq("id", artifactId).eq("owner_id", ownerId);
+      const current = await client
+        .schema("app")
+        .from("generated_artifacts")
+        .update({ title: document.title, current_version_id: inserted.data.id })
+        .eq("id", artifactId)
+        .eq("owner_id", ownerId);
       if (current.error) throw current.error;
       saved.push({ artifactType: document.artifactType, artifactId, versionId: inserted.data.id });
     }
-    return apiResponse({ applicationId, status: saved.length ? "ready" : "needs_evidence", generatedCount: saved.length, artifacts: saved, provider: generated.provider.model }, request, 201);
+    return apiResponse(
+      {
+        applicationId,
+        status: saved.length ? "ready" : "needs_evidence",
+        generatedCount: saved.length,
+        artifacts: saved,
+        provider: generated.provider.model
+      },
+      request,
+      201
+    );
   });
 }

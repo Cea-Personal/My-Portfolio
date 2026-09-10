@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { apiResponse } from "@/lib/api/response";
 import { withPrivateApi } from "@/lib/api/private";
-import { requestCareerBrainRefresh } from "@/inngest/career-brain-events";
+import { requestJournalKnowledgeIndex } from "@/inngest/journal-knowledge-index";
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   return withPrivateApi(request, async ({ client, ownerId }) => {
@@ -53,9 +53,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       .eq("owner_id", ownerId)
       .is("deleted_at", null);
     if (update.error) throw update.error;
-    await requestCareerBrainRefresh(ownerId, "journal", `${id}:${contentHash}`).catch(
-      () => undefined
-    );
+    await requestJournalKnowledgeIndex(ownerId, id, contentHash).catch(() => undefined);
     return apiResponse({ version: version.data }, request);
   });
 }

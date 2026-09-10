@@ -1,6 +1,45 @@
 import { loadPublicPortfolio } from "@/lib/api/public-data";
+import { projectYoutubeEmbedUrl, youtubeEmbedUrl } from "@/lib/portfolio-media";
 
 export const dynamic = "force-dynamic";
+
+const text = (value: unknown, fallback = "") =>
+  typeof value === "string" && value.trim() ? value.trim() : fallback;
+
+const record = (value: unknown): Record<string, unknown> =>
+  value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+
+const strings = (value: unknown): string[] =>
+  Array.isArray(value)
+    ? value
+        .filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+        .map((item) => item.trim())
+    : [];
+
+function safeExternalUrl(value: unknown): string {
+  const candidate = text(value);
+  if (!candidate) return "";
+  try {
+    const url = new URL(candidate);
+    return url.protocol === "https:" || url.protocol === "http:" ? url.toString() : "";
+  } catch {
+    return "";
+  }
+}
+
+function firstImage(media: unknown): { url: string; alt: string } | null {
+  if (!Array.isArray(media)) return null;
+  for (const item of media) {
+    const itemRecord = record(item);
+    const value = typeof item === "string" ? item : itemRecord.url ?? itemRecord.src;
+    const url = safeExternalUrl(value);
+    if (!url || youtubeEmbedUrl(url)) continue;
+    return { url, alt: text(itemRecord.alt, "Project cover image") };
+  }
+  return null;
+}
 
 export default async function ProjectPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -10,25 +49,50 @@ export default async function ProjectPage({ params }: { params: Promise<{ slug: 
   );
   if (!project) {
     return (
-      <main>
+      <main className="project-detail-page">
         <h1>Project unavailable</h1>
         <p>This project is not part of the active public projection.</p>
       </main>
     );
   }
-  const media = Array.isArray(project.sanitized_media)
-    ? project.sanitized_media.filter((item): item is Record<string, unknown> =>
-        Boolean(item && typeof item === "object")
-      )
-    : [];
-  const citations = Array.isArray(project.public_citations)
-    ? project.public_citations.filter((item): item is Record<string, unknown> =>
-        Boolean(item && typeof item === "object")
-      )
-    : [];
+
+  const structured = record(project.structured_content);
+  const title = text(project.title, "Project");
+  const summary = text(project.public_summary, text(structured.summary, "A selected project."));
+  const description = text(structured.description, summary);
+  const problem = text(structured.problem);
+  const approach = text(structured.approach);
+  const role = text(structured.role, text(project.subtitle));
+  const outcome = text(structured.outcome);
+  const points = Array.from(
+    new Set([
+      ...strings(structured.highlights),
+      ...strings(structured.points),
+      ...strings(structured.experience),
+      ...strings(structured.outcomes)
+    ])
+  ).slice(0, 12);
+  const process = strings(structured.process).slice(0, 12);
+  const technologies = Array.from(
+    new Set([...strings(project.display_technologies), ...strings(structured.technologies)])
+  );
+  const videoUrl = projectYoutubeEmbedUrl(project.sanitized_media, project.structured_content);
+  const coverImage = firstImage(project.sanitized_media);
+  const links = [
+    { label: "Live project", url: safeExternalUrl(structured.liveUrl) },
+    { label: "GitHub repository", url: safeExternalUrl(structured.githubUrl) },
+    { label: "Project link", url: safeExternalUrl(structured.url ?? structured.link) }
+  ].filter(
+    (link, index, all) =>
+      Boolean(link.url) && all.findIndex((candidate) => candidate.url === link.url) === index
+  );
+  const videoWithAutoplay = videoUrl
+    ? `${videoUrl}${videoUrl.includes("?") ? "&" : "?"}autoplay=1&mute=1`
+    : null;
+
   return (
     <main className="project-detail-page">
-      <p>
+      <p className="project-detail-back">
         <a href="/#projects">← Back to selected projects</a>
       </p>
       {snapshot.stale ? (
@@ -36,62 +100,99 @@ export default async function ProjectPage({ params }: { params: Promise<{ slug: 
           Showing the latest approved project snapshot while live content reconnects.
         </p>
       ) : null}
-      <h1>{typeof project.title === "string" ? project.title : "Project"}</h1>
-      {typeof project.subtitle === "string" ? <p>{project.subtitle}</p> : null}
-      <p>{typeof project.public_summary === "string" ? project.public_summary : ""}</p>
-      {typeof project.display_metric === "string" ? <p>{project.display_metric}</p> : null}
-      {Array.isArray(project.display_technologies) && project.display_technologies.length ? (
-        <section aria-labelledby="project-tools">
-          <h2 id="project-tools">Tools and technologies</h2>
-          <ul>
-            {project.display_technologies.map((technology) => (
-              <li key={String(technology)}>{String(technology)}</li>
-            ))}
-          </ul>
+
+      <header className="project-detail-hero">
+        {videoWithAutoplay ? (
+          <div className="project-detail-hero-video">
+            <iframe
+              src={videoWithAutoplay}
+              title={`${title} project demonstration`}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowFullScreen
+            />
+          </div>
+        ) : coverImage ? (
+          <figure className="project-detail-hero-image">
+            <img src={coverImage.url} alt={coverImage.alt || `${title} cover`} />
+          </figure>
+        ) : null}
+        <div className="project-detail-hero-copy">
+          <p className="eyebrow">{text(project.career_stage, "Selected project")}</p>
+          <h1>{title}</h1>
+          {role ? <p className="project-detail-role">{role}</p> : null}
+          <p className="project-detail-summary">{summary}</p>
+          {links.length ? (
+            <nav className="project-detail-links" aria-label="Project links">
+              {links.map((link) => (
+                <a key={link.url} href={link.url} rel="noreferrer" target="_blank">
+                  {link.label} <span aria-hidden="true">↗</span>
+                </a>
+              ))}
+            </nav>
+          ) : null}
+        </div>
+      </header>
+
+      <div className="project-detail-sections">
+        <section className="project-detail-section project-detail-overview" aria-labelledby="project-overview">
+          <p className="eyebrow">01 / The work</p>
+          <h2 id="project-overview">What this project set out to solve.</h2>
+          <p>{description}</p>
+          {problem ? (
+            <div>
+              <h3>The problem</h3>
+              <p>{problem}</p>
+            </div>
+          ) : null}
+          {approach ? (
+            <div>
+              <h3>The approach</h3>
+              <p>{approach}</p>
+            </div>
+          ) : null}
+          {outcome ? (
+            <div>
+              <h3>Outcome</h3>
+              <p>{outcome}</p>
+            </div>
+          ) : null}
         </section>
-      ) : null}
-      {media.length ? (
-        <section aria-labelledby="project-links">
-          <h2 id="project-links">Explore the work</h2>
-          <ul>
-            {media.map((item, index) => {
-              const url =
-                typeof item.url === "string"
-                  ? item.url
-                  : typeof item.href === "string"
-                    ? item.href
-                    : null;
-              const label =
-                typeof item.label === "string" ? item.label : `Project link ${String(index + 1)}`;
-              return url ? (
-                <li key={`${url}-${String(index)}`}>
-                  <a href={url} rel="noreferrer">
-                    {label} ↗
-                  </a>
+
+        {points.length ? (
+          <section className="project-detail-section" aria-labelledby="project-points">
+            <p className="eyebrow">02 / Project notes</p>
+            <h2 id="project-points">The decisions and results worth remembering.</h2>
+            <ul className="project-detail-list">
+              {points.map((point) => <li key={point}>{point}</li>)}
+            </ul>
+          </section>
+        ) : null}
+
+        {process.length ? (
+          <section className="project-detail-section" aria-labelledby="project-process">
+            <p className="eyebrow">03 / How it was built</p>
+            <h2 id="project-process">From first constraint to working system.</h2>
+            <ol className="project-detail-process">
+              {process.map((step, index) => (
+                <li key={step}>
+                  <span>{String(index + 1).padStart(2, "0")}</span>
+                  <p>{step}</p>
                 </li>
-              ) : null;
-            })}
-          </ul>
-        </section>
-      ) : null}
-      {citations.length ? (
-        <section aria-labelledby="project-evidence">
-          <h2 id="project-evidence">Facts and contribution</h2>
-          <ul>
-            {citations.map((item, index) => (
-              <li
-                key={
-                  typeof item.public_evidence_id === "string"
-                    ? item.public_evidence_id
-                    : `evidence-${String(index)}`
-                }
-              >
-                Published fact reference
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
+              ))}
+            </ol>
+          </section>
+        ) : null}
+
+        {technologies.length ? (
+          <section className="project-detail-section" aria-labelledby="project-skills">
+            <p className="eyebrow">04 / Skills and tools</p>
+            <h2 id="project-skills">The technical choices behind it.</h2>
+            <ul className="project-detail-tools">
+              {technologies.map((technology) => <li key={technology}>{technology}</li>)}
+            </ul>
+          </section>
+        ) : null}
+      </div>
     </main>
   );
 }

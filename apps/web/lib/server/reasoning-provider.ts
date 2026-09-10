@@ -172,6 +172,28 @@ function parseJsonObject(content: string): Record<string, unknown> {
   return lastObject;
 }
 
+function isTimeoutError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  return /(?:timeout|timed\s*out|aborted)/i.test(message);
+}
+
+/** Defense in depth for providers that ignore the employer privacy instruction. */
+export function anonymizeEmployerReferences(value: unknown): unknown {
+  if (typeof value === "string") {
+    return value.replace(
+      /\bthames[\s-]+water(?:\s+(?:plc|limited|ltd))?\b/gi,
+      "a utilities organisation"
+    );
+  }
+  if (Array.isArray(value)) return value.map((item) => anonymizeEmployerReferences(item));
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [key, anonymizeEmployerReferences(item)])
+    );
+  }
+  return value;
+}
+
 export async function generateReasoningJson(
   providers: ResolvedReasoningProvider[],
   system: string,
@@ -198,7 +220,10 @@ export async function generateReasoningJson(
             { system, input },
             { timeoutMs: provider.timeoutMs }
           );
-          const output = parseJsonObject(generated.text);
+          const output = anonymizeEmployerReferences(parseJsonObject(generated.text)) as Record<
+            string,
+            unknown
+          >;
           return {
             output,
             provider: { ...provider, model: generated.model },
@@ -241,7 +266,10 @@ export async function generateReasoningJson(
         };
         const content = payload.choices?.[0]?.message?.content;
         if (!content) throw new Error("AI_PROVIDER_RESPONSE_INVALID");
-        const output = parseJsonObject(content);
+        const output = anonymizeEmployerReferences(parseJsonObject(content)) as Record<
+          string,
+          unknown
+        >;
         return {
           output,
           provider,
@@ -251,6 +279,12 @@ export async function generateReasoningJson(
         };
       } catch (error) {
         lastError = error;
+        // Retrying a bounded native-agent request after its deadline only
+        // multiplies the outage (and can make the HTTP route time out before
+        // a configured fallback provider is reached). Move directly to the
+        // next provider on timeout; transient non-timeout failures retain the
+        // configured retry behavior.
+        if (isTimeoutError(error)) break;
       }
     }
   }

@@ -21,6 +21,18 @@ interface Selection {
   public_eligible: boolean;
 }
 
+interface ProjectMedia {
+  id: string;
+  project_key: string;
+  source_type: "uploaded" | "ai_generated";
+  status: "draft" | "approved" | "rejected" | "superseded";
+  public_url: string;
+  alt_text: string;
+  provider?: string | null;
+  model?: string | null;
+  created_at: string;
+}
+
 const value = (item: CareerBrainItem, key: string) =>
   typeof item[key] === "string" ? item[key] : "";
 const list = (item: CareerBrainItem, key: string) =>
@@ -66,6 +78,9 @@ export function CareerBrain() {
   const [role, setRole] = useState("");
   const [period, setPeriod] = useState("");
   const [saving, setSaving] = useState(false);
+  const [projectMedia, setProjectMedia] = useState<Record<string, ProjectMedia[]>>({});
+  const [projectImageDirection, setProjectImageDirection] = useState<Record<string, string>>({});
+  const [projectImageReferences, setProjectImageReferences] = useState<Record<string, File[]>>({});
 
   const applyPayload = useCallback(
     (payload: { snapshot?: Snapshot | null; selections?: Selection[] }) => {
@@ -105,7 +120,7 @@ export function CareerBrain() {
         return;
       }
       applyPayload(payload.data ?? {});
-      if (!quiet) setNotice("Career Brain regenerated from the latest private evidence.");
+      if (!quiet) setNotice("Career Brain regenerated from the latest career information.");
     },
     [applyPayload]
   );
@@ -192,8 +207,160 @@ export function CareerBrain() {
   }
 
   const content = snapshot?.content;
+  useEffect(() => {
+    const projects = content?.projects ?? [];
+    if (!projects.length) {
+      setProjectMedia({});
+      return;
+    }
+    let active = true;
+    void Promise.all(
+      projects.map(async (project) => {
+        const response = await fetch(
+          `/api/v1/portfolio/projects/${encodeURIComponent(project.id)}/media`,
+          { cache: "no-store" }
+        );
+        if (!response.ok) return [project.id, []] as const;
+        const payload = (await response.json().catch(() => ({}))) as {
+          data?: { media?: ProjectMedia[] };
+        };
+        return [project.id, payload.data?.media ?? []] as const;
+      })
+    ).then((entries) => {
+      if (active) {
+        setProjectMedia(
+          Object.fromEntries(entries) as Record<string, ProjectMedia[]>
+        );
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [content]);
+
+  async function refreshProjectMedia(projectKey: string) {
+    const response = await fetch(
+      `/api/v1/portfolio/projects/${encodeURIComponent(projectKey)}/media`,
+      { cache: "no-store" }
+    );
+    if (!response.ok) throw new Error("Project media could not be loaded.");
+    const payload = (await response.json()) as { data?: { media?: ProjectMedia[] } };
+    setProjectMedia((current) => ({ ...current, [projectKey]: payload.data?.media ?? [] }));
+  }
+
+  async function generateProjectCover(item: CareerBrainItem) {
+    const busy = `media:${item.id}`;
+    setBusyKey(busy);
+    try {
+      const body = new FormData();
+      const direction = projectImageDirection[item.id]?.trim();
+      if (direction) body.set("direction", direction);
+      for (const reference of projectImageReferences[item.id] ?? []) {
+        body.append("referenceImages", reference);
+      }
+      const response = await fetch(
+        `/api/v1/portfolio/projects/${encodeURIComponent(item.id)}/media/generate`,
+        {
+          method: "POST",
+          headers: { "idempotency-key": `project-cover-${item.id}-${crypto.randomUUID()}` },
+          body
+        }
+      );
+      const payload = (await response.json().catch(() => ({}))) as {
+        data?: { detail?: string; code?: string };
+      };
+      if (!response.ok)
+        throw new Error(payload.data?.detail ?? payload.data?.code ?? "Image generation failed.");
+      await refreshProjectMedia(item.id);
+      setNotice("Cover generated as a private draft. Approve it when you are happy with it.");
+      setProjectImageReferences((current) => ({ ...current, [item.id]: [] }));
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Image generation failed.");
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
+  async function uploadProjectCover(item: CareerBrainItem, file: File) {
+    const busy = `media:${item.id}`;
+    setBusyKey(busy);
+    try {
+      const body = new FormData();
+      body.set("file", file);
+      body.set("altText", `${value(item, "title")} project cover`);
+      const response = await fetch(
+        `/api/v1/portfolio/projects/${encodeURIComponent(item.id)}/media`,
+        {
+          method: "POST",
+          headers: { "idempotency-key": `project-upload-${item.id}-${crypto.randomUUID()}` },
+          body
+        }
+      );
+      const payload = (await response.json().catch(() => ({}))) as {
+        data?: { detail?: string; code?: string };
+      };
+      if (!response.ok)
+        throw new Error(payload.data?.detail ?? payload.data?.code ?? "Image upload failed.");
+      await refreshProjectMedia(item.id);
+      setNotice("Image uploaded as a private draft. Approve it to use it in the portfolio.");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Image upload failed.");
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
+  async function approveProjectCover(item: CareerBrainItem, mediaId: string) {
+    const busy = `media:${item.id}`;
+    setBusyKey(busy);
+    try {
+      const response = await fetch(
+        `/api/v1/portfolio/projects/${encodeURIComponent(item.id)}/media/${mediaId}/approve`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "idempotency-key": `project-approve-${mediaId}-${crypto.randomUUID()}`
+          },
+          body: JSON.stringify({})
+        }
+      );
+      if (!response.ok) throw new Error("The project image could not be approved.");
+      await refreshProjectMedia(item.id);
+      setNotice("Project cover approved. Build and activate a portfolio snapshot to publish it.");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "The project image could not be approved.");
+    } finally {
+      setBusyKey(null);
+    }
+  }
   const technicalSkills = content
     ? Array.from(new Map(content.technicalSkills.map((item) => [item.id, item])).values())
+    : [];
+  const projectCategories = [
+    "Software",
+    "AI software engineering",
+    "Data platform",
+    "Data engineering",
+    "AI engineering",
+    "AI data engineering"
+  ];
+  const projectGroups = content
+    ? projectCategories
+        .map((category) => ({
+          category,
+          items: content.projects.filter((item) => value(item, "category") === category)
+        }))
+        .filter((group) => group.items.length)
+    : [];
+  const profileStats = content
+    ? [
+        { label: "Roles", value: content.experiences.length },
+        { label: "Projects", value: content.projects.length },
+        { label: "Credentials", value: content.education.length + content.certifications.length },
+        { label: "Skill groups", value: technicalSkills.length },
+        { label: "Selected", value: selections.filter((item) => item.public_eligible).length }
+      ]
     : [];
   return (
     <main className="workspace-page career-brain" aria-labelledby="career-brain-title">
@@ -229,6 +396,15 @@ export function CareerBrain() {
         ) : null}
       </header>
 
+      <nav className="career-brain-index" aria-label="Career Brain sections">
+        <a href="#career-profiles">Profiles</a>
+        <a href="#career-experiences">Experience</a>
+        <a href="#career-projects">Projects</a>
+        <a href="#career-credentials">Credentials</a>
+        <a href="#career-skills">Skills</a>
+        <a href="#career-add-source">Add source</a>
+      </nav>
+
       <WorkspaceToast
         message={notice}
         onDismiss={() => {
@@ -243,15 +419,36 @@ export function CareerBrain() {
       ) : null}
 
       {content ? (
+        <section className="career-brain-overview" aria-label="Career Brain overview">
+          <div>
+            <p className="eyebrow">Current profile</p>
+            <h2>A living view of your work.</h2>
+            <p>
+              Review the synthesized profile below, then choose the parts that should move into the
+              next public portfolio snapshot.
+            </p>
+          </div>
+          <dl>
+            {profileStats.map((stat) => (
+              <div key={stat.label}>
+                <dt>{stat.label}</dt>
+                <dd>{stat.value}</dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+      ) : null}
+
+      {content ? (
         <div className="career-synthesis">
-          <section className="career-narratives" aria-labelledby="career-narratives-title">
+          <section id="career-profiles" className="career-narratives" aria-labelledby="career-narratives-title">
             <header>
               <p className="eyebrow">Profiles</p>
               <h2 id="career-narratives-title">Your story, shaped for its destination.</h2>
             </header>
             <article>
               <h3>CV profile summary</h3>
-              <p>{content.cvSummary || "More evidence is needed to form a CV summary."}</p>
+              <p>{content.cvSummary || "More career detail is needed to form a CV summary."}</p>
               <button
                 type="button"
                 onClick={() => void navigator.clipboard.writeText(content.cvSummary)}
@@ -262,7 +459,8 @@ export function CareerBrain() {
             <article>
               <h3>Portfolio profile summary</h3>
               <p>
-                {content.portfolioSummary || "More evidence is needed to form a portfolio summary."}
+                {content.portfolioSummary ||
+                  "More career detail is needed to form a portfolio summary."}
               </p>
               <PublishChoice
                 itemKey="profile:portfolio"
@@ -274,7 +472,7 @@ export function CareerBrain() {
             </article>
             <article>
               <h3>About me</h3>
-              <p>{content.about || "More evidence is needed to form an About narrative."}</p>
+              <p>{content.about || "More career detail is needed to form an About narrative."}</p>
               <PublishChoice
                 itemKey="profile:about"
                 itemType="about"
@@ -285,14 +483,15 @@ export function CareerBrain() {
             </article>
           </section>
 
-          <section aria-labelledby="career-experiences-title">
+          <section id="career-experiences" aria-labelledby="career-experiences-title">
             <header>
               <p className="eyebrow">Experience</p>
               <h2 id="career-experiences-title">Roles, organisations, and the work within them.</h2>
               <p>
                 Repeated CV entries for the same role are merged. For each role, Career Brain keeps
-                the strongest six or seven verified responsibility, achievement, and impact points,
-                ranked against your recent target job descriptions.
+                up to 10 detailed, de-duplicated experience sentences that combine responsibilities,
+                achievements, impacts, and outcomes, ranked against your recent target job
+                descriptions.
               </p>
             </header>
             <div className="career-synthesis-list">
@@ -308,25 +507,26 @@ export function CareerBrain() {
                     <em>{value(item, "summary")}</em>
                   </summary>
                   <div className="career-synthesis-detail">
-                    {(["responsibilities", "achievements", "impact", "projects"] as const).map(
-                      (key) =>
-                        list(item, key).length ? (
-                          <section key={key}>
-                            <h3>
-                              {key === "achievements"
-                                ? "Achievements"
-                                : key === "impact"
-                                  ? "Impact and outcomes"
-                                  : key.charAt(0).toUpperCase() + key.slice(1)}
-                            </h3>
-                            <ul>
-                              {list(item, key).map((entry) => (
-                                <li key={entry}>{entry}</li>
-                              ))}
-                            </ul>
-                          </section>
-                        ) : null
-                    )}
+                    {list(item, "experience").length ? (
+                      <section>
+                        <h3>Experience</h3>
+                        <ul>
+                          {list(item, "experience").map((entry) => (
+                            <li key={entry}>{entry}</li>
+                          ))}
+                        </ul>
+                      </section>
+                    ) : null}
+                    {list(item, "projects").length ? (
+                      <section>
+                        <h3>Projects carried out in this role</h3>
+                        <ul>
+                          {list(item, "projects").map((entry) => (
+                            <li key={entry}>{entry}</li>
+                          ))}
+                        </ul>
+                      </section>
+                    ) : null}
                     {list(item, "technologies").length ? (
                       <p>
                         <strong>Technical skills:</strong> {list(item, "technologies").join(", ")}
@@ -355,55 +555,163 @@ export function CareerBrain() {
             </div>
           </section>
 
-          <section aria-labelledby="career-projects-title">
+          <section id="career-projects" aria-labelledby="career-projects-title">
             <header>
               <p className="eyebrow">Selected projects</p>
-              <h2 id="career-projects-title">Systems and ideas with evidence behind them.</h2>
+              <h2 id="career-projects-title">Systems and ideas with a story behind them.</h2>
             </header>
             <div className="career-editorial-grid">
-              {content.projects.map((item) => (
-                <article key={item.id}>
-                  <h3>{value(item, "title")}</h3>
-                  <p>{value(item, "summary")}</p>
-                  {value(item, "outcome") ? (
-                    <p>
-                      <strong>Outcome:</strong> {value(item, "outcome")}
-                    </p>
-                  ) : null}
+              {projectGroups.map((group) => (
+                <section key={group.category} className="career-project-group">
+                  <h3>{group.category}</h3>
+                  {group.items.map((item) => (
+                    <article key={item.id}>
+                      <h4>{value(item, "title")}</h4>
+                      {value(item, "role") ? <small>{value(item, "role")}</small> : null}
+                      <p>{value(item, "summary")}</p>
+                      {value(item, "outcome") ? (
+                        <p>
+                          <strong>Outcome:</strong> {value(item, "outcome")}
+                        </p>
+                      ) : null}
                   {list(item, "process").length ? (
-                    <div>
-                      <strong>How it was built</strong>
-                      <ul>
-                        {list(item, "process").map((entry) => (
-                          <li key={entry}>{entry}</li>
-                        ))}
-                      </ul>
-                    </div>
+                        <div>
+                          <strong>How it was built</strong>
+                          <ul>
+                            {list(item, "process").map((entry) => (
+                              <li key={entry}>{entry}</li>
+                            ))}
+                          </ul>
+                        </div>
                   ) : null}
                   <small>{list(item, "technologies").join(" · ")}</small>
-                  {list(item, "evidence").length ? (
-                    <details>
-                      <summary>Source details</summary>
-                      <ul>
-                        {list(item, "evidence").map((entry) => (
-                          <li key={entry}>{entry}</li>
+                  {(() => {
+                    const media = projectMedia[item.id] ?? [];
+                    const approved = media.find((asset) => asset.status === "approved");
+                    const drafts = media.filter((asset) => asset.status === "draft");
+                    const mediaBusy = busyKey === `media:${item.id}`;
+                    const references = projectImageReferences[item.id] ?? [];
+                    return (
+                      <section className="career-project-media" aria-label="Project cover image">
+                        {approved ? (
+                          <img
+                            src={approved.public_url}
+                            alt={approved.alt_text || `${value(item, "title")} project cover`}
+                            loading="lazy"
+                          />
+                        ) : (
+                          <p>No approved cover image yet.</p>
+                        )}
+                        <label>
+                          Optional art direction
+                          <textarea
+                            value={projectImageDirection[item.id] ?? ""}
+                            onChange={(event) => {
+                              setProjectImageDirection((current) => ({
+                                ...current,
+                                [item.id]: event.target.value
+                              }));
+                            }}
+                            placeholder="For example: use a quiet editorial composition with a visible data-flow motif and deep teal accents."
+                            rows={2}
+                            maxLength={1200}
+                          />
+                        </label>
+                        <label>
+                          Optional reference images
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            multiple
+                            disabled={mediaBusy}
+                            onChange={(event) => {
+                              const files = Array.from(event.target.files ?? []).slice(0, 4);
+                              event.target.value = "";
+                              setProjectImageReferences((current) => ({
+                                ...current,
+                                [item.id]: files
+                              }));
+                            }}
+                          />
+                          <small>Up to 4 JPEG, PNG, or WebP files; used as visual references, not copied.</small>
+                        </label>
+                        {references.length ? (
+                          <small>
+                            References: {references.map((file) => file.name).join(" · ")}
+                          </small>
+                        ) : null}
+                        <div className="workspace-actions">
+                          <button
+                            type="button"
+                            disabled={mediaBusy}
+                            onClick={() => void generateProjectCover(item)}
+                          >
+                            {mediaBusy ? "Working…" : approved ? "Regenerate cover" : "Generate cover"}
+                          </button>
+                          <label className="button-secondary">
+                            Upload cover
+                            <input
+                              type="file"
+                              accept="image/jpeg,image/png,image/webp"
+                              hidden
+                              disabled={mediaBusy}
+                              onChange={(event) => {
+                                const file = event.target.files?.[0];
+                                event.target.value = "";
+                                if (file) void uploadProjectCover(item, file);
+                              }}
+                            />
+                          </label>
+                        </div>
+                        {drafts.map((asset) => (
+                          <div key={asset.id} className="career-project-media-draft">
+                            <img
+                              src={asset.public_url}
+                              alt={asset.alt_text || `${value(item, "title")} generated draft`}
+                              loading="lazy"
+                            />
+                            <span>
+                              {asset.source_type === "ai_generated"
+                                ? `Generated${asset.model ? ` with ${asset.model}` : ""}`
+                                : "Uploaded draft"}
+                            </span>
+                            <button
+                              type="button"
+                              disabled={mediaBusy}
+                              onClick={() => void approveProjectCover(item, asset.id)}
+                            >
+                              Approve this cover
+                            </button>
+                          </div>
                         ))}
-                      </ul>
-                    </details>
-                  ) : null}
-                  <PublishChoice
-                    itemKey={item.id}
-                    itemType="project"
-                    selected={selected(item.id)}
-                    busy={busyKey === item.id}
-                    onChange={selectForPortfolio}
-                  />
-                </article>
+                      </section>
+                    );
+                  })()}
+                  {list(item, "evidence").length ? (
+                        <details>
+                          <summary>Source details</summary>
+                          <ul>
+                            {list(item, "evidence").map((entry) => (
+                              <li key={entry}>{entry}</li>
+                            ))}
+                          </ul>
+                        </details>
+                      ) : null}
+                      <PublishChoice
+                        itemKey={item.id}
+                        itemType="project"
+                        selected={selected(item.id)}
+                        busy={busyKey === item.id}
+                        onChange={selectForPortfolio}
+                      />
+                    </article>
+                  ))}
+                </section>
               ))}
             </div>
           </section>
 
-          <section className="career-credentials" aria-labelledby="career-credentials-title">
+          <section id="career-credentials" className="career-credentials" aria-labelledby="career-credentials-title">
             <header>
               <p className="eyebrow">Credentials</p>
               <h2 id="career-credentials-title">Education and certifications</h2>
@@ -448,7 +756,7 @@ export function CareerBrain() {
             </div>
           </section>
 
-          <section className="career-skills" aria-labelledby="career-skills-title">
+          <section id="career-skills" className="career-skills" aria-labelledby="career-skills-title">
             <header>
               <p className="eyebrow">Technical practice</p>
               <h2 id="career-skills-title">Skills grouped by how you use them.</h2>
@@ -474,7 +782,7 @@ export function CareerBrain() {
         </div>
       ) : null}
 
-      <details className="career-manual-source">
+      <details id="career-add-source" className="career-manual-source">
         <summary>Add information that is not in a document or journal</summary>
         <form className="knowledge-entry-form" onSubmit={(event) => void addFact(event)}>
           <label>

@@ -10,6 +10,7 @@ import { dataExport } from "../../../inngest/data-export";
 import { automationScheduler } from "../../../inngest/automation-scheduler";
 import { careerBrainRefresh } from "../../../inngest/career-brain-refresh";
 import { embeddingBackfill } from "../../../inngest/embedding-backfill";
+import { journalKnowledgeIndex } from "../../../inngest/journal-knowledge-index";
 
 const handler = serve({
   client: inngest,
@@ -18,6 +19,7 @@ const handler = serve({
     documentIngestion,
     embeddingBackfill,
     careerBrainRefresh,
+    journalKnowledgeIndex,
     jobSearch,
     analyticsAggregation,
     ...durableDomainEvents,

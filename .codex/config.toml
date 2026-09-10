@@ -1,5 +1,58 @@
+# Project-level Codex configuration for the AI-native portfolio
+
+[features]
+multi_agent = true
+
 [agents]
-enabled = true
-max_concurrent_threads_per_session = 1
+max_concurrent_threads_per_session = 6
+max_depth = 2
 default_subagent_model = "gpt-5.6-sol"
-default_subagent_reasoning_effort = "high"
+default_subagent_reasoning_effort = "medium"
+
+[agents.career-orchestrator]
+description = "Routes career and portfolio requests to the right specialist agents and synthesizes their outputs."
+config_file = "agents/career-orchestrator.toml"
+
+[agents.career-synthesizer]
+description = "Builds a structured, evidence-backed model of the candidate's career from approved knowledge sources."
+config_file = "agents/career-synthesizer.toml"
+
+[agents.role-fit-analyst]
+description = "Maps a job description to verified career evidence, projects, and skills."
+config_file = "agents/role-fit-analyst.toml"
+
+[agents.job-matcher]
+description = "Matches job requirements against verified career evidence and produces an explainable fit assessment."
+config_file = "agents/job-matcher.toml"
+
+[agents.career-gap-analyst]
+description = "Identifies skill, evidence, positioning, and experience gaps between the candidate's current profile and target roles."
+config_file = "agents/career-gap-analyst.toml"
+
+[agents.compensation-analyst]
+description = "Analyzes salary, contract rates, compensation structure, and negotiation positioning for job opportunities."
+config_file = "agents/compensation-analyst.toml"
+
+[agents.application-writer]
+description = "Writes evidence-backed, job-specific application materials without inventing candidate experience."
+config_file = "agents/application-writer.toml"
+
+[agents.writing-editor]
+description = "Final editorial and factual-consistency reviewer for career-related writing."
+config_file = "agents/writing-editor.toml"
+
+[agents.interview-coach]
+description = "Creates stage-specific, evidence-backed interview preparation and coaching."
+config_file = "agents/interview-coach.toml"
+
+[agents.portfolio-assistant]
+description = "Public-facing portfolio Q&A agent that answers recruiter questions from approved public career evidence only."
+config_file = "agents/portfolio-assistant.toml"
+
+[agents.portfolio-analytics]
+description = "Analyzes portfolio engagement and job-search funnel data to surface actionable career insights."
+config_file = "agents/portfolio-analytics.toml"
+
+[agents.image-generator]
+description = "Creates optional editorial project cover images from source-grounded project detail."
+config_file = "agents/image-generator.toml"

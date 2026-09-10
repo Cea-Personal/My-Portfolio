@@ -14,6 +14,7 @@ import type { CareerTimelineStage } from "../../components/portfolio/career-time
 import { loadPublicBlogPostsWithStatus, loadPublicPortfolio } from "@/lib/api/public-data";
 import { PublicEvents } from "@/components/analytics/public-events";
 import { CredentialsAndSkills } from "@/components/portfolio/credentials-skills";
+import { youtubeEmbedUrl } from "@/lib/portfolio-media";
 
 export const dynamic = "force-dynamic";
 
@@ -122,13 +123,20 @@ export default async function PublicPortfolioPage() {
           };
         })
     ];
-    const stageImpacts = impactItems
+    const stageExperience = impactItems
       .filter((impact) => identities(impact).includes(key))
       .flatMap((impact) => [text(impact.display_metric, text(impact.public_summary))])
       .filter(Boolean);
     const directImpact = text(item.display_metric);
-    if (directImpact) stageImpacts.unshift(directImpact);
-    stageImpacts.unshift(...list(structured.achievements));
+    if (directImpact) stageExperience.unshift(directImpact);
+    // New snapshots expose one detailed experience list. Keep the old fields
+    // as a publication migration fallback so existing selections do not lose
+    // their content until the next publication is staged.
+    stageExperience.unshift(...list(structured.experience));
+    stageExperience.unshift(...list(structured.responsibilities));
+    stageExperience.unshift(...list(structured.achievements));
+    stageExperience.unshift(...list(structured.impact));
+    stageExperience.unshift(...list(structured.outcomes));
     const stageSkills = [
       ...skillItems
         .filter((skill) => identities(skill).includes(key))
@@ -149,7 +157,7 @@ export default async function PublicPortfolioPage() {
       ...(company ? { company } : {}),
       ...(period ? { period } : {}),
       ...(stageProjects.length ? { projects: stageProjects } : {}),
-      ...(stageImpacts.length ? { impacts: stageImpacts } : {}),
+      ...(stageExperience.length ? { experience: [...new Set(stageExperience)] } : {}),
       ...(stageSkills.length ? { skills: [...new Set(stageSkills)] } : {})
     };
   });
@@ -214,14 +222,19 @@ export default async function PublicPortfolioPage() {
     let candidate: unknown;
     for (const entry of value as unknown[]) {
       if (typeof entry === "string") {
-        candidate = entry;
-        break;
+        if (!youtubeEmbedUrl(entry)) {
+          candidate = entry;
+          break;
+        }
       }
       if (!entry || typeof entry !== "object") continue;
       const media = entry as Record<string, unknown>;
       if (typeof media.url === "string" || typeof media.src === "string") {
-        candidate = entry;
-        break;
+        const mediaUrl = text(media.url, text(media.src));
+        if (!youtubeEmbedUrl(mediaUrl)) {
+          candidate = entry;
+          break;
+        }
       }
     }
     const source =
@@ -238,12 +251,14 @@ export default async function PublicPortfolioPage() {
   const renderedProjects = personalProjectItems.map((item) => {
     const href = slugHref(item);
     const technologies = list(item.display_technologies);
+    const structured = record(item.structured_content);
     const image = mediaSource(item.sanitized_media);
     return {
       title: text(item.title, "Project"),
       summary: text(item.public_summary),
       ...(href ? { href } : {}),
       ...(technologies.length ? { technologies } : {}),
+      ...(text(structured.category) ? { category: text(structured.category) } : {}),
       ...(text(item.subtitle) ? { meta: text(item.subtitle) } : {}),
       ...(image ? { image } : {})
     };

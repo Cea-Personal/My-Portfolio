@@ -6,10 +6,15 @@ import { allowPublicAiRequest } from "@/lib/public-ai-rate-limit";
 import { loadPublicBlogPostsWithStatus, loadPublicPortfolio } from "@/lib/api/public-data";
 import { publicApiResponse } from "@/lib/api/response";
 import { embedWithFallback, resolveEmbeddingProviders } from "@/lib/server/embedding-provider";
-import { generateReasoningJson, resolveReasoningProviders } from "@/lib/server/reasoning-provider";
+import {
+  anonymizeEmployerReferences,
+  generateReasoningJson,
+  resolveReasoningProviders
+} from "@/lib/server/reasoning-provider";
 import { rerankCandidates } from "@/lib/server/reranker-provider";
 import {
   CAREER_OUTPUT_SCOPE_INSTRUCTION,
+  EMPLOYER_PRIVACY_INSTRUCTION,
   PUBLIC_ASSISTANT_ALLOWED_SOURCE_TYPES,
   PUBLIC_ASSISTANT_BLOCKED_SOURCE_TYPES
 } from "@/lib/server/retrieval-policy";
@@ -110,6 +115,7 @@ async function composeGroundedAnswer(
       [
         "You are Ask Basil, a public portfolio assistant.",
         CAREER_OUTPUT_SCOPE_INSTRUCTION,
+        EMPLOYER_PRIVACY_INSTRUCTION,
         "Answer the visitor's question using only the supplied published portfolio context.",
         "Synthesize a clear, human answer from multiple context entries when useful; do not copy one entry blindly.",
         "Do not invent employers, dates, metrics, tools, projects, or personal details.",
@@ -303,7 +309,8 @@ export async function POST(request: Request) {
     ownerId && vectorEvidence.length
       ? await composeGroundedAnswer(question, retrieved, allEvidence, ownerId)
       : retrieved;
+  const safeResult = anonymizeEmployerReferences(result) as ReturnType<typeof answerPublicQuestion>;
   if (request.headers.get("accept")?.includes("text/event-stream"))
-    return streamResponse(result, request, request.headers.get("last-event-id"));
-  return publicApiResponse(result, request, result.abstained ? 200 : 201);
+    return streamResponse(safeResult, request, request.headers.get("last-event-id"));
+  return publicApiResponse(safeResult, request, safeResult.abstained ? 200 : 201);
 }

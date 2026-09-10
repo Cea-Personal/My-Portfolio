@@ -1,6 +1,7 @@
 import { apiResponse } from "@/lib/api/response";
 import { withPrivateApi } from "@/lib/api/private";
 import { generateReasoningJson, resolveReasoningProviders } from "@/lib/server/reasoning-provider";
+import { EMPLOYER_PRIVACY_INSTRUCTION } from "@/lib/server/retrieval-policy";
 
 const modes = new Set(["ideas", "outline", "draft", "rewrite", "summary", "titles", "tags", "seo"]);
 
@@ -49,6 +50,7 @@ export async function POST(request: Request) {
         [
           "You are the Blog writing editor subagent for Basil Ogbonna.",
           "Use only the supplied prompt and explicitly approved evidence.",
+          EMPLOYER_PRIVACY_INSTRUCTION,
           "Do not invent employers, achievements, metrics, technologies, dates, or outcomes.",
           `Produce a ${mode} suggestion. Return JSON only with status, message, content, editedText, and suggestions.`,
           "Put the usable result in content or editedText; use suggestions for titles, tags, or alternatives.",

@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { embedWithFallback, resolveEmbeddingProviders } from "./embedding-provider";
 import { generateReasoningJson, resolveReasoningProviders } from "./reasoning-provider";
 import { rerankCandidates } from "./reranker-provider";
+import { EMPLOYER_PRIVACY_INSTRUCTION } from "./retrieval-policy";
 
 export interface CareerBrainItem {
   id: string;
@@ -20,14 +21,89 @@ export interface CareerBrainContent {
   technicalSkills: CareerBrainItem[];
 }
 
+const NON_INFORMATION_VALUES = new Set([
+  "",
+  "role not identified",
+  "organisation not identified",
+  "untitled project",
+  "education",
+  "certification",
+  "technical skills"
+]);
+
+export const CAREER_PROJECT_CATEGORIES = [
+  "Software",
+  "AI software engineering",
+  "Data platform",
+  "Data engineering",
+  "AI engineering",
+  "AI data engineering"
+] as const;
+
+function usefulText(value: unknown): boolean {
+  return typeof value === "string" && !NON_INFORMATION_VALUES.has(value.trim().toLocaleLowerCase());
+}
+
+function usefulList(value: unknown): boolean {
+  return Array.isArray(value) && value.some((entry) => usefulText(entry));
+}
+
+/** Prevent an empty `{}` agent response from replacing a usable snapshot. */
+export function hasMeaningfulCareerBrainContent(content: CareerBrainContent): boolean {
+  if ([content.cvSummary, content.portfolioSummary, content.about].some(usefulText)) return true;
+  if (
+    content.experiences.some(
+      (item) =>
+        ["organization", "role", "period", "summary"].some((key) => usefulText(item[key])) ||
+        [
+          "experience",
+          "responsibilities",
+          "achievements",
+          "impact",
+          "outcomes",
+          "outcome",
+          "projects",
+          "technologies",
+          "evidence"
+        ].some((key) => usefulList(item[key]))
+    )
+  )
+    return true;
+  if (
+    content.projects.some(
+      (item) =>
+        ["title", "summary", "description", "problem", "approach", "role", "outcome", "url", "liveUrl", "githubUrl", "videoUrl"].some((key) => usefulText(item[key])) ||
+        ["highlights", "technologies", "process", "evidence"].some((key) => usefulList(item[key]))
+    )
+  )
+    return true;
+  if (
+    content.education.some((item) =>
+      ["qualification", "institution", "period", "summary"].some((key) => usefulText(item[key]))
+    )
+  )
+    return true;
+  if (
+    content.certifications.some((item) =>
+      ["name", "issuer", "date", "summary"].some((key) => usefulText(item[key]))
+    )
+  )
+    return true;
+  return content.technicalSkills.some(
+    (item) => usefulText(item.category) || usefulText(item.summary) || usefulList(item.skills)
+  );
+}
+
 // Increment when the synthesis contract or prompt changes so an existing
 // snapshot cannot silently keep the older, summary-only shape.
-const CAREER_BRAIN_SYNTHESIS_VERSION = "career-brain.v3.human-voice";
+const CAREER_BRAIN_SYNTHESIS_VERSION = "career-brain.v8.project-detail-media";
 
 // Career Brain is a bounded synthesis job, not a health probe. Native Codex
 // subagents can need more time to reconcile multiple documents and produce the
-// complete structured profile requested by the schema.
-const CAREER_BRAIN_TIMEOUT_MS = 120_000;
+// complete structured profile requested by the schema. Keep this below the
+// route's five-minute budget so embedding, reranking, and persistence have
+// room to finish in the same request.
+const CAREER_BRAIN_TIMEOUT_MS = 180_000;
 const CAREER_BRAIN_RAG_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 const CAREER_BRAIN_RAG_CACHE_VERSION = "rag.v1";
 
@@ -57,43 +133,68 @@ function uniqueStrings(value: unknown, limit = 100): string[] {
     .slice(0, limit);
 }
 
-/** Keep a role useful for a CV without letting repeated source CV bullets take over. */
-function selectRolePoints(item: Record<string, unknown>) {
-  const buckets = [
-    { key: "achievements", values: uniqueStrings(item.achievements, 8) },
-    { key: "impact", values: uniqueStrings(item.impact, 8) },
-    { key: "responsibilities", values: uniqueStrings(item.responsibilities, 8) }
-  ] as const;
-  const selected = new Set<string>();
-  const selectedByKey = new Map<string, string[]>();
-  const add = (key: string, value: string) => {
-    const normalized = value
-      .toLocaleLowerCase()
-      .replace(/[^a-z0-9]+/g, " ")
-      .trim();
-    if (selected.size >= 7 || selected.has(normalized)) return;
-    selected.add(normalized);
-    selectedByKey.get(key)?.push(value);
-  };
-  for (const bucket of buckets) {
-    selectedByKey.set(bucket.key, []);
-  }
-  // Keep a representative responsibility, achievement, and impact when each
-  // category is available before filling the remaining slots by relevance.
-  for (const bucket of buckets) {
-    const first = bucket.values[0];
-    if (first) add(bucket.key, first);
-  }
-  for (const bucket of buckets) {
-    for (const value of bucket.values) {
-      add(bucket.key, value);
-    }
-  }
-  return {
-    responsibilities: selectedByKey.get("responsibilities") ?? [],
-    achievements: selectedByKey.get("achievements") ?? [],
-    impact: selectedByKey.get("impact") ?? []
-  };
+/** Merge legacy CV categories into one detailed, de-duplicated role narrative. */
+function selectRoleExperience(item: Record<string, unknown>, limit = 10): string[] {
+  return uniqueStrings(
+    [
+      ...strings(item.experience),
+      ...strings(item.responsibilities),
+      ...strings(item.achievements),
+      ...strings(item.impact),
+      ...strings(item.outcomes),
+      ...(typeof item.outcome === "string" ? [item.outcome] : [])
+    ],
+    limit
+  );
+}
+
+type CareerProjectCategory = (typeof CAREER_PROJECT_CATEGORIES)[number];
+
+function projectCategory(item: Record<string, unknown>): CareerProjectCategory {
+  const suppliedValues = [
+    ...strings(item.categories),
+    ...(typeof item.category === "string" ? [item.category] : [])
+  ];
+  const explicit = CAREER_PROJECT_CATEGORIES.find((category) =>
+    suppliedValues.some(
+      (value) => value.trim().toLocaleLowerCase() === category.toLocaleLowerCase()
+    )
+  );
+  if (explicit) return explicit;
+  const supplied = suppliedValues.join(" ").toLocaleLowerCase();
+  const haystack = [
+    supplied,
+    text(item.title),
+    text(item.summary),
+    text(item.role),
+    text(item.outcome),
+    ...strings(item.technologies),
+    ...strings(item.process)
+  ]
+    .join(" ")
+    .toLocaleLowerCase();
+  const hasAi =
+    /\b(ai|ml|machine learning|llm|rag|vector|embedding|model|artificial intelligence)\b/.test(
+      haystack
+    );
+  const hasData =
+    /\b(data|etl|elt|pipeline|warehouse|lakehouse|analytics|sql|dbt|airflow|spark)\b/.test(
+      haystack
+    );
+  const hasSoftware =
+    /\b(software|web|application|api|backend|frontend|typescript|javascript|react|node|service)\b/.test(
+      haystack
+    );
+  const hasPlatform =
+    /\b(platform|infrastructure|kubernetes|docker|cloud|terraform|deployment|observability|reliability)\b/.test(
+      haystack
+    );
+  if (hasAi && hasData) return "AI data engineering";
+  if (hasAi && hasSoftware) return "AI software engineering";
+  if (hasAi) return "AI engineering";
+  if (hasData && hasPlatform) return "Data platform";
+  if (hasData) return "Data engineering";
+  return "Software";
 }
 const records = (value: unknown) =>
   Array.isArray(value)
@@ -109,7 +210,10 @@ const record = (value: unknown): Record<string, unknown> | null =>
 
 function anonymizePrivateEmployer(value: unknown): unknown {
   if (typeof value === "string") {
-    return value.replace(/\bthames\s+water\b/gi, "a utilities organisation");
+    return value.replace(
+      /\bthames[\s-]+water(?:\s+(?:plc|limited|ltd))?\b/gi,
+      "a utilities organisation"
+    );
   }
   if (Array.isArray(value)) return value.map((item) => anonymizePrivateEmployer(item));
   if (value && typeof value === "object") {
@@ -175,7 +279,9 @@ function retrievalCacheKey(
 function evidenceFromRows(value: unknown): RetrievedEvidence[] {
   return records(value).flatMap((item) => {
     const id = text(item.chunk_id || item.id);
-    const content = text(item.content).slice(0, 2500);
+    // Keep the RAG context bounded. The source tables already contain the
+    // complete text; synthesis only needs the highest-ranked excerpts.
+    const content = text(item.content).slice(0, 1_800);
     if (!id || !content) return [];
     return [
       {
@@ -196,7 +302,7 @@ function mergeEvidence(...sets: RetrievedEvidence[][]): RetrievedEvidence[] {
       if (!merged.has(item.id)) merged.set(item.id, item);
     }
   }
-  return [...merged.values()].slice(0, 60);
+  return [...merged.values()].slice(0, 32);
 }
 
 async function readRetrievalCache(
@@ -269,20 +375,22 @@ async function writeRetrievalCache(
 }
 
 function compactCanonicalFacts(value: unknown) {
-  return boundedRecords(
-    records(value).map((item) => {
-      const version = firstRecord(item.currentVersion);
-      return {
-        id: item.id,
-        type: item.fact_type,
-        statement: text(version?.statement).slice(0, 2500),
-        structuredValue: record(version?.structured_value),
-        updatedAt: item.updated_at
-      };
-    }),
-    600,
-    70_000
-  );
+  const compact = records(value).map((item) => {
+    const version = firstRecord(item.currentVersion);
+    return {
+      id: item.id,
+      type: item.fact_type,
+      statement: text(version?.statement).slice(0, 2500),
+      structuredValue: record(version?.structured_value),
+      updatedAt: item.updated_at
+    };
+  });
+  // Project facts are first-class Career Brain inputs. Put them ahead of the
+  // general fact stream so a large history cannot consume the context budget
+  // before distinct project records reach the synthesizer.
+  const projects = compact.filter((item) => item.type === "project");
+  const otherFacts = compact.filter((item) => item.type !== "project");
+  return boundedRecords([...projects, ...otherFacts], 500, 60_000);
 }
 
 function compactExtractedFacts(value: unknown) {
@@ -305,7 +413,7 @@ function compactExtractedFacts(value: unknown) {
       }
     ];
   });
-  return boundedRecords(compact, 750, 90_000);
+  return boundedRecords(compact, 450, 55_000);
 }
 
 function compactJournals(value: unknown) {
@@ -322,8 +430,8 @@ function compactJournals(value: unknown) {
         text: text(version?.text).slice(0, 4000)
       };
     }),
-    100,
-    50_000
+    50,
+    20_000
   );
 }
 
@@ -341,8 +449,8 @@ function compactApplications(value: unknown) {
         description: text(job?.current_description).slice(0, 2000)
       };
     }),
-    50,
-    35_000
+    30,
+    20_000
   );
 }
 
@@ -363,22 +471,14 @@ export function normalizeCareerBrainContent(value: unknown): CareerBrainContent 
         const role = text(item.role, "Role not identified");
         const key = `${organization}|${role}`.toLocaleLowerCase().replace(/\s+/g, " ");
         const previous = merged.get(key);
-        const points = selectRolePoints(item);
+        const experience = selectRoleExperience(item);
         const mergedItem = {
           ...(previous ?? {}),
           organization,
           role,
           period: text(previous?.period, text(item.period)),
           summary: text(previous?.summary, text(item.summary)),
-          responsibilities: uniqueStrings(
-            [...strings(previous?.responsibilities), ...points.responsibilities],
-            7
-          ),
-          achievements: uniqueStrings(
-            [...strings(previous?.achievements), ...points.achievements],
-            7
-          ),
-          impact: uniqueStrings([...strings(previous?.impact), ...points.impact], 7),
+          experience: uniqueStrings([...strings(previous?.experience), ...experience], 10),
           projects: uniqueStrings([...strings(previous?.projects), ...strings(item.projects)], 8),
           technologies: uniqueStrings(
             [...strings(previous?.technologies), ...strings(item.technologies)],
@@ -389,16 +489,13 @@ export function normalizeCareerBrainContent(value: unknown): CareerBrainContent 
         merged.set(key, mergedItem);
       }
       return [...merged.values()].slice(0, 30).map((item) => {
-        const points = selectRolePoints(item);
         return {
           id: stableId("experience", [text(item.organization), text(item.role), text(item.period)]),
           organization: text(item.organization, "Organisation not identified"),
           role: text(item.role, "Role not identified"),
           period: text(item.period),
           summary: text(item.summary),
-          responsibilities: points.responsibilities,
-          achievements: points.achievements,
-          impact: points.impact,
+          experience: selectRoleExperience(item),
           projects: uniqueStrings(item.projects, 8),
           technologies: uniqueStrings(item.technologies, 30),
           evidence: uniqueStrings(item.evidence, 12)
@@ -407,33 +504,52 @@ export function normalizeCareerBrainContent(value: unknown): CareerBrainContent 
     })(),
     projects: (() => {
       const merged = new Map<string, Record<string, unknown>>();
-      for (const item of records(root.projects).slice(0, 50)) {
+      for (const item of records(root.projects).slice(0, 100)) {
         const title = text(item.title, "Untitled project");
         const key = title.toLocaleLowerCase().replace(/\s+/g, " ");
         const previous = merged.get(key);
         merged.set(key, {
           ...(previous ?? {}),
           title,
+          category: projectCategory(item),
           summary: text(previous?.summary, text(item.summary)),
+          description: text(previous?.description, text(item.description)),
+          problem: text(previous?.problem, text(item.problem)),
+          approach: text(previous?.approach, text(item.approach)),
           role: text(previous?.role, text(item.role)),
           outcome: text(previous?.outcome, text(item.outcome)),
+          highlights: uniqueStrings(
+            [...strings(previous?.highlights), ...strings(item.highlights)],
+            12
+          ),
           technologies: uniqueStrings(
             [...strings(previous?.technologies), ...strings(item.technologies)],
             30
           ),
           url: text(previous?.url, text(item.url)),
+          liveUrl: text(previous?.liveUrl, text(item.liveUrl)),
+          githubUrl: text(previous?.githubUrl, text(item.githubUrl)),
+          videoUrl: text(previous?.videoUrl, text(item.videoUrl)),
           process: uniqueStrings([...strings(previous?.process), ...strings(item.process)], 8),
           evidence: uniqueStrings([...strings(previous?.evidence), ...strings(item.evidence)], 12)
         });
       }
-      return [...merged.values()].slice(0, 30).map((item) => ({
+      return [...merged.values()].slice(0, 100).map((item) => ({
         id: stableId("project", [text(item.title)]),
         title: text(item.title, "Untitled project"),
+        category: projectCategory(item),
         summary: text(item.summary),
+        description: text(item.description),
+        problem: text(item.problem),
+        approach: text(item.approach),
         role: text(item.role),
         outcome: text(item.outcome),
+        highlights: uniqueStrings(item.highlights, 12),
         technologies: uniqueStrings(item.technologies, 30),
         url: text(item.url),
+        liveUrl: text(item.liveUrl),
+        githubUrl: text(item.githubUrl),
+        videoUrl: text(item.videoUrl),
         process: uniqueStrings(item.process, 8),
         evidence: uniqueStrings(item.evidence, 12)
       }));
@@ -478,10 +594,11 @@ export function normalizeCareerBrainContent(value: unknown): CareerBrainContent 
       }
       return [...merged.values()].map((item) => {
         const category = text(item.category, "Technical skills");
+        const skills = uniqueStrings(item.skills, 50);
         return {
-          id: stableId("skill", [category]),
+          id: stableId("skill", [category, ...skills]),
           category,
-          skills: uniqueStrings(item.skills, 50),
+          skills,
           summary: text(item.summary)
         };
       });
@@ -561,8 +678,8 @@ async function refreshCareerBrainRetrievalCache(
   const forceFresh = options.forceFresh === true;
   const embeddingProviders = await resolveEmbeddingProviders(client, ownerId);
   const queries = [
-    "employment history organisations roles dates responsibilities achievements measurable impact",
-    "selected personal and professional software data artificial intelligence projects outcomes",
+    "employment history organisations roles dates detailed experience responsibilities achievements measurable impact outcomes",
+    "selected personal and professional software data artificial intelligence projects outcomes categories",
     "technical skills programming languages platforms tools frameworks data and AI technologies",
     "education certifications credentials courses issuers dates",
     "professional profile strengths leadership working style and portfolio about biography"
@@ -611,7 +728,7 @@ async function refreshCareerBrainRetrievalCache(
     ownerId,
     queries.join("\n"),
     mergeEvidence(freshEvidence),
-    40
+    24
   );
   const evidence = forceFresh
     ? rerankedFreshEvidence
@@ -639,17 +756,18 @@ export async function synthesizeCareerBrain(
 ) {
   const forceFresh = options.forceFresh === true;
   const { source, sourceHash } = await loadInputs(client, ownerId);
-  const existing = await client
+  const existingResult = await client
     .schema("app")
     .from("career_brain_snapshots")
     .select("*")
     .eq("owner_id", ownerId)
     .eq("input_source_hash", sourceHash)
     .order("generated_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (existing.error) throw existing.error;
-  const existingSnapshot = existing.data as unknown as Record<string, unknown> | null;
+    .limit(20);
+  if (existingResult.error) throw existingResult.error;
+  const existingSnapshot = records(existingResult.data).find((candidate) =>
+    hasMeaningfulCareerBrainContent(normalizeCareerBrainContent(candidate.content))
+  ) as unknown as Record<string, unknown> | undefined;
   if (existingSnapshot && !forceFresh) {
     if (options.refreshRetrievalCache) {
       await refreshCareerBrainRetrievalCache(client, ownerId, sourceHash, options.serviceMode);
@@ -673,21 +791,23 @@ export async function synthesizeCareerBrain(
   const generation = await generateReasoningJson(
     providers,
     [
-      "Do not mention Thames Water or close variants in generated output; use work from that source as evidence but anonymize the employer.",
+      EMPLOYER_PRIVACY_INSTRUCTION,
       "Prioritize data-engineering and data-platform experience such as pipelines, warehouses, modelling, orchestration, quality, governance, reliability, scale, and delivery tools over generic software responsibilities."
     ].join(" ") +
       " " +
-      `You maintain Basil Ogbonna's private Career Brain. Return JSON only. Synthesize, deduplicate and reconcile all supplied CVs, extracted facts, journals, and evidence without inventing facts. The recentApplicationFocus input contains target job descriptions: use those descriptions only to rank which verified bullets are most useful for the roles Basil is pursuing; never treat a job description as proof that Basil did something. Preserve useful detail instead of collapsing evidence into generic summaries. Write like a thoughtful senior engineer speaking plainly: specific, warm, confident, and grounded in real work. Use natural sentence structure and varied wording; avoid keyword stuffing, corporate clichés, exaggerated claims, empty phrases such as "results-driven" or "passionate professional", and repetitive AI-style openings. Keep the CV profile concise and professional, but make portfolioSummary and about sound like Basil's own first-person voice. Output cvSummary (concise CV profile), portfolioSummary (human first-person portfolio profile), about (first-person About narrative), experiences[], projects[], education[], certifications[], technicalSkills[]. Each experience must represent exactly one role at one organization. Merge repeated versions of the same organization and role into one record, even when the same bullet appears in several CVs. For each role select the strongest 6-7 combined points across responsibilities[], achievements[], and impact[]; do not return 6-7 in every list. Prefer points that match the target job descriptions while retaining important role-defining work. Responsibilities are action-and-scope bullets, achievements are specific accomplishments, and impact is measurable or observable outcomes such as scale, reliability, speed, cost, quality, users, or business effect; do not duplicate the same point across lists. Also include projects[] (named initiatives carried out in that role), technologies[] (exact tools, platforms, languages, and methods), and evidence[] (short source-grounded details or source labels explaining where the role and outcomes came from). Keep dates, scope, metrics, and technical names when present. Projects contain title, summary, role, outcome, technologies[], url, process[] (important design/build/engineering steps), and evidence[] (source-grounded details). Education contains qualification, institution, period, summary. Certifications contain name, issuer, date, summary. technicalSkills groups contain category, skills[], summary. Prefer corroborated specifics; omit uncertain entries rather than guessing, but do not omit a supported detail merely because it is lengthy.`,
+      `You maintain Basil Ogbonna's private Career Brain. Return JSON only. Synthesize, deduplicate and reconcile all supplied CVs, extracted facts, and semantically retrieved private knowledge-base material without inventing facts. Journal entries are knowledge-base sources, so use only the journal excerpts returned by retrieval rather than a separate journal-insight workflow. The recentApplicationFocus input contains target job descriptions: use those descriptions only to rank which verified details are most useful for the roles Basil is pursuing; never treat a job description as proof that Basil did something. Preserve useful detail instead of collapsing evidence into generic summaries. Write like a thoughtful senior engineer speaking plainly: specific, warm, confident, and grounded in real work. Use natural sentence structure and varied wording; avoid keyword stuffing, corporate clichés, empty phrases such as "results-driven" or "passionate professional", repetitive AI-style openings, abstract proof language, and generic self-descriptions. Draw precise descriptors from the professional summaries and write what Basil actually did using concrete verbs such as built, designed, led, delivered, operated, improved, migrated, or supported only when the supplied material supports them. Keep the CV profile concise and professional, but make portfolioSummary and about sound like Basil's own first-person voice. Output cvSummary (concise CV profile), portfolioSummary (human first-person portfolio profile), about (first-person About narrative), experiences[], projects[], education[], certifications[], technicalSkills[]. Each experience must represent exactly one role at one organization. Merge repeated versions of the same organization and role into one record, even when the same detail appears in several CVs. For each role return no more than 10 detailed experience[] entries containing the most useful and specific combined responsibilities, achievements, impacts, and outcomes; do not split these into separate fields. Each entry may be a complete sentence, and should combine the action, scope, and outcome in one natural sentence when the source supports all three. Do not duplicate a detail within a role. Include every distinct supported project from the supplied career facts, CVs, and retrieved material; do not reduce the project list to only the most prominent examples. Assign each project exactly one category from: Software, AI software engineering, Data platform, Data engineering, AI engineering, AI data engineering. Also include technologies[] (exact tools, platforms, languages, and methods) and evidence[] (short source-grounded details or source labels explaining where the role and outcomes came from). Keep dates, scope, metrics, and technical names when present. Projects must be detailed: provide a useful summary of what was built and why, the role played, a concrete outcome when supported, technologies[], url when known, 4-8 process[] steps covering important design/build/engineering decisions, and evidence[] grounded in the supplied material. Education contains qualification, institution, period, summary. Certifications contain name, issuer, date, summary. technicalSkills groups contain category, skills[], summary. Prefer specific, natural wording taken from the professional summaries; omit uncertain entries rather than guessing, but do not omit a supported detail merely because it is lengthy.`,
     {
       semanticEvidence: evidence,
       canonicalPrivateFacts: source.facts,
       extractedPrivateFacts: source.extracted,
-      journalEvidence: source.journals,
       recentApplicationFocus: source.recentApplications
     },
     { task: "evidence_extraction" }
   );
   const content = normalizeCareerBrainContent(generation.output);
+  if (!hasMeaningfulCareerBrainContent(content)) {
+    throw new Error("CAREER_BRAIN_EMPTY_OUTPUT:orchestrator returned no usable career content");
+  }
   // Snapshots are append-only by run key. A forced re-synthesis must be able
   // to produce a new snapshot even when the underlying source hash has not
   // changed, otherwise the unique key would silently return the older result.
@@ -718,18 +838,22 @@ export async function synthesizeCareerBrain(
     // The first insert wins; the other request should reuse that durable result
     // rather than surface a false generation failure to the owner.
     if (insert.error?.code === "23505") {
-      const concurrent = await client
+      const concurrentResult = await client
         .schema("app")
         .from("career_brain_snapshots")
         .select("*")
         .eq("owner_id", ownerId)
         .eq("input_source_hash", sourceHash)
         .order("generated_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (!concurrent.error && concurrent.data) {
+        .limit(20);
+      const concurrent = concurrentResult.error
+        ? undefined
+        : records(concurrentResult.data).find((candidate) =>
+            hasMeaningfulCareerBrainContent(normalizeCareerBrainContent(candidate.content))
+          );
+      if (!concurrentResult.error && concurrent) {
         return {
-          snapshot: concurrent.data as unknown as Record<string, unknown>,
+          snapshot: concurrent as unknown as Record<string, unknown>,
           reused: true
         };
       }

@@ -1,4 +1,21 @@
+"use client";
+
+import { useState } from "react";
 import { PortfolioProof } from "./portfolio-proof";
+
+const PROJECT_CATEGORIES = [
+  "Software",
+  "AI software engineering",
+  "Data platform",
+  "Data engineering",
+  "AI engineering",
+  "AI data engineering"
+] as const;
+
+function canonicalCategory(value: string | undefined) {
+  const normalized = value?.trim().toLocaleLowerCase();
+  return PROJECT_CATEGORIES.find((category) => category.toLocaleLowerCase() === normalized) ?? value;
+}
 
 export function Projects({
   items = [],
@@ -9,11 +26,19 @@ export function Projects({
     summary: string;
     href?: string;
     technologies?: string[];
+    category?: string;
     meta?: string;
     image?: string;
+    videoUrl?: string;
   }[];
   portfolioSourceUrl?: string;
 }) {
+  const [activeCategory, setActiveCategory] = useState<string>("all");
+  const visibleItems =
+    activeCategory === "all"
+      ? items
+      : items.filter((item) => canonicalCategory(item.category) === activeCategory);
+
   return (
     <section id="projects" className="projects-section" aria-labelledby="projects-title">
       <header className="editorial-heading projects-heading">
@@ -24,13 +49,42 @@ export function Projects({
         </span>
       </header>
       <PortfolioProof {...(portfolioSourceUrl ? { sourceUrl: portfolioSourceUrl } : {})} />
-      {items.length ? (
-        <ol className="project-chapters">
-          {items.map((item, index) => (
-            <li className="project-chapter" key={item.title}>
+      <>
+        <div className="project-category-tabs" role="tablist" aria-label="Project categories">
+            <button
+              className={activeCategory === "all" ? "is-active" : ""}
+              type="button"
+              role="tab"
+              aria-selected={activeCategory === "all"}
+              onClick={() => {
+                setActiveCategory("all");
+              }}
+            >
+              All projects
+            </button>
+            {PROJECT_CATEGORIES.map((category) => (
+              <button
+                className={activeCategory === category ? "is-active" : ""}
+                key={category}
+                type="button"
+                role="tab"
+                aria-selected={activeCategory === category}
+                onClick={() => {
+                  setActiveCategory(category);
+                }}
+              >
+                {category}
+              </button>
+            ))}
+        </div>
+        {visibleItems.length ? (
+            <ol className="project-chapters">
+              {visibleItems.map((item, index) => (
+            <li className="project-chapter" key={`${item.category ?? "project"}-${item.title}-${String(index)}`}>
               <div className="project-chapter-copy">
                 <span className="project-chapter-number">{String(index + 1).padStart(2, "0")}</span>
                 <p className="project-chapter-type">{item.meta ?? "Personal project"}</p>
+                {item.category ? <p className="project-chapter-type">{canonicalCategory(item.category)}</p> : null}
                 <h3>{item.href ? <a href={item.href}>{item.title}</a> : item.title}</h3>
                 <p className="project-chapter-summary">{item.summary}</p>
                 {item.technologies?.length ? (
@@ -44,13 +98,16 @@ export function Projects({
                     href={item.href}
                     aria-label={`Open ${item.title}`}
                   >
-                    Experience project <span aria-hidden="true">↗</span>
+                    View project <span aria-hidden="true">↗</span>
                   </a>
                 ) : (
                   <span className="project-chapter-link is-disabled">Preview pending</span>
                 )}
               </div>
-              <div className="project-chapter-visual" aria-hidden="true">
+              <div
+                className="project-chapter-visual"
+                {...(item.videoUrl ? {} : { "aria-hidden": true })}
+              >
                 {item.image ? (
                   <span
                     className="project-chapter-image"
@@ -66,9 +123,14 @@ export function Projects({
                 )}
               </div>
             </li>
-          ))}
-        </ol>
-      ) : null}
+              ))}
+            </ol>
+        ) : items.length ? (
+            <p className="project-category-empty">
+              No published projects in this category yet.
+            </p>
+        ) : null}
+      </>
     </section>
   );
 }

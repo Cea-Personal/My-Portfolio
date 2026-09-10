@@ -1,13 +1,13 @@
 import { apiResponse } from "@/lib/api/response";
 import { withPrivateApi } from "@/lib/api/private";
 import { createHash } from "node:crypto";
-import { requestCareerBrainRefresh } from "@/inngest/career-brain-events";
+import { requestJournalKnowledgeIndex } from "@/inngest/journal-knowledge-index";
 export function GET(request: Request) {
   return withPrivateApi(request, async ({ client, ownerId }) => {
     const { data, error } = await client
       .schema("app")
       .from("journal_entries")
-      .select("*, journal_versions(*), journal_insights(*)")
+      .select("*, journal_versions(*)")
       .eq("owner_id", ownerId)
       .is("deleted_at", null)
       .order("created_at", { ascending: false });
@@ -17,7 +17,6 @@ export function GET(request: Request) {
       // Older rows and relationship failures can surface nullable child
       // collections. Keep the client contract array-shaped.
       journal_versions: Array.isArray(entry.journal_versions) ? entry.journal_versions : [],
-      journal_insights: Array.isArray(entry.journal_insights) ? entry.journal_insights : []
     }));
     return apiResponse({ entries }, request);
   });
@@ -72,9 +71,7 @@ export async function POST(request: Request) {
         .insert(tags.map((tag: string) => ({ entry_id: entry.id, tag })));
       if (insertedTags.error) throw insertedTags.error;
     }
-    await requestCareerBrainRefresh(ownerId, "journal", `${entry.id}:${contentHash}`).catch(
-      () => undefined
-    );
+    await requestJournalKnowledgeIndex(ownerId, entry.id, contentHash).catch(() => undefined);
     return apiResponse({ ...entry, currentVersion: version }, request, 201);
   });
 }
