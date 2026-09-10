@@ -216,15 +216,21 @@ export function CareerBrain() {
     let active = true;
     void Promise.all(
       projects.map(async (project) => {
-        const response = await fetch(
-          `/api/v1/portfolio/projects/${encodeURIComponent(project.id)}/media`,
-          { cache: "no-store" }
-        );
-        if (!response.ok) return [project.id, []] as const;
-        const payload = (await response.json().catch(() => ({}))) as {
-          data?: { media?: ProjectMedia[] };
-        };
-        return [project.id, payload.data?.media ?? []] as const;
+        try {
+          const response = await fetch(
+            `/api/v1/portfolio/projects/${encodeURIComponent(project.id)}/media`,
+            { cache: "no-store" }
+          );
+          if (!response.ok) return [project.id, []] as const;
+          const payload = (await response.json().catch(() => ({}))) as {
+            data?: { media?: ProjectMedia[] };
+          };
+          return [project.id, payload.data?.media ?? []] as const;
+        } catch {
+          // Media is optional enrichment. A storage or media endpoint outage
+          // must never prevent the synthesized career details from rendering.
+          return [project.id, []] as const;
+        }
       })
     ).then((entries) => {
       if (active) {
@@ -239,13 +245,18 @@ export function CareerBrain() {
   }, [content]);
 
   async function refreshProjectMedia(projectKey: string) {
-    const response = await fetch(
-      `/api/v1/portfolio/projects/${encodeURIComponent(projectKey)}/media`,
-      { cache: "no-store" }
-    );
-    if (!response.ok) throw new Error("Project media could not be loaded.");
-    const payload = (await response.json()) as { data?: { media?: ProjectMedia[] } };
-    setProjectMedia((current) => ({ ...current, [projectKey]: payload.data?.media ?? [] }));
+    try {
+      const response = await fetch(
+        `/api/v1/portfolio/projects/${encodeURIComponent(projectKey)}/media`,
+        { cache: "no-store" }
+      );
+      if (!response.ok) return false;
+      const payload = (await response.json()) as { data?: { media?: ProjectMedia[] } };
+      setProjectMedia((current) => ({ ...current, [projectKey]: payload.data?.media ?? [] }));
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   async function generateProjectCover(item: CareerBrainItem) {
@@ -271,8 +282,12 @@ export function CareerBrain() {
       };
       if (!response.ok)
         throw new Error(payload.data?.detail ?? payload.data?.code ?? "Image generation failed.");
-      await refreshProjectMedia(item.id);
-      setNotice("Cover generated as a private draft. Approve it when you are happy with it.");
+      const mediaLoaded = await refreshProjectMedia(item.id);
+      setNotice(
+        mediaLoaded
+          ? "Cover generated as a private draft. Approve it when you are happy with it."
+          : "Cover generated, but the media preview is temporarily unavailable. Career details remain available."
+      );
       setProjectImageReferences((current) => ({ ...current, [item.id]: [] }));
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Image generation failed.");
@@ -301,8 +316,12 @@ export function CareerBrain() {
       };
       if (!response.ok)
         throw new Error(payload.data?.detail ?? payload.data?.code ?? "Image upload failed.");
-      await refreshProjectMedia(item.id);
-      setNotice("Image uploaded as a private draft. Approve it to use it in the portfolio.");
+      const mediaLoaded = await refreshProjectMedia(item.id);
+      setNotice(
+        mediaLoaded
+          ? "Image uploaded as a private draft. Approve it to use it in the portfolio."
+          : "Image uploaded, but the media preview is temporarily unavailable."
+      );
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Image upload failed.");
     } finally {
@@ -326,8 +345,12 @@ export function CareerBrain() {
         }
       );
       if (!response.ok) throw new Error("The project image could not be approved.");
-      await refreshProjectMedia(item.id);
-      setNotice("Project cover approved. Build and activate a portfolio snapshot to publish it.");
+      const mediaLoaded = await refreshProjectMedia(item.id);
+      setNotice(
+        mediaLoaded
+          ? "Project cover approved. Build and activate a portfolio snapshot to publish it."
+          : "Project cover approved, but the media preview is temporarily unavailable. Build and activate a snapshot when ready."
+      );
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "The project image could not be approved.");
     } finally {
@@ -495,8 +518,8 @@ export function CareerBrain() {
               </p>
             </header>
             <div className="career-synthesis-list">
-              {content.experiences.map((item) => (
-                <details key={item.id}>
+              {content.experiences.map((item, itemIndex) => (
+                <details key={`${item.id}-${String(itemIndex)}`}>
                   <summary>
                     <span>
                       <strong>{value(item, "role")}</strong>
@@ -511,8 +534,8 @@ export function CareerBrain() {
                       <section>
                         <h3>Experience</h3>
                         <ul>
-                          {list(item, "experience").map((entry) => (
-                            <li key={entry}>{entry}</li>
+                          {list(item, "experience").map((entry, entryIndex) => (
+                            <li key={`${entry}-${String(entryIndex)}`}>{entry}</li>
                           ))}
                         </ul>
                       </section>
@@ -521,8 +544,8 @@ export function CareerBrain() {
                       <section>
                         <h3>Projects carried out in this role</h3>
                         <ul>
-                          {list(item, "projects").map((entry) => (
-                            <li key={entry}>{entry}</li>
+                          {list(item, "projects").map((entry, entryIndex) => (
+                            <li key={`${entry}-${String(entryIndex)}`}>{entry}</li>
                           ))}
                         </ul>
                       </section>
@@ -536,8 +559,8 @@ export function CareerBrain() {
                       <details>
                         <summary>Source details</summary>
                         <ul>
-                          {list(item, "evidence").map((entry) => (
-                            <li key={entry}>{entry}</li>
+                          {list(item, "evidence").map((entry, entryIndex) => (
+                            <li key={`${entry}-${String(entryIndex)}`}>{entry}</li>
                           ))}
                         </ul>
                       </details>
@@ -564,8 +587,8 @@ export function CareerBrain() {
               {projectGroups.map((group) => (
                 <section key={group.category} className="career-project-group">
                   <h3>{group.category}</h3>
-                  {group.items.map((item) => (
-                    <article key={item.id}>
+                  {group.items.map((item, itemIndex) => (
+                    <article key={`${item.id}-${String(itemIndex)}`}>
                       <h4>{value(item, "title")}</h4>
                       {value(item, "role") ? <small>{value(item, "role")}</small> : null}
                       <p>{value(item, "summary")}</p>
@@ -578,8 +601,8 @@ export function CareerBrain() {
                         <div>
                           <strong>How it was built</strong>
                           <ul>
-                            {list(item, "process").map((entry) => (
-                              <li key={entry}>{entry}</li>
+                            {list(item, "process").map((entry, entryIndex) => (
+                              <li key={`${entry}-${String(entryIndex)}`}>{entry}</li>
                             ))}
                           </ul>
                         </div>
@@ -691,8 +714,8 @@ export function CareerBrain() {
                         <details>
                           <summary>Source details</summary>
                           <ul>
-                            {list(item, "evidence").map((entry) => (
-                              <li key={entry}>{entry}</li>
+                          {list(item, "evidence").map((entry, entryIndex) => (
+                            <li key={`${entry}-${String(entryIndex)}`}>{entry}</li>
                             ))}
                           </ul>
                         </details>
@@ -717,8 +740,8 @@ export function CareerBrain() {
               <h2 id="career-credentials-title">Education and certifications</h2>
             </header>
             <div className="career-lined-list">
-              {content.education.map((item) => (
-                <article key={item.id}>
+              {content.education.map((item, itemIndex) => (
+                <article key={`${item.id}-${String(itemIndex)}`}>
                   <div>
                     <h3>{value(item, "qualification")}</h3>
                     <p>
@@ -735,8 +758,8 @@ export function CareerBrain() {
                   />
                 </article>
               ))}
-              {content.certifications.map((item) => (
-                <article key={item.id}>
+              {content.certifications.map((item, itemIndex) => (
+                <article key={`${item.id}-${String(itemIndex)}`}>
                   <div>
                     <h3>{value(item, "name")}</h3>
                     <p>
@@ -762,8 +785,8 @@ export function CareerBrain() {
               <h2 id="career-skills-title">Skills grouped by how you use them.</h2>
             </header>
             <div className="career-lined-list">
-              {technicalSkills.map((item) => (
-                <article key={item.id}>
+              {technicalSkills.map((item, itemIndex) => (
+                <article key={`${item.id}-${String(itemIndex)}`}>
                   <div>
                     <h3>{value(item, "category")}</h3>
                     <p>{list(item, "skills").join(" · ")}</p>

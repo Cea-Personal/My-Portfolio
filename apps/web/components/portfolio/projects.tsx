@@ -5,15 +5,20 @@ import { PortfolioProof } from "./portfolio-proof";
 
 const PROJECT_CATEGORIES = [
   "Software",
-  "AI software engineering",
-  "Data platform",
-  "Data engineering",
-  "AI engineering",
-  "AI data engineering"
+  "Data",
+  "AI"
 ] as const;
 
 function canonicalCategory(value: string | undefined) {
   const normalized = value?.trim().toLocaleLowerCase();
+  if (!normalized) return value;
+  if (normalized === "software" || normalized.includes("software engineering")) {
+    return normalized.includes("ai") ? "AI" : "Software";
+  }
+  if (normalized === "data" || normalized.includes("data platform") || normalized === "data engineering") {
+    return "Data";
+  }
+  if (normalized.includes("ai") || normalized.includes("machine learning")) return "AI";
   return PROJECT_CATEGORIES.find((category) => category.toLocaleLowerCase() === normalized) ?? value;
 }
 
