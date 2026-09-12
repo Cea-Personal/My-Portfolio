@@ -107,7 +107,8 @@ export async function generateImageWithProvider(
     form.set("prompt", prompt);
     form.set("n", "1");
     form.set("size", "1536x1024");
-    form.set("response_format", "b64_json");
+    // Do not send `response_format` here. OpenAI's current image models return
+    // b64_json by default and reject the legacy parameter on the edits API.
     for (const [index, reference] of referenceImages.entries()) {
       const copy = new ArrayBuffer(reference.bytes.byteLength);
       new Uint8Array(copy).set(reference.bytes);
@@ -134,8 +135,7 @@ export async function generateImageWithProvider(
         model: provider.model,
         prompt,
         n: 1,
-        size: "1536x1024",
-        response_format: "b64_json"
+        size: "1536x1024"
       }),
       signal: requestSignal
     });

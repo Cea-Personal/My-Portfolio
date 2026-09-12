@@ -21,9 +21,8 @@ export default async function PublicBlogIndex() {
         </header>
         {posts.length ? (
           <ol className="writing-index">
-            {posts.map((post, index) => (
+            {posts.map((post) => (
               <li key={post.id}>
-                <span>{String(index + 1).padStart(2, "0")}</span>
                 <div>
                   <p>{new Date(post.visible_at).toLocaleDateString()}</p>
                   <h2>

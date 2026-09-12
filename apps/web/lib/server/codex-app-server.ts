@@ -28,6 +28,9 @@ const TASK_TO_NATIVE_ROLE = {
   public_qa: "portfolio-assistant",
   role_fit: "role-fit-analyst",
   evidence_extraction: "career-synthesizer",
+  career_profile_synthesis: "career-synthesizer",
+  career_experience_synthesis: "career-synthesizer",
+  career_project_synthesis: "career-synthesizer",
   career_gap: "career-gap-analyst",
   job_scoring: "job-matcher",
   document_composition: "application-writer",
@@ -89,11 +92,19 @@ const TASK_OUTPUT_SCHEMAS: Readonly<Record<string, JsonSchema>> = {
       summary: textSchema(),
       experience: textListSchema(),
       projects: textListSchema(),
+      workProjects: objectListSchema({
+        title: textSchema(),
+        summary: textSchema(),
+        outcome: textSchema(),
+        technologies: textListSchema(),
+        evidence: textListSchema()
+      }),
       technologies: textListSchema(),
       evidence: textListSchema()
     }),
     projects: objectListSchema({
       title: textSchema(),
+      projectType: textSchema(),
       category: textSchema(),
       summary: textSchema(),
       description: textSchema(),
@@ -107,6 +118,7 @@ const TASK_OUTPUT_SCHEMAS: Readonly<Record<string, JsonSchema>> = {
       liveUrl: textSchema(),
       githubUrl: textSchema(),
       videoUrl: textSchema(),
+      links: textListSchema(),
       process: textListSchema(),
       evidence: textListSchema()
     }),
@@ -126,6 +138,69 @@ const TASK_OUTPUT_SCHEMAS: Readonly<Record<string, JsonSchema>> = {
       category: textSchema(),
       skills: textListSchema(),
       summary: textSchema()
+    })
+  }),
+  career_profile_synthesis: objectSchema({
+    cvSummary: textSchema(),
+    portfolioSummary: textSchema(),
+    about: textSchema(),
+    education: objectListSchema({
+      qualification: textSchema(),
+      institution: textSchema(),
+      period: textSchema(),
+      summary: textSchema()
+    }),
+    certifications: objectListSchema({
+      name: textSchema(),
+      issuer: textSchema(),
+      date: textSchema(),
+      summary: textSchema()
+    }),
+    technicalSkills: objectListSchema({
+      category: textSchema(),
+      skills: textListSchema(),
+      summary: textSchema()
+    })
+  }),
+  career_experience_synthesis: objectSchema({
+    experiences: objectListSchema({
+      organization: textSchema(),
+      role: textSchema(),
+      period: textSchema(),
+      summary: textSchema(),
+      experience: textListSchema(),
+      projects: textListSchema(),
+      workProjects: objectListSchema({
+        title: textSchema(),
+        summary: textSchema(),
+        outcome: textSchema(),
+        technologies: textListSchema(),
+        evidence: textListSchema()
+      }),
+      technologies: textListSchema(),
+      evidence: textListSchema()
+    })
+  }),
+  career_project_synthesis: objectSchema({
+    projects: objectListSchema({
+      title: textSchema(),
+      projectType: textSchema(),
+      category: textSchema(),
+      summary: textSchema(),
+      description: textSchema(),
+      problem: textSchema(),
+      approach: textSchema(),
+      role: textSchema(),
+      outcome: textSchema(),
+      highlights: textListSchema(),
+      technologies: textListSchema(),
+      url: textSchema(),
+      liveUrl: textSchema(),
+      githubUrl: textSchema(),
+      videoUrl: textSchema(),
+      links: textListSchema(),
+      process: textListSchema(),
+      evidence: textListSchema()
     })
   }),
   career_gap: objectSchema({

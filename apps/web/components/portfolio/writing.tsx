@@ -1,7 +1,13 @@
 export function Writing({
   items = []
 }: {
-  items?: readonly { title: string; summary: string; href?: string; meta?: string }[];
+  items?: readonly {
+    title: string;
+    summary: string;
+    href?: string;
+    meta?: string;
+    external?: boolean;
+  }[];
 }) {
   return (
     <section id="blog" className="blog-section" aria-labelledby="writing-title">
@@ -14,16 +20,30 @@ export function Writing({
       </header>
       {items.length ? (
         <ol className="writing-index">
-          {items.map((item, index) => (
+          {items.map((item) => (
             <li key={item.title}>
-              <span>{String(index + 1).padStart(2, "0")}</span>
               <div>
                 <p>{item.meta ?? "From the work"}</p>
-                <h3>{item.href ? <a href={item.href}>{item.title}</a> : item.title}</h3>
+                <h3>
+                  {item.href ? (
+                    <a
+                      href={item.href}
+                      {...(item.external ? { target: "_blank", rel: "noreferrer" } : {})}
+                    >
+                      {item.title}
+                    </a>
+                  ) : (
+                    item.title
+                  )}
+                </h3>
                 <span>{item.summary}</span>
               </div>
               {item.href ? (
-                <a href={item.href} aria-label={`Read ${item.title}`}>
+                <a
+                  href={item.href}
+                  aria-label={`Read ${item.title}`}
+                  {...(item.external ? { target: "_blank", rel: "noreferrer" } : {})}
+                >
                   Read ↗
                 </a>
               ) : null}

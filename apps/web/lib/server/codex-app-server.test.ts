@@ -12,6 +12,7 @@ describe("native Codex orchestration", () => {
     expect(codexAgentRoleForTask("document_composition")).toBe("application-writer");
     expect(codexAgentRoleForTask("role_fit")).toBe("role-fit-analyst");
     expect(codexAgentRoleForTask("image_generation")).toBe("image-generator");
+    expect(codexAgentRoleForTask("career_project_synthesis")).toBe("career-synthesizer");
   });
 
   it("rejects tasks without a native role", () => {
@@ -39,6 +40,9 @@ describe("native Codex orchestration", () => {
       "public_qa",
       "role_fit",
       "evidence_extraction",
+      "career_profile_synthesis",
+      "career_experience_synthesis",
+      "career_project_synthesis",
       "career_gap",
       "job_scoring",
       "document_composition",
@@ -54,6 +58,25 @@ describe("native Codex orchestration", () => {
       expect(Object.keys(schema.properties ?? {}).length).toBeGreaterThan(0);
       expect(schema.required).toEqual(Object.keys(schema.properties ?? {}));
     }
+  });
+
+  it("uses focused Career Brain contracts for parallel native synthesis", () => {
+    expect(
+      Object.keys(codexOutputSchemaForTask("career_profile_synthesis").properties ?? {})
+    ).toEqual([
+      "cvSummary",
+      "portfolioSummary",
+      "about",
+      "education",
+      "certifications",
+      "technicalSkills"
+    ]);
+    expect(
+      Object.keys(codexOutputSchemaForTask("career_experience_synthesis").properties ?? {})
+    ).toEqual(["experiences"]);
+    expect(
+      Object.keys(codexOutputSchemaForTask("career_project_synthesis").properties ?? {})
+    ).toEqual(["projects"]);
   });
 
   it("requires interview questions to include grounded suggested answers", () => {

@@ -1,11 +1,13 @@
 import { loadPublicPortfolio } from "@/lib/api/public-data";
 import { publicApiResponse } from "@/lib/api/response";
 
+export const dynamic = "force-dynamic";
+
 const sectionTitles: Record<string, string> = {
   hero: "Hero",
   about: "About",
   career: "Experience",
-  projects: "Personal projects",
+  projects: "Projects",
   blog: "Blog",
   contact: "Contact"
 };
@@ -15,12 +17,10 @@ export async function GET(request: Request) {
   const groups = new Map<string, { id: string; title: string; items: unknown[] }>();
   for (const item of snapshot.items) {
     const sourceType = typeof item.source_entity_type === "string" ? item.source_entity_type : "";
-    const hasCareerStage =
-      typeof item.career_stage === "string" && item.career_stage.trim().length > 0;
     const section =
       sourceType === "post"
         ? "blog"
-        : sourceType === "project" && !hasCareerStage
+        : sourceType === "project"
           ? "projects"
           : ["experience", "project", "achievement", "skill"].includes(sourceType)
             ? "career"

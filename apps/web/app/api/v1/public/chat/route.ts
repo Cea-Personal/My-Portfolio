@@ -12,6 +12,8 @@ import {
   resolveReasoningProviders
 } from "@/lib/server/reasoning-provider";
 import { rerankCandidates } from "@/lib/server/reranker-provider";
+import { publicPortfolioItemContext } from "@/lib/public-assistant-context";
+import { expandTechnologyTerms } from "@/lib/portfolio-career-rules";
 import {
   CAREER_OUTPUT_SCOPE_INSTRUCTION,
   EMPLOYER_PRIVACY_INSTRUCTION,
@@ -56,8 +58,9 @@ async function retrievePublicVectorEvidence(
       const item = row as Record<string, unknown>;
       const publicEvidenceId =
         typeof item.public_evidence_id === "string" ? item.public_evidence_id : "";
-      const excerpt =
-        typeof item.sanitized_excerpt === "string" ? item.sanitized_excerpt.trim() : "";
+      const excerpt = expandTechnologyTerms(
+        typeof item.sanitized_excerpt === "string" ? item.sanitized_excerpt.trim() : ""
+      );
       if (!publicEvidenceId || !excerpt) return [];
       return [
         {
@@ -103,11 +106,17 @@ async function composeGroundedAnswer(
       ...evidence.filter((item) => cited.has(item.handle)),
       ...evidence.filter((item) => !cited.has(item.handle))
     ]
+      .filter(
+        (item, index, values) =>
+          values.findIndex(
+            (candidate) => candidate.handle === item.handle || candidate.text === item.text
+          ) === index
+      )
       .slice(0, 12)
       .map((item) => ({
         handle: item.handle,
         source: item.source ?? "Portfolio",
-        text: item.text
+        text: item.text.slice(0, 5_000)
       }));
     if (!context.length) return result;
     const generated = await generateReasoningJson(
@@ -117,8 +126,11 @@ async function composeGroundedAnswer(
         CAREER_OUTPUT_SCOPE_INSTRUCTION,
         EMPLOYER_PRIVACY_INSTRUCTION,
         "Answer the visitor's question using only the supplied published portfolio context.",
-        "Synthesize a clear, human answer from multiple context entries when useful; do not copy one entry blindly.",
+        "Aggregate the relevant facts across context entries, then answer the exact question directly in concise, natural prose.",
+        "Prefer 1-3 short paragraphs or a compact list when the question asks for several examples. Do not dump or repeat the full context.",
         "Do not invent employers, dates, metrics, tools, projects, or personal details.",
+        "Use Lead Software Engineer as the Bloom Institute of Technology role title; do not describe it as Technical Team Lead.",
+        "Wheretocode and Lambdadoor are professional team projects. Describe Basil's public project relationship as Contributor and answer with the supported work he contributed, without labelling either project personal.",
         "The sources array must contain only exact evidence handles from the supplied context.",
         "If the context does not support an answer, return an empty sources array and say you could not find enough information to answer that yet.",
         "Return JSON only with answer, sources, confidence, status, and message."
@@ -128,9 +140,10 @@ async function composeGroundedAnswer(
     );
     const answer =
       typeof generated.output.answer === "string" ? generated.output.answer.trim() : "";
+    const allowedHandles = new Set(context.map((item) => item.handle));
     const sources = Array.isArray(generated.output.sources)
       ? generated.output.sources.filter(
-          (value): value is string => typeof value === "string" && cited.has(value)
+          (value): value is string => typeof value === "string" && allowedHandles.has(value)
         )
       : [];
     if (!answer || !sources.length) return result;
@@ -222,7 +235,9 @@ export async function POST(request: Request) {
       PUBLIC_ASSISTANT_BLOCKED_SOURCE_TYPES.has(evidenceType)
     )
       return [];
-    const text = typeof item.sanitized_excerpt === "string" ? item.sanitized_excerpt : "";
+    const text = expandTechnologyTerms(
+      typeof item.sanitized_excerpt === "string" ? item.sanitized_excerpt : ""
+    );
     if (!text || typeof item.public_evidence_id !== "string") return [];
     const handle = issueEvidenceHandle({
       chunkId: item.public_evidence_id,
@@ -252,18 +267,7 @@ export async function POST(request: Request) {
     const title = typeof item.title === "string" ? item.title.trim() : "";
     const summary = typeof item.public_summary === "string" ? item.public_summary.trim() : "";
     if (!publicId || !summary) return [];
-    const details = [
-      title,
-      typeof item.subtitle === "string" ? item.subtitle.trim() : "",
-      typeof item.company_name === "string" ? item.company_name.trim() : "",
-      typeof item.organization_name === "string" ? item.organization_name.trim() : "",
-      typeof item.period === "string" ? item.period.trim() : "",
-      typeof item.display_metric === "string" ? item.display_metric.trim() : "",
-      Array.isArray(item.display_technologies)
-        ? item.display_technologies.filter((value): value is string => typeof value === "string")
-        : []
-    ].flat();
-    const text = [...new Set([title, ...details, summary].filter(Boolean))].join(" — ");
+    const text = publicPortfolioItemContext(item);
     if (!text) return [];
     const handle = issueEvidenceHandle({
       chunkId: `public-item:${publicId}`,
@@ -306,11 +310,19 @@ export async function POST(request: Request) {
     : [...publishedItemEvidence, ...publishedBlogEvidence, ...evidence];
   const retrieved = answerPublicQuestion(question, allEvidence);
   const result =
-    ownerId && vectorEvidence.length
+    ownerId && allEvidence.length
       ? await composeGroundedAnswer(question, retrieved, allEvidence, ownerId)
       : retrieved;
   const safeResult = anonymizeEmployerReferences(result) as ReturnType<typeof answerPublicQuestion>;
+  const sourceByHandle = new Map(allEvidence.map((item) => [item.handle, item.source]));
+  const responseResult = {
+    ...safeResult,
+    answer: expandTechnologyTerms(safeResult.answer),
+    citationLabels: safeResult.citations.map(
+      (handle) => sourceByHandle.get(handle) ?? "Published portfolio"
+    )
+  };
   if (request.headers.get("accept")?.includes("text/event-stream"))
-    return streamResponse(safeResult, request, request.headers.get("last-event-id"));
-  return publicApiResponse(safeResult, request, safeResult.abstained ? 200 : 201);
+    return streamResponse(responseResult, request, request.headers.get("last-event-id"));
+  return publicApiResponse(responseResult, request, safeResult.abstained ? 200 : 201);
 }

@@ -6,6 +6,8 @@ export interface CareerTimelineProject {
   title: string;
   summary: string;
   href?: string;
+  outcome?: string;
+  technologies?: readonly string[];
 }
 
 export interface CareerTimelineStage {
@@ -44,7 +46,6 @@ export function CareerTimeline({ stages = [] }: { stages?: readonly CareerTimeli
                   setOpenIndex((current) => (current === index ? null : index));
                 }}
               >
-                <span>{String(index + 1).padStart(2, "0")}</span>
                 <strong>{stage.title}</strong>
                 <small>{stage.company ?? stage.period ?? "Career chapter"}</small>
                 <em>{stage.summary}</em>
@@ -53,30 +54,11 @@ export function CareerTimeline({ stages = [] }: { stages?: readonly CareerTimeli
               {index === openIndex ? (
                 <article id={`career-detail-${String(index)}`} className="career-accordion-detail">
                   <div className="career-detail-intro">
-                    <p>{stage.period ?? `Chapter ${String(index + 1).padStart(2, "0")}`}</p>
+                    <p>{stage.period ?? "Career chapter"}</p>
                     <h3>{stage.title}</h3>
                     {stage.company ? <strong>{stage.company}</strong> : null}
                   </div>
-                  <div className="career-unfold">
-                    <section className="career-unfold-panel career-work">
-                      <h4>Selected work</h4>
-                      {stage.projects?.length ? (
-                        <ul>
-                          {stage.projects.map((project) => (
-                            <li key={project.title}>
-                              {project.href ? (
-                                <a href={project.href}>{project.title}</a>
-                              ) : (
-                                project.title
-                              )}
-                              <p>{project.summary}</p>
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <p className="career-detail-empty">Published work will appear here.</p>
-                      )}
-                    </section>
+                  <div className="career-unfold career-unfold-simple">
                     <section className="career-unfold-panel career-impact">
                       <h4>Experience</h4>
                       {stage.experience?.length || stage.impacts?.length ? (

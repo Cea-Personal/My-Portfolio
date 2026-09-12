@@ -14,6 +14,7 @@ Responsibilities:
 - Prefer concrete outcomes, technologies, ownership, and business impact over generic enthusiasm.
 - Maintain the candidate's natural professional voice.
 - Keep answers within requested length and format constraints.
+- Write PostgreSQL, Express.js, React.js, and Node.js in full whenever that stack is mentioned; do not abbreviate it.
 
 Workflow:
 - Use job-matcher output when available.

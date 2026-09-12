@@ -1,21 +1,17 @@
 const proofSteps = [
   {
-    number: "01",
     title: "Structure",
     text: "Career history, projects, skills, and outcomes are modelled as connected data."
   },
   {
-    number: "02",
     title: "Curate",
     text: "Only reviewed facts are projected into the portfolio experience."
   },
   {
-    number: "03",
     title: "Match",
     text: "A role description is compared with published facts to explain fit."
   },
   {
-    number: "04",
     title: "Answer",
     text: "The portfolio assistant answers from portfolio facts and returns supporting references."
   }
@@ -65,8 +61,7 @@ export function PortfolioProof({ sourceUrl }: { sourceUrl?: string }) {
         </div>
         <ol className="proof-flow">
           {proofSteps.map((step) => (
-            <li key={step.number}>
-              <span>{step.number}</span>
+            <li key={step.title}>
               <h3>{step.title}</h3>
               <p>{step.text}</p>
             </li>

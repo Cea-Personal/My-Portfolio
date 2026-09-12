@@ -1,5 +1,6 @@
 import artifact from "@/public/generated/public-fallback.json";
 import type { PublicPortfolioSnapshot } from "@career-os/database";
+import { expandTechnologyLabels, expandTechnologyTerms } from "@/lib/portfolio-career-rules";
 
 export interface PublicBlogPost {
   id: string;
@@ -139,13 +140,13 @@ export function parsePublicBlogPost(value: unknown): PublicBlogPost | null {
   return {
     id: value.id,
     slug: value.slug,
-    title: value.title,
-    excerpt: value.excerpt,
-    markdown: value.markdown,
+    title: expandTechnologyTerms(value.title),
+    excerpt: expandTechnologyTerms(value.excerpt),
+    markdown: expandTechnologyTerms(value.markdown),
     cover_url: value.cover_url,
-    tags: value.tags,
-    seo_title: value.seo_title,
-    seo_description: value.seo_description,
+    tags: expandTechnologyLabels(value.tags),
+    seo_title: value.seo_title ? expandTechnologyTerms(value.seo_title) : null,
+    seo_description: value.seo_description ? expandTechnologyTerms(value.seo_description) : null,
     visible_at: value.visible_at,
     evidence_type: "technical_knowledge",
     supports_employment_claim: false

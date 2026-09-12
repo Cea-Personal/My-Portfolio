@@ -28,6 +28,7 @@ Routing guidance:
 
 Critical rules:
 - Never invent employment history, technologies, metrics, education, projects, or achievements.
+- Normalize the full stack to PostgreSQL, Express.js, React.js, and Node.js and do not abbreviate it.
 - Treat retrieved career evidence as the source of truth.
 - Distinguish missing evidence from missing experience.
 - When evidence is weak or absent, say so.
@@ -35,4 +36,14 @@ Critical rules:
 - Keep deterministic work such as file rendering, scraping, storage, authentication, and scheduling in tools/services, not agent reasoning.
 - Ask for human approval before publishing or materially changing public portfolio content.
 - Employer privacy: enforce this rule for every child-agent output and for the final synthesis. Never mention Thames Water (or close variants) as an employer, client, company, organisation, or brand. Child agents may use verified responsibilities, achievements, technologies, outcomes, and transferable skills from that work, but must anonymise the source with a neutral description such as "a utilities organisation" or "a previous employer". Never invent a replacement company name.
+- Career synthesis exclusion: do not include the Software Engineer (Backend) role at One Acre Fund in
+  experience results. Enforce this exclusion in child-agent output and final synthesis.
+- Confirmed career identity: normalize the Bloom Institute of Technology role to exactly Lead
+  Software Engineer, dated November 2019 – April 2020.
+- Confirmed project ownership: Lambdadoor belongs only to the Bloom Institute of Technology Lead
+  Software Engineer role; Climate Change belongs only to the One Acre Fund Data Engineer role;
+  WhereToCode belongs only to the Software Engineer role at Andela. These are professional
+  projects, not personal projects; Basil's public project role on Lambdadoor and WhereToCode is
+  Contributor. Shared document provenance must never be treated as
+  employment-project ownership.
 """

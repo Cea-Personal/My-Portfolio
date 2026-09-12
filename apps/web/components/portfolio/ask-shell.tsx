@@ -15,6 +15,7 @@ type ConversationTurn = {
   question: string;
   answer?: string;
   citations: string[];
+  citationLabels: string[];
   unavailable: boolean;
   status: "loading" | "complete" | "error";
 };
@@ -37,6 +38,7 @@ export function AskShell() {
         id: turnId,
         question: normalizedQuestion,
         citations: [],
+        citationLabels: [],
         unavailable: false,
         status: "loading"
       }
@@ -48,7 +50,12 @@ export function AskShell() {
         body: JSON.stringify({ question: normalizedQuestion })
       });
       const payload = (await response.json()) as {
-        data?: { answer?: string; citations?: string[]; unavailable?: boolean };
+        data?: {
+          answer?: string;
+          citations?: string[];
+          citationLabels?: string[];
+          unavailable?: boolean;
+        };
       };
       if (!response.ok) throw new Error("request failed");
       setConversation((current) =>
@@ -56,8 +63,10 @@ export function AskShell() {
           turn.id === turnId
             ? {
                 ...turn,
-                answer: payload.data?.answer ?? "I don't have enough portfolio facts to answer that.",
+                answer:
+                  payload.data?.answer ?? "I couldn't find enough information to answer that yet.",
                 citations: payload.data?.citations ?? [],
+                citationLabels: payload.data?.citationLabels ?? [],
                 unavailable: payload.data?.unavailable === true,
                 status: "complete"
               }
@@ -142,20 +151,14 @@ export function AskShell() {
           </summary>
           <ol>
             <li data-state={latestTurn ? "complete" : "waiting"}>
-              <span>01</span>
               <code>classify_question</code>
               <small>{latestTurn ? "intent resolved" : "awaiting question"}</small>
             </li>
             <li
               data-state={
-                status === "loading"
-                  ? "running"
-                  : latestTurn?.answer
-                    ? "complete"
-                    : "waiting"
+                status === "loading" ? "running" : latestTurn?.answer ? "complete" : "waiting"
               }
             >
-              <span>02</span>
               <code>retrieve_portfolio_facts</code>
               <small>
                 {status === "loading"
@@ -166,7 +169,6 @@ export function AskShell() {
               </small>
             </li>
             <li data-state={latestTurn?.answer ? "complete" : "waiting"}>
-              <span>03</span>
               <code>compose_grounded_answer</code>
               <small>{latestTurn?.answer ? "facts checked" : "idle"}</small>
             </li>
@@ -196,7 +198,9 @@ export function AskShell() {
                     {turn.citations.length ? (
                       <ul aria-label="Supporting facts">
                         {turn.citations.map((citation, citationIndex) => (
-                          <li key={`${turn.id}-citation-${String(citationIndex)}`}>{citation}</li>
+                          <li key={`${turn.id}-${citation}`}>
+                            {turn.citationLabels[citationIndex] ?? "Published portfolio"}
+                          </li>
                         ))}
                       </ul>
                     ) : (

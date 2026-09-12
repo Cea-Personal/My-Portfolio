@@ -1,5 +1,7 @@
 import { loadPublicPortfolio } from "@/lib/api/public-data";
+import { expandTechnologyLabels, expandTechnologyTerms } from "@/lib/portfolio-career-rules";
 import { projectYoutubeEmbedUrl, youtubeEmbedUrl } from "@/lib/portfolio-media";
+import { ThemeToggle } from "@/components/portfolio/theme-toggle";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +35,7 @@ function firstImage(media: unknown): { url: string; alt: string } | null {
   if (!Array.isArray(media)) return null;
   for (const item of media) {
     const itemRecord = record(item);
-    const value = typeof item === "string" ? item : itemRecord.url ?? itemRecord.src;
+    const value = typeof item === "string" ? item : (itemRecord.url ?? itemRecord.src);
     const url = safeExternalUrl(value);
     if (!url || youtubeEmbedUrl(url)) continue;
     return { url, alt: text(itemRecord.alt, "Project cover image") };
@@ -43,9 +45,18 @@ function firstImage(media: unknown): { url: string; alt: string } | null {
 
 export default async function ProjectPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
+  let projectSlug = slug;
+  try {
+    projectSlug = decodeURIComponent(slug);
+  } catch {
+    // Keep the original route segment if a malformed escape reaches the page;
+    // it will safely fall through to the unavailable state below.
+  }
   const snapshot = await loadPublicPortfolio();
   const project = snapshot.items.find(
-    (item) => item.source_entity_type === "project" && item.detail_slug === slug
+    (item) =>
+      item.source_entity_type === "project" &&
+      (item.detail_slug === projectSlug || item.public_id === projectSlug)
   );
   if (!project) {
     return (
@@ -57,13 +68,18 @@ export default async function ProjectPage({ params }: { params: Promise<{ slug: 
   }
 
   const structured = record(project.structured_content);
-  const title = text(project.title, "Project");
-  const summary = text(project.public_summary, text(structured.summary, "A selected project."));
-  const description = text(structured.description, summary);
-  const problem = text(structured.problem);
-  const approach = text(structured.approach);
-  const role = text(structured.role, text(project.subtitle));
-  const outcome = text(structured.outcome);
+  const displayText = (value: unknown, fallback = "") =>
+    expandTechnologyTerms(text(value, fallback));
+  const title = displayText(project.title, "Project");
+  const summary = displayText(
+    project.public_summary,
+    displayText(structured.summary, "A selected project.")
+  );
+  const description = displayText(structured.description, summary);
+  const problem = displayText(structured.problem);
+  const approach = displayText(structured.approach);
+  const role = displayText(structured.role, text(project.subtitle));
+  const outcome = displayText(structured.outcome);
   const points = Array.from(
     new Set([
       ...strings(structured.highlights),
@@ -71,10 +87,14 @@ export default async function ProjectPage({ params }: { params: Promise<{ slug: 
       ...strings(structured.experience),
       ...strings(structured.outcomes)
     ])
-  ).slice(0, 12);
-  const process = strings(structured.process).slice(0, 12);
-  const technologies = Array.from(
-    new Set([...strings(project.display_technologies), ...strings(structured.technologies)])
+  )
+    .map(expandTechnologyTerms)
+    .slice(0, 12);
+  const process = strings(structured.process).map(expandTechnologyTerms).slice(0, 12);
+  const technologies = expandTechnologyLabels(
+    Array.from(
+      new Set([...strings(project.display_technologies), ...strings(structured.technologies)])
+    )
   );
   const videoUrl = projectYoutubeEmbedUrl(project.sanitized_media, project.structured_content);
   const coverImage = firstImage(project.sanitized_media);
@@ -92,9 +112,12 @@ export default async function ProjectPage({ params }: { params: Promise<{ slug: 
 
   return (
     <main className="project-detail-page">
-      <p className="project-detail-back">
-        <a href="/#projects">← Back to selected projects</a>
-      </p>
+      <div className="project-detail-toolbar">
+        <p className="project-detail-back">
+          <a href="/#projects">← Back to selected projects</a>
+        </p>
+        <ThemeToggle />
+      </div>
       {snapshot.stale ? (
         <p className="portfolio-stale-notice" role="status">
           Showing the latest approved project snapshot while live content reconnects.
@@ -134,8 +157,11 @@ export default async function ProjectPage({ params }: { params: Promise<{ slug: 
       </header>
 
       <div className="project-detail-sections">
-        <section className="project-detail-section project-detail-overview" aria-labelledby="project-overview">
-          <p className="eyebrow">01 / The work</p>
+        <section
+          className="project-detail-section project-detail-overview"
+          aria-labelledby="project-overview"
+        >
+          <p className="eyebrow">The work</p>
           <h2 id="project-overview">What this project set out to solve.</h2>
           <p>{description}</p>
           {problem ? (
@@ -160,22 +186,23 @@ export default async function ProjectPage({ params }: { params: Promise<{ slug: 
 
         {points.length ? (
           <section className="project-detail-section" aria-labelledby="project-points">
-            <p className="eyebrow">02 / Project notes</p>
+            <p className="eyebrow">Project notes</p>
             <h2 id="project-points">The decisions and results worth remembering.</h2>
             <ul className="project-detail-list">
-              {points.map((point) => <li key={point}>{point}</li>)}
+              {points.map((point) => (
+                <li key={point}>{point}</li>
+              ))}
             </ul>
           </section>
         ) : null}
 
         {process.length ? (
           <section className="project-detail-section" aria-labelledby="project-process">
-            <p className="eyebrow">03 / How it was built</p>
+            <p className="eyebrow">How it was built</p>
             <h2 id="project-process">From first constraint to working system.</h2>
             <ol className="project-detail-process">
-              {process.map((step, index) => (
+              {process.map((step) => (
                 <li key={step}>
-                  <span>{String(index + 1).padStart(2, "0")}</span>
                   <p>{step}</p>
                 </li>
               ))}
@@ -185,10 +212,12 @@ export default async function ProjectPage({ params }: { params: Promise<{ slug: 
 
         {technologies.length ? (
           <section className="project-detail-section" aria-labelledby="project-skills">
-            <p className="eyebrow">04 / Skills and tools</p>
+            <p className="eyebrow">Skills and tools</p>
             <h2 id="project-skills">The technical choices behind it.</h2>
             <ul className="project-detail-tools">
-              {technologies.map((technology) => <li key={technology}>{technology}</li>)}
+              {technologies.map((technology) => (
+                <li key={technology}>{technology}</li>
+              ))}
             </ul>
           </section>
         ) : null}

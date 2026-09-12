@@ -15,6 +15,14 @@ import { loadPublicBlogPostsWithStatus, loadPublicPortfolio } from "@/lib/api/pu
 import { PublicEvents } from "@/components/analytics/public-events";
 import { CredentialsAndSkills } from "@/components/portfolio/credentials-skills";
 import { youtubeEmbedUrl } from "@/lib/portfolio-media";
+import {
+  expandTechnologyLabels,
+  expandTechnologyTerms,
+  normalizeCareerIdentity,
+  projectCareerPlacement,
+  projectContributionLabel,
+  sameCareerIdentity
+} from "@/lib/portfolio-career-rules";
 
 export const dynamic = "force-dynamic";
 
@@ -57,14 +65,8 @@ export default async function PublicPortfolioPage() {
   const configuredHeadline = typeof profile?.headline === "string" ? profile.headline.trim() : "";
   const headline =
     configuredHeadline && !/senior data\s*(?:&|and)\s*ai engineer/i.test(configuredHeadline)
-      ? configuredHeadline
+      ? expandTechnologyTerms(configuredHeadline)
       : "Senior Data Engineer";
-  const careerItems = items.filter(
-    (item) =>
-      item.source_entity_type === "experience" ||
-      item.source_entity_type === "career_experience" ||
-      (item.section === "experience" && String(item.title).toLowerCase() === "experience")
-  );
   const projectItems = items.filter(
     (item) => item.section === "projects" || item.source_entity_type === "project"
   );
@@ -85,97 +87,249 @@ export default async function PublicPortfolioPage() {
     (item) => item.section === "blog" || item.source_entity_type === "post"
   );
   const text = (value: unknown, fallback = "") => (typeof value === "string" ? value : fallback);
+  const displayText = (value: unknown, fallback = "") =>
+    expandTechnologyTerms(text(value, fallback));
   const list = (value: unknown) =>
     Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
   const record = (value: unknown) =>
     value && typeof value === "object" && !Array.isArray(value)
       ? (value as Record<string, unknown>)
       : {};
+  const objectList = (value: unknown) =>
+    Array.isArray(value)
+      ? value.filter(
+          (item): item is Record<string, unknown> =>
+            Boolean(item) && typeof item === "object" && !Array.isArray(item)
+        )
+      : [];
+  const publishedCareerItems = items.filter((item) => {
+    const isCareerItem =
+      item.source_entity_type === "experience" ||
+      item.source_entity_type === "career_experience" ||
+      (item.section === "experience" && String(item.title).toLowerCase() === "experience");
+    if (!isCareerItem) return false;
+    const structured = record(item.structured_content);
+    const role = text(item.title, text(structured.role));
+    const organization = text(
+      item.subtitle,
+      text(item.company_name, text(item.organization_name, text(structured.organization)))
+    );
+    return !(
+      /one\s+acre\s+fund/i.test(organization) && /software\s+engineer\s*\(?.*backend/i.test(role)
+    );
+  });
+  const projectNameKey = (value: unknown) =>
+    text(value)
+      .toLocaleLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim();
   const slugHref = (item: Record<string, unknown>) => {
-    const slug = text(item.detail_slug);
+    const slug = text(item.detail_slug, text(item.public_id));
     return slug ? `/projects/${encodeURIComponent(slug)}` : undefined;
   };
   const identities = (item: Record<string, unknown>) =>
     [text(item.career_stage), text(item.title)].filter(Boolean).map((value) => value.toLowerCase());
-  const stageKey = (item: Record<string, unknown>) =>
-    [identities(item)[0] ?? "career stage", text(item.subtitle), text(item.period)]
-      .join("|")
-      .toLowerCase();
-  const timelineStages: CareerTimelineStage[] = Array.from(
-    new Map(careerItems.map((item) => [stageKey(item), item])).values()
-  ).map((item) => {
-    const key = identities(item)[0] ?? "career stage";
+  const careerIdentityForItem = (item: Record<string, unknown>) => {
     const structured = record(item.structured_content);
-    const embeddedProjects = list(structured.projects).map((project) => ({
-      title: project,
-      summary: project
-    }));
-    const stageProjects = [
-      ...embeddedProjects,
-      ...projectItems
-        .filter((project) => identities(project).includes(key))
-        .map((project) => {
-          const href = slugHref(project);
-          return {
-            title: text(project.title, "Project"),
-            summary: text(project.public_summary),
-            ...(href ? { href } : {})
-          };
-        })
-    ];
-    const stageExperience = impactItems
-      .filter((impact) => identities(impact).includes(key))
-      .flatMap((impact) => [text(impact.display_metric, text(impact.public_summary))])
-      .filter(Boolean);
-    const directImpact = text(item.display_metric);
-    if (directImpact) stageExperience.unshift(directImpact);
-    // New snapshots expose one detailed experience list. Keep the old fields
-    // as a publication migration fallback so existing selections do not lose
-    // their content until the next publication is staged.
-    stageExperience.unshift(...list(structured.experience));
-    stageExperience.unshift(...list(structured.responsibilities));
-    stageExperience.unshift(...list(structured.achievements));
-    stageExperience.unshift(...list(structured.impact));
-    stageExperience.unshift(...list(structured.outcomes));
-    const stageSkills = [
-      ...skillItems
-        .filter((skill) => identities(skill).includes(key))
-        .map((skill) => text(skill.title)),
-      ...list(item.display_technologies)
-    ].filter(Boolean);
-    const company = text(item.company_name, text(item.organization_name, text(item.subtitle)));
-    const period = text(
-      item.period,
+    return normalizeCareerIdentity(
+      text(item.title, text(structured.role)),
       text(
-        structured.period,
-        [text(item.start_date), text(item.end_date)].filter(Boolean).join(" — ")
+        item.company_name,
+        text(item.organization_name, text(item.subtitle, text(structured.organization)))
+      ),
+      text(
+        item.period,
+        text(
+          structured.period,
+          [text(item.start_date), text(item.end_date)].filter(Boolean).join(" — ")
+        )
       )
     );
-    return {
-      title: text(item.title, "Career stage"),
-      summary: text(item.public_summary),
-      ...(company ? { company } : {}),
-      ...(period ? { period } : {}),
-      ...(stageProjects.length ? { projects: stageProjects } : {}),
-      ...(stageExperience.length ? { experience: [...new Set(stageExperience)] } : {}),
-      ...(stageSkills.length ? { skills: [...new Set(stageSkills)] } : {})
-    };
-  });
-  const timelineProjectIds = new Set(
-    timelineStages.flatMap((stage) => (stage.projects ?? []).map((project) => project.title))
+  };
+  // The owner has explicitly confirmed this public career chapter. Keep it as
+  // a resilient baseline if an older publication omitted the Bloom record.
+  const bloomIdentity = normalizeCareerIdentity(
+    "Lead Software Engineer",
+    "Bloom Institute of Technology",
+    "November 2019 – April 2020"
   );
-  // These narratives already have canonical presentations below: PortfolioProof is
-  // rendered inside Projects and EngineeringProcesses owns its own section. A
-  // projection row for either would show the same content a second time.
-  const standaloneProjectTitles = new Set([
+  const careerItems = publishedCareerItems.some((item) =>
+    sameCareerIdentity(careerIdentityForItem(item), bloomIdentity)
+  )
+    ? publishedCareerItems
+    : [
+        ...publishedCareerItems,
+        {
+          public_id: "confirmed-bloom-lead-software-engineer",
+          source_entity_type: "experience",
+          source_entity_id: "confirmed-bloom-lead-software-engineer",
+          section: "experience",
+          career_stage: "lead-software-engineer",
+          title: bloomIdentity.role,
+          company_name: bloomIdentity.organization,
+          period: bloomIdentity.period,
+          public_summary:
+            "Led technical decisions that helped teams ship reliable systems together.",
+          structured_content: { experience: [], projects: [], workProjects: [] }
+        }
+      ];
+  const stageKey = (item: Record<string, unknown>) =>
+    Object.values(careerIdentityForItem(item)).join("|").toLowerCase();
+  const parseEmploymentStart = (value: unknown): number | null => {
+    const candidate = text(value);
+    if (!candidate) return null;
+    const match = candidate.match(
+      /\b((?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)?)\s*(\d{4})\b/i
+    );
+    if (!match) return null;
+    const monthName = (match[1] ?? "").trim().toLocaleLowerCase();
+    const months = [
+      "jan",
+      "feb",
+      "mar",
+      "apr",
+      "may",
+      "jun",
+      "jul",
+      "aug",
+      "sep",
+      "oct",
+      "nov",
+      "dec"
+    ];
+    const month = months.findIndex((name) => monthName.startsWith(name));
+    return Date.UTC(Number(match[2]), month < 0 ? 0 : month, 1);
+  };
+  const timelineStages: CareerTimelineStage[] = Array.from(
+    new Map(careerItems.map((item) => [stageKey(item), item])).values()
+  )
+    .map((item) => {
+      const careerIdentity = careerIdentityForItem(item);
+      const key = identities(item)[0] ?? "career stage";
+      const structured = record(item.structured_content);
+      const declaredProjectKeys = [...list(structured.projects), ...list(item.projects)].map(
+        projectNameKey
+      );
+      const detailedWorkProjects = objectList(structured.workProjects).map((project) => ({
+        title: displayText(project.title, "Work project"),
+        summary: displayText(
+          project.summary,
+          displayText(project.outcome, "Delivered during this role.")
+        ),
+        ...(text(project.outcome) ? { outcome: displayText(project.outcome) } : {}),
+        ...(list(project.technologies).length
+          ? { technologies: expandTechnologyLabels(list(project.technologies)) }
+          : {})
+      }));
+      const detailedProjectNames = new Set(
+        detailedWorkProjects.map((project) => projectNameKey(project.title))
+      );
+      const embeddedProjects = list(structured.projects)
+        .filter((project) => !detailedProjectNames.has(projectNameKey(project)))
+        .map((project) => ({
+          title: expandTechnologyTerms(project),
+          summary: expandTechnologyTerms(project)
+        }));
+      const stageProjects = Array.from(
+        new Map(
+          [
+            ...detailedWorkProjects,
+            ...embeddedProjects,
+            ...projectItems
+              .filter((project) => {
+                const projectStructured = record(project.structured_content);
+                const projectKey = projectNameKey(project.title);
+                const confirmedPlacement = projectCareerPlacement(text(project.title));
+                if (confirmedPlacement)
+                  return sameCareerIdentity(careerIdentity, confirmedPlacement);
+                if (declaredProjectKeys.includes(projectKey)) return true;
+
+                // Source-document overlap is provenance, not ownership. Only an
+                // explicit role/career-stage plus a compatible employer can attach a
+                // standalone project to this timeline chapter.
+                const projectRole = text(
+                  project.career_stage,
+                  text(projectStructured.careerStage, text(projectStructured.role))
+                );
+                const projectOrganization = text(
+                  project.company_name,
+                  text(
+                    project.organization_name,
+                    text(projectStructured.organization, text(projectStructured.company))
+                  )
+                );
+                if (!projectRole) return false;
+                const roleMatches = [key, careerIdentity.role]
+                  .map(projectNameKey)
+                  .includes(projectNameKey(projectRole));
+                const organizationMatches =
+                  !projectOrganization ||
+                  projectNameKey(projectOrganization) ===
+                    projectNameKey(careerIdentity.organization);
+                return roleMatches && organizationMatches;
+              })
+              .map((project) => {
+                const href = slugHref(project);
+                return {
+                  title: displayText(project.title, "Project"),
+                  summary: displayText(project.public_summary),
+                  ...(href ? { href } : {})
+                };
+              })
+          ].map((project) => [projectNameKey(project.title), project])
+        ).values()
+      );
+      const stageExperience = impactItems
+        .filter((impact) => identities(impact).includes(key))
+        .flatMap((impact) => [text(impact.display_metric, text(impact.public_summary))])
+        .filter(Boolean);
+      const directImpact = text(item.display_metric);
+      if (directImpact) stageExperience.unshift(directImpact);
+      // New snapshots expose one detailed experience list. Keep the old fields
+      // as a publication migration fallback so existing selections do not lose
+      // their content until the next publication is staged.
+      stageExperience.unshift(...list(structured.experience));
+      stageExperience.unshift(...list(structured.responsibilities));
+      stageExperience.unshift(...list(structured.achievements));
+      stageExperience.unshift(...list(structured.impact));
+      stageExperience.unshift(...list(structured.outcomes));
+      const expandedExperience = stageExperience.map(expandTechnologyTerms);
+      const stageSkills = expandTechnologyLabels(
+        [
+          ...skillItems
+            .filter((skill) => identities(skill).includes(key))
+            .map((skill) => text(skill.title)),
+          ...list(item.display_technologies)
+        ].filter(Boolean)
+      );
+      return {
+        title: careerIdentity.role || "Career stage",
+        summary: displayText(item.public_summary),
+        ...(careerIdentity.organization ? { company: careerIdentity.organization } : {}),
+        ...(careerIdentity.period ? { period: careerIdentity.period } : {}),
+        ...(stageProjects.length ? { projects: stageProjects } : {}),
+        ...(expandedExperience.length ? { experience: [...new Set(expandedExperience)] } : {}),
+        ...(stageSkills.length ? { skills: [...new Set(stageSkills)] } : {})
+      };
+    })
+    .sort((left, right) => {
+      const leftDate = parseEmploymentStart(left.period);
+      const rightDate = parseEmploymentStart(right.period);
+      if (leftDate === null && rightDate === null) return 0;
+      if (leftDate === null) return 1;
+      if (rightDate === null) return -1;
+      return rightDate - leftDate;
+    });
+  // The active publication already contains only the projects selected by the
+  // owner. Project type is descriptive metadata, not a visibility filter:
+  // professional, personal, and open-source projects can all be featured.
+  const nonProjectNarratives = new Set([
     "portfolio as proof",
     "engineering process",
     "engineering processes"
   ]);
-  const personalProjectItems = projectItems.filter(
-    (project) =>
-      !timelineProjectIds.has(text(project.title)) &&
-      !standaloneProjectTitles.has(text(project.title).trim().toLowerCase())
+  const selectedProjectItems = projectItems.filter(
+    (project) => !nonProjectNarratives.has(text(project.title).trim().toLowerCase())
   );
   // Use the included local portrait when a deployment does not supply an external image URL.
   const profileImage =
@@ -198,8 +352,8 @@ export default async function PublicPortfolioPage() {
   });
   // The publication bio is the resilient fallback for the portfolio summary;
   // it is separate from the About narrative below.
-  const portfolioSummary = text(portfolioSummaryItem?.public_summary, text(profile?.bio));
-  const bio = text(aboutItem?.public_summary, text(profile?.bio));
+  const portfolioSummary = displayText(portfolioSummaryItem?.public_summary, text(profile?.bio));
+  const bio = displayText(aboutItem?.public_summary, text(profile?.bio));
   const safeHref = (value: unknown) => {
     const href = text(value).trim();
     return /^(?:https?:\/\/|mailto:)/i.test(href) ? href : "";
@@ -248,18 +402,23 @@ export default async function PublicPortfolioPage() {
           : "";
     return /^(?:https?:\/\/|\/)/i.test(source) ? source : "";
   };
-  const renderedProjects = personalProjectItems.map((item) => {
+  const renderedProjects = selectedProjectItems.map((item) => {
     const href = slugHref(item);
-    const technologies = list(item.display_technologies);
+    const technologies = expandTechnologyLabels(list(item.display_technologies));
     const structured = record(item.structured_content);
     const image = mediaSource(item.sanitized_media);
+    const projectType =
+      projectContributionLabel(text(item.title)) ??
+      (projectCareerPlacement(text(item.title))
+        ? "Professional project"
+        : text(structured.projectType, text(structured.project_type)));
     return {
-      title: text(item.title, "Project"),
-      summary: text(item.public_summary),
+      title: displayText(item.title, "Project"),
+      summary: displayText(item.public_summary),
       ...(href ? { href } : {}),
       ...(technologies.length ? { technologies } : {}),
       ...(text(structured.category) ? { category: text(structured.category) } : {}),
-      ...(text(item.subtitle) ? { meta: text(item.subtitle) } : {}),
+      ...(projectType ? { meta: projectType } : { meta: "Selected project" }),
       ...(image ? { image } : {})
     };
   });
@@ -301,15 +460,15 @@ export default async function PublicPortfolioPage() {
             <CareerTimeline stages={timelineStages} />
             <CredentialsAndSkills
               credentials={certificationItems.map((item) => ({
-                title: text(item.title, "Certification"),
-                ...(text(item.subtitle) ? { issuer: text(item.subtitle) } : {}),
-                ...(text(item.public_summary) ? { summary: text(item.public_summary) } : {})
+                title: displayText(item.title, "Certification"),
+                ...(text(item.subtitle) ? { issuer: displayText(item.subtitle) } : {}),
+                ...(text(item.public_summary) ? { summary: displayText(item.public_summary) } : {})
               }))}
               skillGroups={skillItems
                 .filter((item) => !text(item.career_stage))
                 .map((item) => ({
                   title: text(item.title, "Technical skills"),
-                  skills: list(item.display_technologies)
+                  skills: expandTechnologyLabels(list(item.display_technologies))
                 }))}
             />
             <Projects
@@ -327,14 +486,34 @@ export default async function PublicPortfolioPage() {
                   href: `/blog/${encodeURIComponent(post.slug)}`,
                   meta: new Date(post.visible_at).toLocaleDateString()
                 })),
-                ...writingItems.map((item) => ({
-                  title: text(item.title),
-                  summary: text(item.public_summary),
-                  ...(text(item.detail_slug)
-                    ? { href: `/blog/${encodeURIComponent(text(item.detail_slug))}` }
-                    : {}),
-                  ...(text(item.subtitle) ? { meta: text(item.subtitle) } : {})
-                }))
+                ...writingItems.map((item) => {
+                  const structured = record(item.structured_content);
+                  const externalUrl = safeHref(
+                    structured.externalUrl ??
+                      structured.external_url ??
+                      structured.canonicalUrl ??
+                      structured.sourceUrl ??
+                      structured.url
+                  );
+                  const detailSlug = text(item.detail_slug);
+                  return {
+                    title: text(item.title),
+                    summary: text(item.public_summary),
+                    ...(externalUrl
+                      ? { href: externalUrl, external: true }
+                      : detailSlug
+                        ? { href: `/blog/${encodeURIComponent(detailSlug)}` }
+                        : {}),
+                    ...(text(item.subtitle, text(structured.platform, text(structured.source)))
+                      ? {
+                          meta: text(
+                            item.subtitle,
+                            text(structured.platform, text(structured.source))
+                          )
+                        }
+                      : {})
+                  };
+                })
               ]}
             />
             <Contact />

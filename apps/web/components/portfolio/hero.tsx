@@ -95,11 +95,8 @@ export function Hero({ name = "Basil Ogbonna" }: { name?: string; headline?: str
         <span>Career signal</span>
         <span className="hero-career-track-shell">
           <span className="hero-career-track">
-            {career.map((stage, index) => (
-              <span key={stage}>
-                <small>{String(index + 1).padStart(2, "0")}</small>
-                {stage}
-              </span>
+            {career.map((stage) => (
+              <span key={stage}>{stage}</span>
             ))}
           </span>
           <span className="hero-career-scroll-cue hero-career-scroll-cue-left" aria-hidden="true">

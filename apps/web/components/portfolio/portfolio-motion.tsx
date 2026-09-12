@@ -6,7 +6,7 @@ export function PortfolioMotion() {
   useEffect(() => {
     const sections = Array.from(
       document.querySelectorAll<HTMLElement>(
-        ".portfolio-stream > section:not(.hero-section), .portfolio-stream > .intelligence-grid"
+        ".portfolio-stream > section:not(.hero-section), .portfolio-stream > .intelligence-grid, .project-feature"
       )
     );
 
@@ -18,7 +18,7 @@ export function PortfolioMotion() {
     }
 
     sections.forEach((section) => {
-      section.dataset.reveal = "pending";
+      section.dataset.reveal = "from";
     });
 
     const observer = new IntersectionObserver(

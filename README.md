@@ -144,6 +144,13 @@ Supabase session as a Codex credential. Configure `CODEX_APP_SERVER_COMMAND`,
 the defaults need to change. Embeddings remain a separate provider, and the existing OpenAI/provider
 path remains the fallback when the Codex runtime is unavailable.
 
+Career Brain uses three focused native turns in parallel rather than one oversized synthesis turn:
+profile/credentials, career experience, and projects. Each turn receives a bounded, purpose-ranked
+subset of the same source-aware RAG context. All three validated JSON results are merged and saved as
+one atomic snapshot; a failed segment never silently replaces the current Career Brain with a partial
+profile. **Re-synthesize Career Brain** performs fresh retrieval, while **Refresh cached profile** can
+reuse the current retrieval cache.
+
 The orchestrator defaults to `gpt-5.6-sol` with high reasoning. Career synthesis, interview coaching,
 and application writing explicitly use `gpt-5.6-terra` with high reasoning. Job matching and career-gap
 analysis use `gpt-5.6-terra` with medium reasoning, while writing and portfolio assistance use

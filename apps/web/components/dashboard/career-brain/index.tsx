@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { CAREER_FACT_TYPES } from "@/lib/career-fact-taxonomy";
+import { expandTechnologyLabels, expandTechnologyTerms } from "@/lib/portfolio-career-rules";
 import type { CareerBrainContent, CareerBrainItem } from "@/lib/server/career-brain-synthesis";
 import { WorkspaceToast } from "@/components/ui/workspace-toast";
 import { PublicationControl } from "../publication-control";
@@ -39,6 +40,17 @@ const list = (item: CareerBrainItem, key: string) =>
   Array.isArray(item[key])
     ? item[key].filter((entry): entry is string => typeof entry === "string")
     : [];
+const displayValue = (item: CareerBrainItem, key: string) =>
+  expandTechnologyTerms(value(item, key));
+const displayList = (item: CareerBrainItem, key: string) =>
+  list(item, key).map(expandTechnologyTerms);
+const objectList = (item: CareerBrainItem, key: string): CareerBrainItem[] =>
+  Array.isArray(item[key])
+    ? item[key].filter(
+        (entry): entry is CareerBrainItem => Boolean(entry) && typeof entry === "object"
+      )
+    : [];
+const externalHref = (value: string) => (/^https?:\/\//i.test(value.trim()) ? value.trim() : "");
 
 function PublishChoice({
   itemKey,
@@ -234,9 +246,7 @@ export function CareerBrain() {
       })
     ).then((entries) => {
       if (active) {
-        setProjectMedia(
-          Object.fromEntries(entries) as Record<string, ProjectMedia[]>
-        );
+        setProjectMedia(Object.fromEntries(entries) as Record<string, ProjectMedia[]>);
       }
     });
     return () => {
@@ -348,11 +358,13 @@ export function CareerBrain() {
       const mediaLoaded = await refreshProjectMedia(item.id);
       setNotice(
         mediaLoaded
-          ? "Project cover approved. Build and activate a portfolio snapshot to publish it."
-          : "Project cover approved, but the media preview is temporarily unavailable. Build and activate a snapshot when ready."
+          ? "Project cover approved and now visible on the public portfolio."
+          : "Project cover approved and queued for the public portfolio, but the media preview is temporarily unavailable."
       );
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "The project image could not be approved.");
+      setNotice(
+        error instanceof Error ? error.message : "The project image could not be approved."
+      );
     } finally {
       setBusyKey(null);
     }
@@ -464,17 +476,26 @@ export function CareerBrain() {
 
       {content ? (
         <div className="career-synthesis">
-          <section id="career-profiles" className="career-narratives" aria-labelledby="career-narratives-title">
+          <section
+            id="career-profiles"
+            className="career-narratives"
+            aria-labelledby="career-narratives-title"
+          >
             <header>
               <p className="eyebrow">Profiles</p>
               <h2 id="career-narratives-title">Your story, shaped for its destination.</h2>
             </header>
             <article>
               <h3>CV profile summary</h3>
-              <p>{content.cvSummary || "More career detail is needed to form a CV summary."}</p>
+              <p>
+                {expandTechnologyTerms(content.cvSummary) ||
+                  "More career detail is needed to form a CV summary."}
+              </p>
               <button
                 type="button"
-                onClick={() => void navigator.clipboard.writeText(content.cvSummary)}
+                onClick={() =>
+                  void navigator.clipboard.writeText(expandTechnologyTerms(content.cvSummary))
+                }
               >
                 Copy CV summary
               </button>
@@ -482,7 +503,7 @@ export function CareerBrain() {
             <article>
               <h3>Portfolio profile summary</h3>
               <p>
-                {content.portfolioSummary ||
+                {expandTechnologyTerms(content.portfolioSummary) ||
                   "More career detail is needed to form a portfolio summary."}
               </p>
               <PublishChoice
@@ -495,7 +516,10 @@ export function CareerBrain() {
             </article>
             <article>
               <h3>About me</h3>
-              <p>{content.about || "More career detail is needed to form an About narrative."}</p>
+              <p>
+                {expandTechnologyTerms(content.about) ||
+                  "More career detail is needed to form an About narrative."}
+              </p>
               <PublishChoice
                 itemKey="profile:about"
                 itemType="about"
@@ -522,25 +546,49 @@ export function CareerBrain() {
                 <details key={`${item.id}-${String(itemIndex)}`}>
                   <summary>
                     <span>
-                      <strong>{value(item, "role")}</strong>
+                      <strong>{displayValue(item, "role")}</strong>
                       <small>
-                        {value(item, "organization")} · {value(item, "period")}
+                        {displayValue(item, "organization")} · {displayValue(item, "period")}
                       </small>
                     </span>
-                    <em>{value(item, "summary")}</em>
+                    <em>{displayValue(item, "summary")}</em>
                   </summary>
                   <div className="career-synthesis-detail">
                     {list(item, "experience").length ? (
                       <section>
                         <h3>Experience</h3>
                         <ul>
-                          {list(item, "experience").map((entry, entryIndex) => (
+                          {displayList(item, "experience").map((entry, entryIndex) => (
                             <li key={`${entry}-${String(entryIndex)}`}>{entry}</li>
                           ))}
                         </ul>
                       </section>
                     ) : null}
-                    {list(item, "projects").length ? (
+                    {objectList(item, "workProjects").length ? (
+                      <section>
+                        <h3>Projects carried out in this role</h3>
+                        <div className="career-role-projects">
+                          {objectList(item, "workProjects").map((project, projectIndex) => (
+                            <article key={`${value(project, "title")}-${String(projectIndex)}`}>
+                              <h4>{displayValue(project, "title")}</h4>
+                              <p>{displayValue(project, "summary")}</p>
+                              {value(project, "outcome") ? (
+                                <p>
+                                  <strong>Outcome:</strong> {displayValue(project, "outcome")}
+                                </p>
+                              ) : null}
+                              {list(project, "technologies").length ? (
+                                <small>
+                                  {expandTechnologyLabels(list(project, "technologies")).join(
+                                    " · "
+                                  )}
+                                </small>
+                              ) : null}
+                            </article>
+                          ))}
+                        </div>
+                      </section>
+                    ) : list(item, "projects").length ? (
                       <section>
                         <h3>Projects carried out in this role</h3>
                         <ul>
@@ -552,7 +600,8 @@ export function CareerBrain() {
                     ) : null}
                     {list(item, "technologies").length ? (
                       <p>
-                        <strong>Technical skills:</strong> {list(item, "technologies").join(", ")}
+                        <strong>Technical skills:</strong>{" "}
+                        {expandTechnologyLabels(list(item, "technologies")).join(", ")}
                       </p>
                     ) : null}
                     {list(item, "evidence").length ? (
@@ -589,133 +638,178 @@ export function CareerBrain() {
                   <h3>{group.category}</h3>
                   {group.items.map((item, itemIndex) => (
                     <article key={`${item.id}-${String(itemIndex)}`}>
-                      <h4>{value(item, "title")}</h4>
-                      {value(item, "role") ? <small>{value(item, "role")}</small> : null}
-                      <p>{value(item, "summary")}</p>
+                      <h4>{displayValue(item, "title")}</h4>
+                      {value(item, "role") ? <small>{displayValue(item, "role")}</small> : null}
+                      <p>{displayValue(item, "summary")}</p>
                       {value(item, "outcome") ? (
                         <p>
-                          <strong>Outcome:</strong> {value(item, "outcome")}
+                          <strong>Outcome:</strong> {displayValue(item, "outcome")}
                         </p>
                       ) : null}
-                  {list(item, "process").length ? (
+                      {list(item, "process").length ? (
                         <div>
                           <strong>How it was built</strong>
                           <ul>
-                            {list(item, "process").map((entry, entryIndex) => (
+                            {displayList(item, "process").map((entry, entryIndex) => (
                               <li key={`${entry}-${String(entryIndex)}`}>{entry}</li>
                             ))}
                           </ul>
                         </div>
-                  ) : null}
-                  <small>{list(item, "technologies").join(" · ")}</small>
-                  {(() => {
-                    const media = projectMedia[item.id] ?? [];
-                    const approved = media.find((asset) => asset.status === "approved");
-                    const drafts = media.filter((asset) => asset.status === "draft");
-                    const mediaBusy = busyKey === `media:${item.id}`;
-                    const references = projectImageReferences[item.id] ?? [];
-                    return (
-                      <section className="career-project-media" aria-label="Project cover image">
-                        {approved ? (
-                          <img
-                            src={approved.public_url}
-                            alt={approved.alt_text || `${value(item, "title")} project cover`}
-                            loading="lazy"
-                          />
-                        ) : (
-                          <p>No approved cover image yet.</p>
-                        )}
-                        <label>
-                          Optional art direction
-                          <textarea
-                            value={projectImageDirection[item.id] ?? ""}
-                            onChange={(event) => {
-                              setProjectImageDirection((current) => ({
-                                ...current,
-                                [item.id]: event.target.value
-                              }));
-                            }}
-                            placeholder="For example: use a quiet editorial composition with a visible data-flow motif and deep teal accents."
-                            rows={2}
-                            maxLength={1200}
-                          />
-                        </label>
-                        <label>
-                          Optional reference images
-                          <input
-                            type="file"
-                            accept="image/jpeg,image/png,image/webp"
-                            multiple
-                            disabled={mediaBusy}
-                            onChange={(event) => {
-                              const files = Array.from(event.target.files ?? []).slice(0, 4);
-                              event.target.value = "";
-                              setProjectImageReferences((current) => ({
-                                ...current,
-                                [item.id]: files
-                              }));
-                            }}
-                          />
-                          <small>Up to 4 JPEG, PNG, or WebP files; used as visual references, not copied.</small>
-                        </label>
-                        {references.length ? (
-                          <small>
-                            References: {references.map((file) => file.name).join(" · ")}
-                          </small>
-                        ) : null}
-                        <div className="workspace-actions">
-                          <button
-                            type="button"
-                            disabled={mediaBusy}
-                            onClick={() => void generateProjectCover(item)}
-                          >
-                            {mediaBusy ? "Working…" : approved ? "Regenerate cover" : "Generate cover"}
-                          </button>
-                          <label className="button-secondary">
-                            Upload cover
-                            <input
-                              type="file"
-                              accept="image/jpeg,image/png,image/webp"
-                              hidden
-                              disabled={mediaBusy}
-                              onChange={(event) => {
-                                const file = event.target.files?.[0];
-                                event.target.value = "";
-                                if (file) void uploadProjectCover(item, file);
-                              }}
-                            />
-                          </label>
-                        </div>
-                        {drafts.map((asset) => (
-                          <div key={asset.id} className="career-project-media-draft">
-                            <img
-                              src={asset.public_url}
-                              alt={asset.alt_text || `${value(item, "title")} generated draft`}
-                              loading="lazy"
-                            />
-                            <span>
-                              {asset.source_type === "ai_generated"
-                                ? `Generated${asset.model ? ` with ${asset.model}` : ""}`
-                                : "Uploaded draft"}
-                            </span>
-                            <button
-                              type="button"
-                              disabled={mediaBusy}
-                              onClick={() => void approveProjectCover(item, asset.id)}
+                      ) : null}
+                      <small>
+                        {expandTechnologyLabels(list(item, "technologies")).join(" · ")}
+                      </small>
+                      {externalHref(value(item, "githubUrl")) ||
+                      externalHref(value(item, "videoUrl")) ||
+                      externalHref(value(item, "liveUrl")) ? (
+                        <p className="career-project-links">
+                          {externalHref(value(item, "githubUrl")) ? (
+                            <a
+                              href={externalHref(value(item, "githubUrl"))}
+                              target="_blank"
+                              rel="noreferrer"
                             >
-                              Approve this cover
-                            </button>
-                          </div>
-                        ))}
-                      </section>
-                    );
-                  })()}
-                  {list(item, "evidence").length ? (
+                              GitHub ↗
+                            </a>
+                          ) : null}
+                          {externalHref(value(item, "videoUrl")) ? (
+                            <a
+                              href={externalHref(value(item, "videoUrl"))}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              YouTube ↗
+                            </a>
+                          ) : null}
+                          {externalHref(value(item, "liveUrl")) ? (
+                            <a
+                              href={externalHref(value(item, "liveUrl"))}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              Live project ↗
+                            </a>
+                          ) : null}
+                        </p>
+                      ) : null}
+                      {(() => {
+                        const media = projectMedia[item.id] ?? [];
+                        const approved = media.find((asset) => asset.status === "approved");
+                        const drafts = media.filter((asset) => asset.status === "draft");
+                        const mediaBusy = busyKey === `media:${item.id}`;
+                        const references = projectImageReferences[item.id] ?? [];
+                        return (
+                          <section
+                            className="career-project-media"
+                            aria-label="Project cover image"
+                          >
+                            {approved ? (
+                              <img
+                                src={approved.public_url}
+                                alt={approved.alt_text || `${value(item, "title")} project cover`}
+                                loading="lazy"
+                              />
+                            ) : (
+                              <p>No approved cover image yet.</p>
+                            )}
+                            <label>
+                              Optional art direction
+                              <textarea
+                                value={projectImageDirection[item.id] ?? ""}
+                                onChange={(event) => {
+                                  setProjectImageDirection((current) => ({
+                                    ...current,
+                                    [item.id]: event.target.value
+                                  }));
+                                }}
+                                placeholder="For example: use a quiet editorial composition with a visible data-flow motif and deep teal accents."
+                                rows={2}
+                                maxLength={1200}
+                              />
+                            </label>
+                            <label>
+                              Optional reference images
+                              <input
+                                type="file"
+                                accept="image/jpeg,image/png,image/webp"
+                                multiple
+                                disabled={mediaBusy}
+                                onChange={(event) => {
+                                  const files = Array.from(event.target.files ?? []).slice(0, 4);
+                                  event.target.value = "";
+                                  setProjectImageReferences((current) => ({
+                                    ...current,
+                                    [item.id]: files
+                                  }));
+                                }}
+                              />
+                              <small>
+                                Up to 4 JPEG, PNG, or WebP files; used as visual references, not
+                                copied.
+                              </small>
+                            </label>
+                            {references.length ? (
+                              <small>
+                                References: {references.map((file) => file.name).join(" · ")}
+                              </small>
+                            ) : null}
+                            <div className="workspace-actions">
+                              <button
+                                type="button"
+                                disabled={mediaBusy}
+                                onClick={() => void generateProjectCover(item)}
+                              >
+                                {mediaBusy
+                                  ? "Working…"
+                                  : approved
+                                    ? "Regenerate cover"
+                                    : "Generate cover"}
+                              </button>
+                              <label className="button-secondary">
+                                Upload cover
+                                <input
+                                  type="file"
+                                  accept="image/jpeg,image/png,image/webp"
+                                  hidden
+                                  disabled={mediaBusy}
+                                  onChange={(event) => {
+                                    const file = event.target.files?.[0];
+                                    event.target.value = "";
+                                    if (file) void uploadProjectCover(item, file);
+                                  }}
+                                />
+                              </label>
+                            </div>
+                            {drafts.map((asset) => (
+                              <div key={asset.id} className="career-project-media-draft">
+                                <img
+                                  src={asset.public_url}
+                                  alt={asset.alt_text || `${value(item, "title")} generated draft`}
+                                  loading="lazy"
+                                />
+                                <span>
+                                  {asset.source_type === "ai_generated"
+                                    ? `Generated${asset.model ? ` with ${asset.model}` : ""}`
+                                    : "Uploaded draft"}
+                                </span>
+                                <button
+                                  type="button"
+                                  disabled={mediaBusy}
+                                  onClick={() => void approveProjectCover(item, asset.id)}
+                                >
+                                  Approve this cover
+                                </button>
+                              </div>
+                            ))}
+                          </section>
+                        );
+                      })()}
+                      {list(item, "evidence").length ? (
                         <details>
                           <summary>Source details</summary>
                           <ul>
-                          {list(item, "evidence").map((entry, entryIndex) => (
-                            <li key={`${entry}-${String(entryIndex)}`}>{entry}</li>
+                            {list(item, "evidence").map((entry, entryIndex) => (
+                              <li key={`${entry}-${String(entryIndex)}`}>{entry}</li>
                             ))}
                           </ul>
                         </details>
@@ -734,7 +828,11 @@ export function CareerBrain() {
             </div>
           </section>
 
-          <section id="career-credentials" className="career-credentials" aria-labelledby="career-credentials-title">
+          <section
+            id="career-credentials"
+            className="career-credentials"
+            aria-labelledby="career-credentials-title"
+          >
             <header>
               <p className="eyebrow">Credentials</p>
               <h2 id="career-credentials-title">Education and certifications</h2>
@@ -779,7 +877,11 @@ export function CareerBrain() {
             </div>
           </section>
 
-          <section id="career-skills" className="career-skills" aria-labelledby="career-skills-title">
+          <section
+            id="career-skills"
+            className="career-skills"
+            aria-labelledby="career-skills-title"
+          >
             <header>
               <p className="eyebrow">Technical practice</p>
               <h2 id="career-skills-title">Skills grouped by how you use them.</h2>
@@ -789,7 +891,7 @@ export function CareerBrain() {
                 <article key={`${item.id}-${String(itemIndex)}`}>
                   <div>
                     <h3>{value(item, "category")}</h3>
-                    <p>{list(item, "skills").join(" · ")}</p>
+                    <p>{expandTechnologyLabels(list(item, "skills")).join(" · ")}</p>
                   </div>
                   <PublishChoice
                     itemKey={item.id}

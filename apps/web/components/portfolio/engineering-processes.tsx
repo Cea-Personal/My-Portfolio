@@ -88,11 +88,8 @@ export function EngineeringProcesses() {
         <div className="process-flow">
           <p>{process.statement}</p>
           <ol>
-            {process.steps.map((step, index) => (
-              <li key={step}>
-                <span>{String(index + 1).padStart(2, "0")}</span>
-                {step}
-              </li>
+            {process.steps.map((step) => (
+              <li key={step}>{step}</li>
             ))}
           </ol>
         </div>
@@ -105,11 +102,8 @@ export function EngineeringProcesses() {
           </div>
           <pre>
             <code>
-              {process.snippet.map((line, index) => (
-                <span key={line}>
-                  <i>{String(index + 1).padStart(2, "0")}</i>
-                  {line}
-                </span>
+              {process.snippet.map((line) => (
+                <span key={line}>{line}</span>
               ))}
             </code>
           </pre>
