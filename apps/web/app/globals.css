@@ -141,6 +141,125 @@ body {
   margin-top: 0.35rem;
 }
 
+.role-fit-results .role-fit-matrix {
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0 0.8rem;
+  color: inherit;
+}
+
+.role-fit-matrix th:first-child {
+  width: 30%;
+}
+.role-fit-matrix th:nth-child(2) {
+  width: 18%;
+}
+.role-fit-results .role-fit-matrix th,
+.role-fit-results .role-fit-matrix td {
+  padding: clamp(0.85rem, 2vw, 1.4rem);
+  border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+  overflow-wrap: anywhere;
+  font-size: 1rem;
+  line-height: 1.6;
+}
+.role-fit-matrix tbody tr {
+  background: color-mix(in srgb, currentColor 3%, transparent);
+}
+.role-fit-matrix tbody th {
+  font-weight: 500;
+}
+.role-fit-matrix p {
+  margin: 0 0 0.7rem;
+}
+.role-fit-matrix details {
+  margin-top: 0.7rem;
+  font-weight: 400;
+}
+.role-fit-matrix summary,
+.assistant-sources summary {
+  cursor: pointer;
+  padding-block: 0.5rem;
+}
+.role-fit-matrix details ul {
+  padding-left: 1.1rem;
+}
+.role-fit-score {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.15rem;
+  font-size: 1.6rem;
+  font-weight: 650;
+}
+.role-fit-results .role-fit-score small {
+  display: inline;
+  font-size: 0.9rem;
+  font-weight: 400;
+}
+.role-fit-score-label {
+  display: block;
+  font-size: 0.95rem;
+}
+.role-fit-score-guide {
+  font-size: 1rem;
+  line-height: 1.7;
+}
+
+@media (max-width: 700px) {
+  .role-fit-matrix,
+  .role-fit-matrix tbody,
+  .role-fit-matrix tr,
+  .role-fit-results .role-fit-matrix th,
+  .role-fit-results .role-fit-matrix td {
+    display: block;
+    width: 100%;
+  }
+  .role-fit-matrix thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .role-fit-matrix tbody tr {
+    margin-bottom: 1.2rem;
+  }
+  .role-fit-matrix [data-label]::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+}
+
+.role-fit-areas {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0 0;
+}
+
+.role-fit-areas > li {
+  border-top: 1px solid currentcolor;
+  padding: 1.25rem 0;
+  overflow-wrap: anywhere;
+}
+
+.role-fit-areas h4 {
+  font-size: 1.1rem;
+  margin: 0 0 0.6rem;
+}
+
+.role-fit-areas p,
+.role-fit-areas details {
+  font-size: 1rem;
+  line-height: 1.65;
+}
+
+.role-fit-areas details summary {
+  cursor: pointer;
+  padding-block: 0.6rem;
+}
+
 .workspace-page {
   width: min(100% - 2rem, 76rem);
   margin-inline: auto;
@@ -8112,14 +8231,6 @@ nav[aria-label="Portfolio sections"] a {
 html[data-portfolio-theme="dark"] body {
   background: #0c0f14;
   color: #edf1f5;
-}
-
-html[data-portfolio-theme="dark"] {
-  color-scheme: dark;
-}
-
-html[data-portfolio-theme="light"] {
-  color-scheme: light;
 }
 
 html[data-portfolio-theme="dark"] .portfolio-stream > section,

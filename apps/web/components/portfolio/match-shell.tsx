@@ -1,29 +1,21 @@
 "use client";
 
 import { useState } from "react";
+import type { PublicRoleFitResult } from "@/lib/server/public-role-fit";
 
 export function RoleFit() {
   const [description, setDescription] = useState("");
-  const [result, setResult] = useState<{
-    score: string;
-    abstained?: boolean;
-    unavailable?: boolean;
-    requirements: readonly {
-      id: string;
-      text?: string;
-      priority: string;
-      outcome?: string;
-      rationale?: string;
-      evidence?: string[];
-    }[];
-  } | null>(null);
-  const [error, setError] = useState(false);
+  const [result, setResult] = useState<(PublicRoleFitResult & { unavailable?: boolean }) | null>(
+    null
+  );
+  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function match() {
     if (!description.trim()) return;
     setLoading(true);
-    setError(false);
+    setError(null);
+    setResult(null);
     try {
       const response = await fetch("/api/v1/public/jd-matches", {
         method: "POST",
@@ -31,31 +23,19 @@ export function RoleFit() {
         body: JSON.stringify({ description })
       });
       const payload = (await response.json()) as {
-        data?: {
-          score?: string;
-          abstained?: boolean;
-          unavailable?: boolean;
-          requirements?: readonly {
-            id: string;
-            text?: string;
-            priority: string;
-            outcome?: string;
-            rationale?: string;
-            evidence?: string[];
-          }[];
-        };
+        data?: PublicRoleFitResult & { unavailable?: boolean; detail?: string };
       };
-      if (!response.ok) throw new Error("request failed");
-      setResult({
-        score: payload.data?.score ?? "0.0000",
-        requirements: payload.data?.requirements ?? [],
-        ...(typeof payload.data?.abstained === "boolean"
-          ? { abstained: payload.data.abstained }
-          : {}),
-        ...(payload.data?.unavailable === true ? { unavailable: true } : {})
-      });
-    } catch {
-      setError(true);
+      if (!response.ok || !payload.data || !Array.isArray(payload.data.matches))
+        throw new Error(
+          payload.data?.detail || "The comparison could not be completed. Please try again."
+        );
+      setResult(payload.data);
+    } catch (error) {
+      setError(
+        error instanceof Error
+          ? error.message
+          : "The comparison could not be completed. Please try again."
+      );
     } finally {
       setLoading(false);
     }
@@ -71,7 +51,10 @@ export function RoleFit() {
         <i aria-hidden="true">+</i>
       </summary>
       <div className="assistant-role-fit-body" aria-live="polite">
-        <p>Share a role description to see how it fits with the facts in this portfolio.</p>
+        <p>
+          Share a job description to compare its main requirements with my experience, projects and
+          skills.
+        </p>
         <form
           onSubmit={(event) => {
             event.preventDefault();
@@ -82,6 +65,7 @@ export function RoleFit() {
           <textarea
             id="role-description"
             value={description}
+            disabled={loading}
             maxLength={50000}
             onChange={(event) => {
               setDescription(event.target.value);
@@ -89,10 +73,10 @@ export function RoleFit() {
             rows={6}
           />
           <button type="submit" disabled={loading}>
-            {loading ? "Comparing…" : "Compare"}
+            {loading ? "Finding areas of fit…" : "See how I fit"}
           </button>
         </form>
-        {error ? <p role="alert">Matching is unavailable. Try again.</p> : null}
+        {error ? <p role="alert">{error}</p> : null}
         {result ? (
           <div className="role-fit-results">
             {result.unavailable ? (
@@ -101,47 +85,82 @@ export function RoleFit() {
                 portfolio data is reachable.
               </p>
             ) : null}
-            <p>
-              Match score: {result.score}
-              {result.abstained ? " (no matching portfolio facts)" : ""}
-            </p>
-            {result.requirements.length ? (
-              <div className="role-fit-table-wrap">
-                <table>
-                  <caption>Requirement-by-requirement fit</caption>
+            {!result.unavailable ? (
+              <div className="role-fit-answer">
+                {result.summary
+                  .split(/\n\s*\n/)
+                  .filter((paragraph) => paragraph.trim())
+                  .map((paragraph, index) => (
+                    <p key={index}>{paragraph.trim()}</p>
+                  ))}
+              </div>
+            ) : null}
+            {result.matches?.length ? (
+              <div className="role-fit-comparison">
+                <p id="role-fit-score-guide" className="role-fit-score-guide">
+                  Scores reflect the information available, not a hiring probability. 100: direct
+                  match · 75: strong match · 50: partial match · 25: transferable experience · 0:
+                  not established.
+                </p>
+                <table className="role-fit-matrix" aria-describedby="role-fit-score-guide">
+                  <caption>How my experience aligns with this role</caption>
                   <thead>
                     <tr>
-                      <th>Requirement</th>
-                      <th>Priority</th>
-                      <th>Outcome</th>
-                      <th>Relevant facts</th>
+                      <th scope="col">Major requirement</th>
+                      <th scope="col">Match score</th>
+                      <th scope="col">How my experience fits</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {result.requirements.map((requirement) => (
-                      <tr key={requirement.id}>
-                        <th scope="row">{requirement.text ?? "Requirement"}</th>
-                        <td>{requirement.priority}</td>
-                        <td>
-                          {requirement.outcome?.replace("_", " ") ?? "not assessed"}
-                          <small>{requirement.rationale}</small>
+                    {result.matches.map((match) => (
+                      <tr key={match.area}>
+                        <th scope="row" data-label="Major requirement">
+                          <span>{match.area}</span>
+                          <details>
+                            <summary>From the job description</summary>
+                            <ul>
+                              {match.requirements.map((text) => (
+                                <li key={text}>{text}</li>
+                              ))}
+                            </ul>
+                          </details>
+                        </th>
+                        <td data-label="Match score">
+                          <span className="role-fit-score" data-score={match.score}>
+                            {match.score}
+                            <small>/100</small>
+                          </span>
+                          <span className="role-fit-score-label">
+                            {match.score === 100
+                              ? "Direct match"
+                              : match.score === 75
+                                ? "Strong match"
+                                : match.score === 50
+                                  ? "Partial match"
+                                  : match.score === 25
+                                    ? "Transferable"
+                                    : "Not established"}
+                          </span>
                         </td>
-                        <td>
-                          {requirement.evidence?.length
-                            ? requirement.evidence.join(", ")
-                            : "No supporting facts"}
+                        <td data-label="How my experience fits">
+                          <p>{match.explanation}</p>
+                          {match.sources.length ? (
+                            <details>
+                              <summary>Supporting experience</summary>
+                              <p>
+                                {[...new Set(match.sources.map((source) => source.title))].join(
+                                  " · "
+                                )}
+                              </p>
+                            </details>
+                          ) : null}
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-            ) : (
-              <p>There were no distinct requirements to compare.</p>
-            )}
-            <small>
-              Scores summarize the portfolio facts only; they are not a hiring prediction.
-            </small>
+            ) : null}
           </div>
         ) : null}
       </div>

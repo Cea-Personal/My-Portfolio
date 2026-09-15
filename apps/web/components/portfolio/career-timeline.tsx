@@ -2,20 +2,11 @@
 
 import { useState } from "react";
 
-export interface CareerTimelineProject {
-  title: string;
-  summary: string;
-  href?: string;
-  outcome?: string;
-  technologies?: readonly string[];
-}
-
 export interface CareerTimelineStage {
   title: string;
   summary: string;
   company?: string;
   period?: string;
-  projects?: readonly CareerTimelineProject[];
   experience?: readonly string[];
   /** Legacy published shape; retained so older publications still render. */
   impacts?: readonly string[];

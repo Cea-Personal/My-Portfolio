@@ -75,11 +75,13 @@ const TASK_OUTPUT_SCHEMAS: Readonly<Record<string, JsonSchema>> = {
   }),
   role_fit: objectSchema({
     summary: textSchema(),
-    matches: textListSchema(),
-    gaps: textListSchema(),
-    evidence: textListSchema(),
-    recommendations: textListSchema(),
-    confidence: textSchema()
+    matches: objectListSchema({
+      area: textSchema(),
+      score: numberSchema(),
+      requirements: textListSchema(),
+      explanation: textSchema(),
+      sources: textListSchema()
+    })
   }),
   evidence_extraction: objectSchema({
     cvSummary: textSchema(),
@@ -382,12 +384,34 @@ export function buildOrchestratorPrompt(
   input: Record<string, unknown>,
   nativeRole = codexAgentRoleForTask(task)
 ): string {
+  const requestInput =
+    input.input && typeof input.input === "object"
+      ? (input.input as Record<string, unknown>)
+      : input;
   const outputKeys = Object.keys(codexOutputSchemaForTask(task).properties ?? {}).join(", ");
   return [
     "You are the Career OS orchestrator.",
     `Delegate this request to exactly one native Codex custom agent named ${nativeRole} using the native spawn_agent tool.`,
     "Do not answer the request yourself. Wait for the child agent to finish, then return the child's JSON object unchanged.",
     "Use only the supplied evidence and follow the child agent's privacy and grounding instructions.",
+    ...(task === "role_fit"
+      ? [
+          "This is a public requirement-by-requirement comparison. Delegate to role-fit-analyst and wait for completion. Pass the entire supplied context, jobRequirements and scoring rubric to the child. While it works, check the expected JSON keys and citation IDs; do not do the analysis yourself. No MCP, shell or filesystem tools are needed. Cover all major requirements, including partial and unsupported areas. Each row must include a score (0, 25, 50, 75 or 100), a natural explanation of the aligned experience and any unconfirmed parts, requirement IDs (J1, J2), and supporting context IDs (S1, S2). Zero-score rows have no sources. Scores describe documented alignment, not hiring probability. The summary is a concise balanced introduction, not a CV extract."
+        ]
+      : []),
+    ...(task === "public_qa" && requestInput.mode === "general"
+      ? [
+          "This is a general conversational request. Do not call any MCP tool and do not make claims about Basil; answer directly from general knowledge."
+        ]
+      : task === "public_qa" && requestInput.mode === "retrieved_context"
+        ? [
+            "Pass the entire supplied question, context and writing instructions to portfolio-assistant. While the child works, check the expected JSON keys and source IDs; do not do its analysis yourself. Retrieval is complete: no additional MCP, filesystem or shell tools are needed. The child must synthesize a focused conversational answer, connecting relevant facts rather than copying CV text. Cite only supplied context IDs (S1, S2, etc.) in sources."
+          ]
+        : task === "public_qa"
+          ? [
+              "For public portfolio questions, answer directly when the supplied context is sufficient. If it is not sufficient, use the native get_public_portfolio_context MCP tool once with the visitor's question, then synthesize a natural answer from that tool result. Never use private-context tools."
+            ]
+          : []),
     EMPLOYER_PRIVACY_INSTRUCTION,
     "The caller requires a JSON object and will reject prose outside JSON.",
     `Return every one of these top-level output keys: ${outputKeys}. Use an empty string, empty array, or null where the schema permits it when evidence does not support a value.`,
@@ -410,13 +434,21 @@ function inspectItem(
   if (!value || typeof value !== "object") return;
   const item = value as Record<string, unknown>;
   if (item.type === "collabAgentToolCall" && item.tool === "spawnAgent") {
-    state.started = true;
     const ids = item.receiverThreadIds;
-    if (Array.isArray(ids) && typeof ids[0] === "string") state.subagentThreadId = ids[0];
+    // An attempted/failed spawn is not proof that a specialist executed.
+    if (item.status !== "failed" && Array.isArray(ids) && typeof ids[0] === "string" && ids[0]) {
+      state.started = true;
+      state.subagentThreadId = ids[0];
+    }
   }
-  if (item.type === "subAgentActivity" && item.kind === "started") {
+  if (
+    item.type === "subAgentActivity" &&
+    item.kind === "started" &&
+    typeof item.agentThreadId === "string" &&
+    item.agentThreadId
+  ) {
     state.started = true;
-    if (typeof item.agentThreadId === "string") state.subagentThreadId = item.agentThreadId;
+    state.subagentThreadId = item.agentThreadId;
   }
   if (item.item) inspectItem(item.item, state);
 }
@@ -445,6 +477,7 @@ async function runTurn(
   let turnId: string | undefined;
   let streamedText = "";
   let stderrText = "";
+  let invalidNativeRole = false;
   const childState = { started: false, subagentThreadId: undefined as string | undefined };
   const pending = new Map<number, (message: JsonRpcResponse) => void>();
   const rejected = new Map<number, (error: Error) => void>();
@@ -454,6 +487,9 @@ async function runTurn(
     completedResolve = resolve;
     completedReject = reject;
   });
+  // Startup can fail before we await the turn. A later process exit must not
+  // produce an unhandled rejection that obscures the original config error.
+  void completed.catch(() => undefined);
   const send = (message: Record<string, unknown>) => {
     child.stdin.write(`${JSON.stringify(message)}\n`);
   };
@@ -473,6 +509,16 @@ async function runTurn(
     } catch {
       return;
     }
+    if (message.method === "configWarning") {
+      const summary = message.params?.summary;
+      if (
+        typeof summary === "string" &&
+        summary.includes("malformed agent role") &&
+        summary.includes(`/${nativeAgentRole}.toml`)
+      ) {
+        invalidNativeRole = true;
+      }
+    }
     if (typeof message.id === "number" && message.method) {
       send({
         jsonrpc: "2.0",
@@ -490,6 +536,14 @@ async function runTurn(
       else resolve?.(message);
       return;
     }
+    // App Server can emit activity from child/other threads on this connection.
+    // Only the requested orchestrator may finish this request or contribute text.
+    if (
+      threadId &&
+      typeof message.params?.threadId === "string" &&
+      message.params.threadId !== threadId
+    )
+      return;
     if (message.method === "item/started" || message.method === "item/completed") {
       inspectItem(message.params?.item, childState);
       return;
@@ -534,7 +588,7 @@ async function runTurn(
         completedReject?.(requestError(`native child agent did not start:${nativeAgentRole}`));
         return;
       }
-      const text = streamedText || readTextFromCompletedTurn(params);
+      const text = readTextFromCompletedTurn(params) || streamedText;
       if (!text.trim()) {
         completedReject?.(requestError("turn returned no assistant message"));
         return;
@@ -586,17 +640,21 @@ async function runTurn(
     send({ jsonrpc: "2.0", method: "initialized", params: {} });
     const threadResponse = await request("thread/start", {
       ...(modelFor() ? { model: modelFor() } : {}),
-      ephemeral: true,
+      // Native spawn_agent resolves its parent through the thread store.
+      // Ephemeral roots are not available there in the installed runtime.
+      ephemeral: false,
       approvalPolicy: "never",
       sandbox: "read-only",
       cwd: root,
       developerInstructions: ORCHESTRATOR_DEVELOPER_INSTRUCTIONS,
-      threadSource: "cli"
+      threadSource: "appServer"
     });
     const threadResult = threadResponse.result as Record<string, unknown> | undefined;
     const thread = threadResult?.thread as Record<string, unknown> | undefined;
     if (!thread || typeof thread.id !== "string") throw requestError("thread/start returned no id");
     threadId = thread.id;
+    if (invalidNativeRole)
+      throw requestError(`invalid native agent configuration:${nativeAgentRole}`);
     if (typeof threadResult?.model === "string") model = threadResult.model;
     await request("turn/start", {
       threadId,
@@ -608,6 +666,18 @@ async function runTurn(
     return await completed;
   } finally {
     clearTimeout(timer);
+    // Retain local execution history for diagnostics without leaving completed
+    // web requests in the interactive Codex thread list.
+    if (threadId) {
+      let archiveTimer: ReturnType<typeof setTimeout> | undefined;
+      await Promise.race([
+        request("thread/archive", { threadId }).catch(() => undefined),
+        new Promise<void>((resolve) => {
+          archiveTimer = setTimeout(resolve, 1_500);
+        })
+      ]);
+      if (archiveTimer) clearTimeout(archiveTimer);
+    }
   }
 }
 

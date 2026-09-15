@@ -1,8 +1,20 @@
-import { extractRequirements, matchRequirements, scoreRequirements } from "@career-os/jobs";
 import { hostilePublicInput } from "@career-os/ai";
+import { parsePublicEnv } from "@career-os/config";
+import { createClient } from "@supabase/supabase-js";
+import { captureSanitizedError } from "@career-os/observability";
 import { allowPublicAiRequest } from "@/lib/public-ai-rate-limit";
 import { loadPublicPortfolio } from "@/lib/api/public-data";
 import { publicApiResponse } from "@/lib/api/response";
+import { generateReasoningJson, resolveReasoningProviders } from "@/lib/server/reasoning-provider";
+import {
+  parsePublicRoleFit,
+  publicRoleFitFailure,
+  publicRoleFitRequest,
+  publicRoleFitContext,
+  PUBLIC_ROLE_FIT_INSTRUCTION
+} from "@/lib/server/public-role-fit";
+
+export const maxDuration = 120;
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
@@ -23,43 +35,57 @@ export async function POST(request: Request) {
       request,
       400
     );
-  const requirements = extractRequirements(description);
   const snapshot = await loadPublicPortfolio();
   if (snapshot.source !== "live")
     return publicApiResponse(
       {
-        score: "0.0000",
-        requirements: [],
+        summary: "Portfolio information is temporarily unavailable.",
+        matches: [],
         abstained: true,
         unavailable: true,
         reason: "PUBLIC_EVIDENCE_UNAVAILABLE"
       },
       request
     );
-  const evidence = snapshot.evidence.flatMap((item) => {
-    const content = typeof item.sanitized_excerpt === "string" ? item.sanitized_excerpt : "";
-    const id = typeof item.public_evidence_id === "string" ? item.public_evidence_id : "";
-    return content && id
-      ? [
-          {
-            id,
-            content,
-            visibility: "public" as const,
-            metadata: { title: typeof item.safe_title === "string" ? item.safe_title : "" }
-          }
-        ]
-      : [];
-  });
-  const matches = matchRequirements(requirements, evidence);
-  return publicApiResponse(
-    {
-      ...scoreRequirements(matches),
-      requirements: matches.map((match) => ({
-        ...match,
-        evidenceValue: match.evidenceValue ?? match.match
+  const context = publicRoleFitContext(snapshot);
+  if (!context.length)
+    return publicApiResponse(
+      parsePublicRoleFit({ summary: "", matches: [] }, description, context),
+      request
+    );
+  try {
+    const ownerId =
+      typeof snapshot.publication?.owner_id === "string" ? snapshot.publication.owner_id : "";
+    if (!ownerId) throw new Error("ROLE_FIT_OWNER_UNAVAILABLE");
+    const env = parsePublicEnv();
+    const client = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.NEXT_PUBLIC_SUPABASE_ANON_KEY, {
+      auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false }
+    });
+    const providers = await resolveReasoningProviders(client, ownerId, "role_fit");
+    // Reserve time for a configured fallback within this route's deadline.
+    const budget = Math.floor(90_000 / Math.max(providers.length, 1));
+    const generated = await generateReasoningJson(
+      providers.map((provider) => ({
+        ...provider,
+        timeoutMs: Math.min(provider.timeoutMs, budget),
+        retryLimit: 0
       })),
-      abstained: matches.length === 0 || matches.every((match) => match.match === 0)
-    },
-    request
-  );
+      PUBLIC_ROLE_FIT_INSTRUCTION,
+      publicRoleFitRequest(description, context),
+      { task: "role_fit" }
+    );
+    return publicApiResponse(parsePublicRoleFit(generated.output, description, context), request);
+  } catch (error) {
+    captureSanitizedError(error, { route: "/api/v1/public/jd-matches" });
+    return publicApiResponse(
+      {
+        ...publicRoleFitFailure(error),
+        matches: [],
+        abstained: true,
+        unavailable: true
+      },
+      request,
+      503
+    );
+  }
 }

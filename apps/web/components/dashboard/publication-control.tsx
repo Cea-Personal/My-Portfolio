@@ -67,6 +67,10 @@ export function PublicationControl() {
         Build an immutable preview from the Career Brain items you selected plus approved cited
         evidence. Activating it atomically replaces the current public snapshot.
       </p>
+      <p>
+        <strong>Build staged snapshot</strong> creates a reviewable draft only. The existing active
+        public snapshot remains unchanged until you choose <strong>Activate snapshot</strong>.
+      </p>
       <button disabled={busy} type="button" onClick={() => void mutate("stage")}>
         {busy ? "Working…" : "Build staged snapshot"}
       </button>

@@ -123,6 +123,17 @@ in the same section to send a small synthetic query and verify the provider, mod
 and latency. The test does not send career evidence or expose the API key; failures are recorded in
 the sanitized AI run diagnostics.
 
+For the public Ask Basil chat, reranking is disabled by default so a visitor does not wait for a
+second model request. Set `PUBLIC_CHAT_ENABLE_RERANKER=true` when the extra precision is worth the
+latency; private retrieval and other workflows continue to follow their configured reranker
+policy.
+
+Ask Basil also has a restricted native tool path. The portfolio assistant can answer ordinary
+conversation directly, and when the supplied context is insufficient it may call
+`get_public_portfolio_context` through the `supabase_public` MCP server. That server exposes only
+published portfolio items, public evidence, and published blog posts; private career tools are not
+visible to the public assistant.
+
 All reasoning agents run as subagents under one owner-configured orchestrator model. In **Settings →
 AI providers**, register the chat/generation model with a reasoning capability (or `*`), then in
 **Settings → Agents** select it once and enable **Save orchestrator**. Portfolio Q&A, role fit,
@@ -135,7 +146,7 @@ interviewer. There is no manual STAR-story form in the normal workflow.
 
 The web application exposes this orchestration boundary in `/api/v1/orchestrator/tasks`. Native Codex
 custom agents live in `.codex/agents/*.toml`, with shared native settings in `.codex/config.toml`.
-When the registered provider is `codex_app_server`, the Next.js server starts one ephemeral
+When the registered provider is `codex_app_server`, the Next.js server starts one stored
 `codex app-server --stdio` orchestrator thread for each bounded reasoning turn. The parent explicitly
 delegates exactly one request through native `spawn_agent`; the web adapter requires a child-agent
 event before accepting the result. This uses the local Codex login; it does not reuse the browser's
@@ -143,6 +154,57 @@ Supabase session as a Codex credential. Configure `CODEX_APP_SERVER_COMMAND`,
 `CODEX_APP_SERVER_ARGS`, or (when launched outside the repository) `CODEX_PROJECT_ROOT` only when
 the defaults need to change. Embeddings remain a separate provider, and the existing OpenAI/provider
 path remains the fallback when the Codex runtime is unavailable.
+
+Native delegation needs a stored parent thread: ephemeral roots can fail with
+`collab spawn failed: no thread with id`. Each web execution is archived after completion;
+its trace remains in local Codex history for diagnostics. Agent files inherit MCP server
+tables from the project configuration; `mcp_servers = ["supabase"]` is invalid and causes
+Codex to skip the agent. Use `[mcp_servers.server_name]` tables for overrides.
+
+To explicitly test public role fit against your configured Supabase and reasoning provider,
+run `RUN_LIVE_ROLE_FIT=1 pnpm exec vitest run apps/web/lib/server/public-role-fit.live.test.ts`.
+This reads published portfolio content and incurs one configured AI workflow; it is skipped
+in normal test runs.
+
+### Supabase MCP for Codex agents
+
+The project also registers a local, read-only `supabase` MCP server in
+`.codex/config.toml`. It connects to Supabase Cloud with the server-only
+service-role key and exposes three bounded tools: `search_career_knowledge`,
+`get_career_context`, and `get_public_portfolio_context`. There is no arbitrary
+SQL tool, and every request is locked to `SUPABASE_OWNER_ID` (or, when omitted,
+the sole active owner authorization), so an agent cannot browse another owner's
+records. The bridge loads environment variables first
+and can fall back to the repository's uncommitted `.env.local` for local
+development; it never prints or stores secrets.
+
+Set these values in `.env.local` before using the tools:
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=<server-only-service-role-key>
+# Optional when Supabase has exactly one active owner authorization:
+SUPABASE_OWNER_ID=<configured-owner-uuid>
+```
+
+Apply migration `0154_codex_supabase_mcp_read_access.sql` to a hosted project
+(`supabase db push`) before the first retrieval. It grants the service role
+only the MCP server's read graph; the bridge still filters every query to the
+configured owner.
+
+Run the bridge directly when troubleshooting:
+
+```bash
+pnpm mcp:supabase
+```
+
+It is a stdio MCP process, so a normal terminal will wait for protocol input.
+Use `codex mcp list` from the repository root to confirm it is enabled, then
+restart the Codex app/CLI after changing `.codex/config.toml` or environment
+variables. All `.codex/agents/*.toml` files explicitly declare the `supabase`
+server and instruct the agent which retrieval tool to use. Codex supports
+project-scoped MCP configuration, stdio commands, environment forwarding, and
+tool allow-lists in `config.toml` ([official MCP configuration guide](https://developers.openai.com/codex/mcp/)).
 
 Career Brain uses three focused native turns in parallel rather than one oversized synthesis turn:
 profile/credentials, career experience, and projects. Each turn receives a bounded, purpose-ranked
@@ -196,24 +258,28 @@ page uses an approved YouTube demo as its hero video when one is published, then
 description, problem/approach, points, build process, skills, and safe live/GitHub links from the
 published project details. Rebuild and activate the portfolio snapshot after changing project details.
 
-### LinkedIn job intake and interview packages
+### Job intake and interview packages
 
 In **Jobs**, paste a LinkedIn listing URL while entering its title, company, and description. The
-owner-supplied URL is retained as a reference; the app does not scrape LinkedIn. For automated
-discovery, configure **LinkedIn (authorized feed)** under **Settings → Job sources** with an
-authorized or licensed provider endpoint and a terms/access note.
+owner-supplied URL is retained as a reference; the app does not scrape LinkedIn or expose a LinkedIn
+job-source adapter.
 
 For no-key remote-job discovery, configure these presets under **Settings → Job sources**:
 
-- **Jobgether (public API)** — \`https://jobgether.com/api/v1/jobs\`
-- **Remote OK (public JSON feed)** — \`https://remoteok.com/api\`
-- **Arbeitnow (public API)** — \`https://www.arbeitnow.com/api/job-board-api\`
-- **Adzuna** — \`https://api.adzuna.com/v1/api/jobs/gb/search/1\` (set \`ADZUNA_APP_ID\` and \`ADZUNA_APP_KEY\`)
-- **JSearch** — RapidAPI (set \`JSEARCH_RAPIDAPI_KEY\`)
-- **FlyByAPIs Jobs Search** — RapidAPI (set \`FLYBYAPIS_RAPIDAPI_KEY\`)
-- **SerpApi Google Jobs** — \`https://serpapi.com/search.json\` (set \`SERPAPI_API_KEY\`)
-- **TheirStack** — \`https://api.theirstack.com/v1/jobs/search\` (set \`THEIRSTACK_API_KEY\`)
-- **JobsPipe** — \`https://api.jobspipe.dev/v1/jobs/search\` (set \`JOBSPIPE_API_KEY\`)
+- **Jobgether (public API)** — `https://jobgether.com/api/v1/jobs`
+- **Remote OK** — RapidAPI “RemoteOK Jobs API” (default
+  `https://remoteok-jobs-api.p.rapidapi.com/jobs`; set the shared `RAPIDAPI_KEY`). The public JSON feed
+  remains available if you explicitly configure `https://remoteok.com/api`.
+- **Arbeitnow (public API)** — `https://www.arbeitnow.com/api/job-board-api`
+- **Adzuna** — `https://api.adzuna.com/v1/api/jobs/gb/search/1` (set `ADZUNA_APP_ID` and `ADZUNA_APP_KEY`)
+- **JSearch** — RapidAPI (default endpoint `https://jsearch.p.rapidapi.com/search`; set the shared
+  `RAPIDAPI_KEY`). An OpenWeb Ninja endpoint remains supported when supplied explicitly.
+- **FlyByAPIs Jobs Search** — RapidAPI (set the shared `RAPIDAPI_KEY`)
+- **SerpApi Google Jobs** — `https://serpapi.com/search.json` (set `SERPAPI_API_KEY`)
+- **TheirStack** — `https://api.theirstack.com/v1/jobs/search` (set `THEIRSTACK_API_KEY`)
+- **JobsPipe MCP** — `https://mcp.jobspipe.dev/mcp` (set `JOBSPIPE_KEY` to a
+  `jp_live_...` key). The source runner calls the MCP `search_jobs` tool rather than the REST
+  search endpoint.
 
 The adapters translate the active search profile into each provider's query shape, discard malformed
 metadata records, preserve the provider listing URL, and feed the normal raw-job, eligibility,
@@ -226,8 +292,9 @@ necessarily the employer's application URL. Jobgether's list response does not i
 description; when it supplies an optional description-like field the adapter preserves it, otherwise
 the listing URL remains the source of the full description.
 
-RapidAPI providers use the server-side secret reference configured for the source. The application
-never stores provider keys in Supabase. Scheduled job-search automations run on weekdays and cap
+RapidAPI providers may share one server-side `RAPIDAPI_KEY`; the adapter selects the
+`X-RapidAPI-Host` from each configured endpoint. The application never stores provider keys in
+Supabase. Scheduled job-search automations run on weekdays and cap
 new canonical jobs at ten per owner/day; existing fingerprints are updated rather than duplicated.
 
 For Jobgether, the adapter maps target and preferred titles to slugified `jobReferences` (for example,
@@ -262,13 +329,10 @@ owner input when the profile does not supply a value. Each generated answer stor
 generation context, model version, and a new version number. Answers are editable and can be
 regenerated after new evidence is indexed; final approval remains an owner decision.
 
-The ATS adapters have different credential rules. Greenhouse public job-board endpoints, Lever's
-public postings feed, and Ashby's public job-posting API generally need no key when you are reading
-published postings. SmartRecruiters, Workable, Teamtailor, Personio, Recruitee, and private/company
-endpoints may require an employer-issued API token or account. Obtain those credentials from the
-provider's developer/integrations area or from the employer who owns the board, then store only the
-environment-variable name in Job Sources (never the token itself). LinkedIn requires an
-authorized/licensed provider feed; a normal LinkedIn login is not an API key.
+The supported adapters are Jobgether, Remote OK, Arbeitnow, Adzuna, JSearch, FlyByAPIs, SerpApi,
+TheirStack, and JobsPipe. Provider credentials are entered as server-side environment
+variable references; the secret values are never stored in Supabase. LinkedIn remains a manual URL
+reference only and is not queried by the application.
 
 In **Interview Kit**, create a process from an application and choose **Generate / refresh interview
 package**. The planner reads the selected job description, infers stages when evidence is present (or

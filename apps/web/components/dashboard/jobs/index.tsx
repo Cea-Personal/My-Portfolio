@@ -95,18 +95,6 @@ interface JobSourceSummary {
   last_discovered_count?: number;
   last_accepted_count?: number;
 }
-interface LiveJobCandidate {
-  title: string;
-  company: string;
-  location?: string;
-  canonicalUrl: string;
-  description?: string;
-  postedAt?: string;
-  sourceName?: string;
-  pipelineJobId?: string;
-  discoveryOutcome?: "PASS" | "REVIEW";
-}
-
 const transitions: Record<JobStatus, JobStatus[]> = {
   discovered: ["shortlisted", "interested", "withdrawn", "expired"],
   shortlisted: ["interested", "preparing_application", "rejected", "withdrawn", "expired"],
@@ -180,10 +168,6 @@ export function JobsWorkspace({ initialJobId }: { initialJobId?: string } = {}) 
   const [filter, setFilter] = useState<"active" | "all" | JobStatus>("active");
   const [compareIds, setCompareIds] = useState<string[]>([]);
   const [detail, setDetail] = useState<Job | null>(null);
-  const [liveProfileId, setLiveProfileId] = useState("");
-  const [liveJobs, setLiveJobs] = useState<LiveJobCandidate[]>([]);
-  const [liveReviewQueue, setLiveReviewQueue] = useState<LiveJobCandidate[]>([]);
-  const [liveSearching, setLiveSearching] = useState(false);
   const load = useCallback(async () => {
     try {
       const [jobsResponse, profilesResponse, runsResponse, sourcesResponse] = await Promise.all([
@@ -205,10 +189,6 @@ export function JobsWorkspace({ initialJobId }: { initialJobId?: string } = {}) 
       const nextSources = sourcesPayload.data?.sources ?? [];
       setJobs(jobsPayload.data?.jobs ?? []);
       setProfiles(profilesPayload.data?.profiles ?? []);
-      setLiveProfileId(
-        (current) =>
-          current || profilesPayload.data?.profiles?.find((profile) => profile.enabled)?.id || ""
-      );
       setRuns(runsPayload.data?.runs ?? []);
       setSources(nextSources);
       setSelectedSourceIds((current) => {
@@ -258,7 +238,6 @@ export function JobsWorkspace({ initialJobId }: { initialJobId?: string } = {}) 
     event.preventDefault();
     const profileId = new FormData(event.currentTarget).get("profileId");
     if (typeof profileId !== "string" || !profileId) return;
-    setLiveProfileId(profileId);
     if (!selectedSourceIds.length) {
       setMessage("Select at least one enabled source before starting a search.");
       return;
@@ -314,47 +293,6 @@ export function JobsWorkspace({ initialJobId }: { initialJobId?: string } = {}) 
         );
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not start search.");
-    }
-  }
-  async function liveSearch(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!liveProfileId) {
-      setMessage("Select an enabled profile before searching the live web.");
-      return;
-    }
-    const form = new FormData(event.currentTarget);
-    const rawDomains = form.get("liveDomains");
-    const domains =
-      typeof rawDomains === "string"
-        ? rawDomains
-            .split(",")
-            .map((domain) => domain.trim())
-            .filter(Boolean)
-        : [];
-    setLiveSearching(true);
-    setMessage("Searching the live web with your configured orchestrator…");
-    try {
-      const result = (await mutation("/api/v1/jobs/live-search", "POST", {
-        profileId: liveProfileId,
-        allowedDomains: domains
-      })) as {
-        jobs?: LiveJobCandidate[];
-        elapsedMs?: number;
-        groundedEvidenceCount?: number;
-        discoveredCount?: number;
-        filteredCount?: number;
-        reviewCount?: number;
-        reviewQueue?: LiveJobCandidate[];
-      };
-      setLiveJobs(result.jobs ?? []);
-      setLiveReviewQueue(result.reviewQueue ?? []);
-      setMessage(
-        `Live search found ${String(result.jobs?.length ?? 0)} eligible candidate${result.jobs?.length === 1 ? "" : "s"} from ${String(result.discoveredCount ?? result.jobs?.length ?? 0)} listing${result.discoveredCount === 1 ? "" : "s"}; ${String(result.filteredCount ?? 0)} filtered and ${String(result.reviewCount ?? 0)} placed in the review queue. Eligible jobs were added to your pipeline automatically. Grounded with ${String(result.groundedEvidenceCount ?? 0)} private evidence snippet${result.groundedEvidenceCount === 1 ? "" : "s"}.`
-      );
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Live web search failed.");
-    } finally {
-      setLiveSearching(false);
     }
   }
   const loadDetail = useCallback(async (id: string) => {
@@ -532,101 +470,6 @@ export function JobsWorkspace({ initialJobId }: { initialJobId?: string } = {}) 
             <p>No searches have run yet.</p>
           )}
         </details>
-      </section>
-      <section aria-labelledby="live-discovery-title">
-        <h2 id="live-discovery-title">Live web discovery</h2>
-        <p>
-          Ask the configured orchestrator to search current public listings outside your configured
-          feeds. Results are filtered to approved domains, retain their source URL, and eligible
-          results are added to your private pipeline automatically. Listings that need more evidence
-          remain in the review queue.
-        </p>
-        <form className="knowledge-entry-form" onSubmit={(event) => void liveSearch(event)}>
-          <label>
-            Search profile
-            <select
-              value={liveProfileId}
-              onChange={(event) => {
-                setLiveProfileId(event.target.value);
-              }}
-              required
-            >
-              <option value="" disabled>
-                Select a profile
-              </option>
-              {profiles
-                .filter((profile) => profile.enabled)
-                .map((profile) => (
-                  <option key={profile.id} value={profile.id}>
-                    {profile.name}
-                  </option>
-                ))}
-            </select>
-          </label>
-          <label>
-            Allowed domains (comma-separated, optional)
-            <input
-              name="liveDomains"
-              defaultValue="jobgether.com, remoteok.com, wellfound.com, greenhouse.io, lever.co, ashbyhq.com"
-            />
-          </label>
-          <button
-            type="submit"
-            disabled={liveSearching || !profiles.some((profile) => profile.enabled)}
-          >
-            {liveSearching ? "Searching live web…" : "Search live web"}
-          </button>
-        </form>
-        {liveJobs.length ? (
-          <>
-            <h3>Added to the opportunity pipeline</h3>
-            <ul className="workspace-list">
-              {liveJobs.map((job) => (
-                <li key={job.canonicalUrl}>
-                  <h3>{job.title}</h3>
-                  <p>
-                    {job.company} · {job.location || "Location not stated"}
-                    {job.sourceName ? ` · ${job.sourceName}` : ""}
-                  </p>
-                  {job.description ? <p>{job.description}</p> : null}
-                  <p>
-                    <a href={job.canonicalUrl} target="_blank" rel="noreferrer">
-                      Open listing
-                    </a>
-                  </p>
-                  <p>
-                    {job.pipelineJobId
-                      ? "Added to your private opportunity pipeline automatically."
-                      : "Needs review before it can enter the opportunity pipeline."}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          </>
-        ) : null}
-        {liveReviewQueue.length ? (
-          <>
-            <h3>Review queue</h3>
-            <p>These listings need more evidence before they can be added automatically.</p>
-            <ul className="workspace-list">
-              {liveReviewQueue.map((job) => (
-                <li key={job.canonicalUrl}>
-                  <h3>{job.title}</h3>
-                  <p>
-                    {job.company} · {job.location || "Location not stated"}
-                    {job.sourceName ? ` · ${job.sourceName}` : ""}
-                  </p>
-                  {job.description ? <p>{job.description}</p> : null}
-                  <p>
-                    <a href={job.canonicalUrl} target="_blank" rel="noreferrer">
-                      Open listing
-                    </a>
-                  </p>
-                </li>
-              ))}
-            </ul>
-          </>
-        ) : null}
       </section>
       <section aria-labelledby="manual-job-title">
         <h2 id="manual-job-title">Add an opportunity manually</h2>

@@ -181,31 +181,28 @@ export function AskShell() {
               <article className="assistant-turn" key={turn.id}>
                 <p className="assistant-user-message">{turn.question}</p>
                 {turn.status === "loading" ? (
-                  <p className="assistant-thinking">Retrieving portfolio facts…</p>
+                  <p className="assistant-thinking">Putting your answer together…</p>
                 ) : null}
                 {turn.status === "error" ? (
                   <p role="alert">The public assistant is unavailable. Try again.</p>
                 ) : null}
-                {turn.unavailable ? (
-                  <p className="assistant-unavailable" role="status">
-                    Portfolio facts are reconnecting. Ask Basil will resume when the published
-                    portfolio data is available.
-                  </p>
-                ) : null}
                 {turn.answer ? (
                   <div className="assistant-answer">
-                    <p>{turn.answer}</p>
+                    {turn.answer.split(/\n\s*\n/).map((paragraph, index) => (
+                      <p key={`${turn.id}-paragraph-${index}`}>{paragraph}</p>
+                    ))}
                     {turn.citations.length ? (
-                      <ul aria-label="Supporting facts">
-                        {turn.citations.map((citation, citationIndex) => (
-                          <li key={`${turn.id}-${citation}`}>
-                            {turn.citationLabels[citationIndex] ?? "Published portfolio"}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <small>No supporting facts were returned.</small>
-                    )}
+                      <details className="assistant-sources">
+                        <summary>Explore the supporting information</summary>
+                        <ul aria-label="Supporting facts">
+                          {turn.citations.map((citation, citationIndex) => (
+                            <li key={`${turn.id}-${citation}`}>
+                              {turn.citationLabels[citationIndex] ?? "Published portfolio"}
+                            </li>
+                          ))}
+                        </ul>
+                      </details>
+                    ) : null}
                   </div>
                 ) : null}
               </article>

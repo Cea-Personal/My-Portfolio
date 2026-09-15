@@ -12,7 +12,6 @@ interface SourceConfig {
   last_test_outcome?: string | null;
   discovery_frequency_minutes?: number;
   schedule_eligible?: boolean;
-  extraction_config?: Record<string, string>;
 }
 
 interface JobSource {
@@ -62,24 +61,6 @@ function list(value: FormDataEntryValue | null): string[] {
         .map((item) => item.trim())
         .filter(Boolean)
     : [];
-}
-
-function extractionConfig(form: FormData): Record<string, string> {
-  return Object.fromEntries(
-    [
-      "jobSelector",
-      "titleSelector",
-      "companySelector",
-      "locationSelector",
-      "urlSelector",
-      "nextPageSelector"
-    ]
-      .map((name) => {
-        const value = form.get(name);
-        return [name, typeof value === "string" ? value.trim() : ""] as const;
-      })
-      .filter(([, value]) => value)
-  );
 }
 
 function profileCriteria(form: FormData) {
@@ -164,7 +145,6 @@ export function JobSourcesWorkspace() {
         rateLimitPerMinute: Number(form.get("rateLimit")),
         discoveryFrequencyMinutes: Number(form.get("frequency")),
         scheduleEligible: form.get("scheduleEligible") === "on",
-        extractionConfig: extractionConfig(form),
         termsNote: form.get("termsNote"),
         enabled: form.get("enabled") === "on"
       });
@@ -200,7 +180,6 @@ export function JobSourcesWorkspace() {
         rateLimitPerMinute: Number(form.get("rateLimit")),
         discoveryFrequencyMinutes: Number(form.get("frequency")),
         scheduleEligible: form.get("scheduleEligible") === "on",
-        extractionConfig: extractionConfig(form),
         termsNote: form.get("termsNote")
       });
       setMessage(`${source.name} was updated. Run a new connection test.`);
@@ -228,7 +207,7 @@ export function JobSourcesWorkspace() {
   }
 
   async function remove(source: JobSource) {
-    if (!window.confirm(`Disable and remove “${source.name}” from future searches?`)) return;
+    if (!window.confirm(`Permanently remove “${source.name}” and its connection settings?`)) return;
     setMessage(`Removing ${source.name}…`);
     try {
       await request(`/api/v1/job-sources/${source.id}`, "DELETE");
@@ -261,28 +240,16 @@ export function JobSourcesWorkspace() {
           </label>
           <label>
             Adapter
-            <select name="adapterType" defaultValue="greenhouse">
-              <option value="greenhouse">Greenhouse</option>
-              <option value="lever">Lever</option>
-              <option value="ashby">Ashby</option>
-              <option value="workable">Workable</option>
-              <option value="smartrecruiters">SmartRecruiters</option>
-              <option value="teamtailor">Teamtailor</option>
-              <option value="personio">Personio</option>
-              <option value="recruitee">Recruitee</option>
+            <select name="adapterType" defaultValue="arbeitnow">
               <option value="jobgether">Jobgether (public API)</option>
-              <option value="remoteok">Remote OK (public JSON feed)</option>
+              <option value="remoteok">Remote OK (RapidAPI / public feed)</option>
               <option value="arbeitnow">Arbeitnow (public API)</option>
               <option value="adzuna">Adzuna API</option>
               <option value="jsearch">JSearch (RapidAPI)</option>
               <option value="flybyapis">FlyByAPIs Jobs (RapidAPI)</option>
               <option value="serpapi">SerpApi Google Jobs</option>
               <option value="theirstack">TheirStack Jobs API</option>
-              <option value="jobspipe">JobsPipe API</option>
-              <option value="structured">Structured data (JSON-LD)</option>
-              <option value="linkedin-authorized">LinkedIn (authorized feed)</option>
-              <option value="rss">RSS</option>
-              <option value="custom-rest">Custom REST</option>
+              <option value="jobspipe">JobsPipe MCP</option>
             </select>
           </label>
           <label>
@@ -290,18 +257,24 @@ export function JobSourcesWorkspace() {
             <input
               name="endpoint"
               type="url"
-              placeholder="https://boards-api.greenhouse.io/v1/boards/company/jobs"
+              placeholder="https://www.arbeitnow.com/api/job-board-api"
             />
           </label>
           <p>
-            No-key presets: Jobgether, Remote OK, and Arbeitnow. Keyed providers read only the
-            environment-variable name entered below; the secret itself never enters the database.
-            Defaults are available for Adzuna, JSearch, FlyByAPIs, SerpApi, TheirStack, and JobsPipe.
+            No-key presets: Jobgether and Arbeitnow. Remote OK, JSearch, and FlyByAPIs use RapidAPI
+            by default; the public Remote OK feed remains available when its endpoint is entered
+            explicitly. Keyed providers read only the environment-variable name entered below; the
+            secret itself never enters the database.
           </p>
           <p>
-            LinkedIn is supported through an authorized/licensed feed or partner endpoint only. For
-            a normal LinkedIn listing, paste the URL in Jobs; this app stores the link and does not
-            scrape LinkedIn.
+            JSearch, Remote OK, and FlyByAPIs can be connected through RapidAPI. Copy each
+            provider's exact endpoint and host from its RapidAPI code sample, subscribe to its plan,
+            and set the matching server-side key reference. The same RapidAPI app key may be reused
+            for all three; only the <code>X-RapidAPI-Host</code> changes.
+          </p>
+          <p>
+            Existing sources keep the endpoint saved when they were created. If a provider listing
+            has changed, edit that source and save its current RapidAPI endpoint before testing.
           </p>
           <label>
             Secret environment variable (optional)
@@ -311,9 +284,10 @@ export function JobSourcesWorkspace() {
               placeholder="JOB_SOURCE_API_TOKEN"
             />
             <small>
-            Enter a variable name, never an API key. Suggested names: ADZUNA_APP_KEY,
+              Enter a variable name, never an API key. Suggested names: ADZUNA_APP_KEY, RAPIDAPI_KEY
+              (shared by JSearch, Remote OK, and FlyByAPIs), REMOTEOK_RAPIDAPI_KEY,
               JSEARCH_RAPIDAPI_KEY, FLYBYAPIS_RAPIDAPI_KEY, SERPAPI_API_KEY, THEIRSTACK_API_KEY, or
-              JOBSPIPE_API_KEY.
+              JOBSPIPE_KEY.
             </small>
           </label>
           <label>
@@ -343,34 +317,6 @@ export function JobSourcesWorkspace() {
               required
             />
           </label>
-          <details>
-            <summary>HTML / structured extraction selectors</summary>
-            <p>Optional, reviewed CSS selectors for sources without a supported ATS feed.</p>
-            <label>
-              Job item selector
-              <input name="jobSelector" placeholder="article.job" />
-            </label>
-            <label>
-              Title selector
-              <input name="titleSelector" placeholder="h2" />
-            </label>
-            <label>
-              Company selector
-              <input name="companySelector" placeholder=".company" />
-            </label>
-            <label>
-              Location selector
-              <input name="locationSelector" placeholder=".location" />
-            </label>
-            <label>
-              Job URL selector
-              <input name="urlSelector" placeholder="a.apply" />
-            </label>
-            <label>
-              Next-page selector
-              <input name="nextPageSelector" placeholder="a.next" />
-            </label>
-          </details>
           <label>
             Terms / lawful-use note
             <textarea name="termsNote" rows={3} maxLength={1000} />
@@ -469,51 +415,6 @@ export function JobSourcesWorkspace() {
                         defaultValue={config.discovery_frequency_minutes ?? 1440}
                       />
                     </label>
-                    <details>
-                      <summary>Edit extraction selectors</summary>
-                      <label>
-                        Job item selector
-                        <input
-                          name="jobSelector"
-                          defaultValue={config.extraction_config?.jobSelector ?? ""}
-                        />
-                      </label>
-                      <label>
-                        Title selector
-                        <input
-                          name="titleSelector"
-                          defaultValue={config.extraction_config?.titleSelector ?? ""}
-                        />
-                      </label>
-                      <label>
-                        Company selector
-                        <input
-                          name="companySelector"
-                          defaultValue={config.extraction_config?.companySelector ?? ""}
-                        />
-                      </label>
-                      <label>
-                        Location selector
-                        <input
-                          name="locationSelector"
-                          defaultValue={config.extraction_config?.locationSelector ?? ""}
-                        />
-                      </label>
-                      <label>
-                        Job URL selector
-                        <input
-                          name="urlSelector"
-                          defaultValue={config.extraction_config?.urlSelector ?? ""}
-                        />
-                      </label>
-                      <label>
-                        Next-page selector
-                        <input
-                          name="nextPageSelector"
-                          defaultValue={config.extraction_config?.nextPageSelector ?? ""}
-                        />
-                      </label>
-                    </details>
                     <label>
                       <input
                         name="scheduleEligible"

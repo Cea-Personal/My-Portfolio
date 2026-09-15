@@ -9,6 +9,9 @@ describe("public portfolio assistant context", () => {
       public_summary: "Built dependable data products.",
       structured_content: {
         experience: ["Designed an Airflow ingestion platform."],
+        responsibilities: ["Owned the production data pipeline."],
+        achievements: ["Reduced manual reporting effort."],
+        outcomes: ["Reporting became repeatable for the team."],
         workProjects: [
           {
             title: "Climate Change",
@@ -20,6 +23,9 @@ describe("public portfolio assistant context", () => {
       }
     });
     expect(context).toContain("Designed an Airflow ingestion platform.");
+    expect(context).toContain("Owned the production data pipeline.");
+    expect(context).toContain("Reduced manual reporting effort.");
+    expect(context).toContain("Reporting became repeatable for the team.");
     expect(context).toContain("Climate Change");
     expect(context).toContain("Made reporting repeatable.");
     expect(context).not.toContain("must not be exposed");

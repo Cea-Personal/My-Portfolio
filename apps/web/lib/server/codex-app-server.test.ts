@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import {
   buildOrchestratorPrompt,
   codexErrorMessage,
@@ -8,6 +9,34 @@ import {
 } from "./codex-app-server";
 
 describe("native Codex orchestration", () => {
+  it("keeps private MCP servers disabled with valid transports in the public role", () => {
+    const config = readFileSync(".codex/agents/portfolio-assistant.toml", "utf8");
+    for (const server of ["supabase", "jobspipe", "playwright"]) {
+      const section = config.split(`[mcp_servers.${server}]`)[1]?.split("\n[")[0] ?? "";
+      expect(section).toMatch(/enabled\s*=\s*false/);
+      expect(section).toMatch(/(?:command|url)\s*=\s*"[^"\n]+"/);
+    }
+  });
+  it("routes nested public chat requests without sending general questions to retrieval", () => {
+    const general = buildOrchestratorPrompt("public_qa", {
+      system: "Instructions",
+      input: { mode: "general", question: "What is SQL?" }
+    });
+    expect(general).toContain("general conversational request");
+    expect(general).not.toContain("use the native get_public_portfolio_context");
+    const grounded = buildOrchestratorPrompt("public_qa", { input: { mode: "retrieved_context" } });
+    expect(grounded).toContain("Retrieval is complete");
+    expect(grounded).toContain("connecting relevant facts rather than copying CV text");
+  });
+
+  it("requires a score per role requirement and instructs coverage of unsupported areas", () => {
+    expect(codexOutputSchemaForTask("role_fit").properties?.matches?.items?.required).toContain(
+      "score"
+    );
+    expect(buildOrchestratorPrompt("role_fit", {})).toContain(
+      "including partial and unsupported areas"
+    );
+  });
   it("maps application tasks to native custom agent names", () => {
     expect(codexAgentRoleForTask("document_composition")).toBe("application-writer");
     expect(codexAgentRoleForTask("role_fit")).toBe("role-fit-analyst");

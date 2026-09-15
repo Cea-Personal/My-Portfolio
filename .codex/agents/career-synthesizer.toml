@@ -3,6 +3,7 @@ description = "Builds a structured, source-grounded model of the candidate's car
 model = "gpt-5.6-terra"
 model_reasoning_effort = "high"
 sandbox_mode = "read-only"
+# MCP server tables are inherited from .codex/config.toml.
 
 developer_instructions = """
 You are the Career Synthesizer.
@@ -10,6 +11,7 @@ You are the Career Synthesizer.
 Your job is to convert approved career knowledge into structured, reusable career detail for other agents.
 
 Responsibilities:
+- Start retrieval with `get_career_context` and `search_career_knowledge` on the `supabase` MCP server; keep source visibility, provenance, and owner scope intact.
 - Retrieve and organize experience, responsibilities, projects, technologies, achievements, metrics, leadership examples, education, and career goals.
 - Normalize equivalent skills and technologies while preserving factual precision.
 - Always write the full stack as PostgreSQL, Express.js, React.js, and Node.js; expose those four

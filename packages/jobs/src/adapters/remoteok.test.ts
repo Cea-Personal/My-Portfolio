@@ -68,4 +68,30 @@ describe("Remote OK adapter", () => {
     expect(requests[1]).not.toContain("tag=");
     expect(records).toHaveLength(1);
   });
+
+  it("uses RapidAPI headers for a configured RapidAPI Remote OK endpoint", async () => {
+    let requestedHeaders: Headers | undefined;
+    const records = await remoteOkAdapter.collect({
+      endpoint: "https://remoteok-jobs-api.p.rapidapi.com/jobs",
+      headers: { authorization: "Bearer rapid-key" },
+      fetcher: async (_input, init) => {
+        requestedHeaders = new Headers(init?.headers);
+        return new Response(
+          JSON.stringify({
+            jobs: [
+              {
+                id: "1",
+                position: "Data Engineer",
+                company: "Acme",
+                url: "https://remoteok.com/jobs/1"
+              }
+            ]
+          })
+        );
+      }
+    });
+    expect(requestedHeaders?.get("x-rapidapi-key")).toBe("rapid-key");
+    expect(requestedHeaders?.get("x-rapidapi-host")).toBe("remoteok-jobs-api.p.rapidapi.com");
+    expect(records).toHaveLength(1);
+  });
 });

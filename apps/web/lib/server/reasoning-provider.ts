@@ -30,6 +30,12 @@ export interface ResolvedReasoningProvider extends ProviderRow {
   retryLimit: number;
 }
 
+const REASONING_PROVIDER_CACHE_TTL_MS = 60_000;
+const reasoningProviderCache = new Map<
+  string,
+  { expiresAt: number; providers: ResolvedReasoningProvider[] }
+>();
+
 function endpointFor(provider: ProviderRow): string {
   if (provider.provider === "codex_app_server") {
     // Native mode starts the local `codex app-server --stdio` process; no URL
@@ -50,6 +56,10 @@ export async function resolveReasoningProviders(
   ownerId: string,
   task: string
 ): Promise<ResolvedReasoningProvider[]> {
+  const cacheKey = `${ownerId}:${task}`;
+  const cached = reasoningProviderCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.providers;
+  if (cached) reasoningProviderCache.delete(cacheKey);
   const runtimeClient = aiRuntimeClient(client);
   // All reasoning work is delegated to the single owner-configured
   // orchestrator. The task-specific lookup is retained only as a migration
@@ -123,6 +133,10 @@ export async function resolveReasoningProviders(
     ];
   });
   if (!providers.length) throw new Error(`AI_PROVIDER_NOT_AVAILABLE:${task}`);
+  reasoningProviderCache.set(cacheKey, {
+    expiresAt: Date.now() + REASONING_PROVIDER_CACHE_TTL_MS,
+    providers
+  });
   return providers;
 }
 

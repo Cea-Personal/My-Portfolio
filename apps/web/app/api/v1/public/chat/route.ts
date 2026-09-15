@@ -2,6 +2,7 @@ import { answerPublicQuestion, hostilePublicInput } from "@career-os/ai";
 import { parsePublicEnv } from "@career-os/config";
 import { createClient } from "@supabase/supabase-js";
 import { issueEvidenceHandle } from "@career-os/knowledge";
+import { captureSanitizedError } from "@career-os/observability";
 import { allowPublicAiRequest } from "@/lib/public-ai-rate-limit";
 import { loadPublicBlogPostsWithStatus, loadPublicPortfolio } from "@/lib/api/public-data";
 import { publicApiResponse } from "@/lib/api/response";
@@ -15,13 +16,144 @@ import { rerankCandidates } from "@/lib/server/reranker-provider";
 import { publicPortfolioItemContext } from "@/lib/public-assistant-context";
 import { expandTechnologyTerms } from "@/lib/portfolio-career-rules";
 import {
-  CAREER_OUTPUT_SCOPE_INSTRUCTION,
-  EMPLOYER_PRIVACY_INSTRUCTION,
+  PUBLIC_CHAT_ANSWER_INSTRUCTION,
+  PUBLIC_CHAT_GENERATION_BUDGET_MS,
+  parsePublicChatAnswer,
+  publicChatProviders,
+  publicChatUnavailable
+} from "@/lib/server/public-chat-answer";
+import {
   PUBLIC_ASSISTANT_ALLOWED_SOURCE_TYPES,
   PUBLIC_ASSISTANT_BLOCKED_SOURCE_TYPES
 } from "@/lib/server/retrieval-policy";
 
 export const maxDuration = 120;
+
+type PublicChatResult = ReturnType<typeof answerPublicQuestion> & {
+  citationLabels?: string[];
+  unavailable?: boolean;
+};
+
+const PUBLIC_ANSWER_CACHE_TTL_MS = 5 * 60 * 1_000;
+const PUBLIC_ANSWER_CACHE_MAX_ENTRIES = 100;
+const PUBLIC_ANSWER_CACHE_VERSION = "conversational-v2";
+const PUBLIC_VECTOR_CACHE_TTL_MS = 2 * 60 * 1_000;
+const PUBLIC_VECTOR_CACHE_MAX_ENTRIES = 200;
+const PUBLIC_CHAT_ENABLE_RERANKER = process.env.PUBLIC_CHAT_ENABLE_RERANKER === "true";
+const publicAnswerCache = new Map<string, { expiresAt: number; result: PublicChatResult }>();
+const publicVectorCache = new Map<
+  string,
+  {
+    expiresAt: number;
+    evidence: { handle: string; text: string; source?: string; semantic: true }[];
+  }
+>();
+
+/** Keep an optional provider from blocking the public portfolio indefinitely. */
+function withTimeout<T>(operation: Promise<T>, timeoutMs: number, fallback: T): Promise<T> {
+  return new Promise((resolve) => {
+    let settled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const finish = (value: T) => {
+      if (settled) return;
+      settled = true;
+      if (timer) clearTimeout(timer);
+      resolve(value);
+    };
+    timer = setTimeout(() => finish(fallback), timeoutMs);
+    operation.then(finish).catch(() => finish(fallback));
+  });
+}
+
+function readCachedPublicAnswer(key: string): PublicChatResult | null {
+  const entry = publicAnswerCache.get(key);
+  if (!entry) return null;
+  if (entry.expiresAt <= Date.now()) {
+    publicAnswerCache.delete(key);
+    return null;
+  }
+  return entry.result;
+}
+
+function cachePublicAnswer(key: string, result: PublicChatResult): void {
+  if (publicAnswerCache.size >= PUBLIC_ANSWER_CACHE_MAX_ENTRIES) {
+    const oldest = publicAnswerCache.keys().next().value;
+    if (typeof oldest === "string") publicAnswerCache.delete(oldest);
+  }
+  publicAnswerCache.set(key, { expiresAt: Date.now() + PUBLIC_ANSWER_CACHE_TTL_MS, result });
+}
+
+function readCachedVectorEvidence(
+  key: string
+): { handle: string; text: string; source?: string; semantic: true }[] | null {
+  const entry = publicVectorCache.get(key);
+  if (!entry) return null;
+  if (entry.expiresAt <= Date.now()) {
+    publicVectorCache.delete(key);
+    return null;
+  }
+  return entry.evidence;
+}
+
+function cacheVectorEvidence(
+  key: string,
+  evidence: { handle: string; text: string; source?: string; semantic: true }[]
+): void {
+  if (publicVectorCache.size >= PUBLIC_VECTOR_CACHE_MAX_ENTRIES) {
+    const oldest = publicVectorCache.keys().next().value;
+    if (typeof oldest === "string") publicVectorCache.delete(oldest);
+  }
+  publicVectorCache.set(key, { expiresAt: Date.now() + PUBLIC_VECTOR_CACHE_TTL_MS, evidence });
+}
+
+function directPublicProfileAnswer(
+  question: string,
+  publication: Record<string, unknown> | null
+): PublicChatResult | null {
+  if (!/\b(?:what is|what's|who is)\s+(?:my|your)\s+name\b|\bwho am i\b/i.test(question))
+    return null;
+  const configuredName =
+    publication && typeof publication.display_name === "string"
+      ? publication.display_name.trim()
+      : "";
+  const name = configuredName || "Basil Ogbonna";
+  const publicationId = typeof publication?.id === "string" ? publication.id : "public-profile";
+  const profileHandle = issueEvidenceHandle({
+    chunkId: `public-profile:${publicationId}`,
+    sourceVersionHash:
+      typeof publication?.content_hash === "string" ? publication.content_hash : publicationId,
+    start: 0,
+    end: name.length
+  });
+  return {
+    answer: `Your name is ${name}.`,
+    citations: [profileHandle],
+    citationLabels: ["Public profile"],
+    abstained: false
+  };
+}
+
+function directSmallTalkAnswer(question: string): PublicChatResult | null {
+  if (!/^(?:hi|hello|hey)(?:\s+(?:there|basil))?[!.?\s]*$/i.test(question)) return null;
+  return {
+    answer:
+      "Hello! I’m Ask Basil, the portfolio assistant. Ask me about Basil’s experience, projects, skills, or engineering approach.",
+    citations: [],
+    citationLabels: [],
+    abstained: false
+  };
+}
+
+function isPortfolioQuestion(question: string): boolean {
+  const portfolioSignal =
+    /\b(?:basil|my|your|portfolio|career|experience|projects?|roles?|resume|cv|github|linkedin|achievements?|outcomes?|skills?|worked|built)\b/i.test(
+      question
+    );
+  const generalDefinition =
+    /^(?:what is|what are|define|explain|how does|how do|why does|why do)\b/i.test(question) &&
+    !portfolioSignal;
+  return portfolioSignal && !generalDefinition;
+}
 
 function requestKey(request: Request): string {
   return request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "anonymous";
@@ -37,9 +169,13 @@ function publicRuntimeClient() {
 async function retrievePublicVectorEvidence(
   ownerId: string,
   question: string,
-  client: ReturnType<typeof publicRuntimeClient>
-): Promise<{ handle: string; text: string; source?: string }[]> {
+  client: ReturnType<typeof publicRuntimeClient>,
+  revision: string
+): Promise<{ handle: string; text: string; source?: string; semantic: true }[]> {
   try {
+    const cacheKey = `${ownerId}:${revision}:${question.toLocaleLowerCase().replace(/\s+/g, " ").trim()}`;
+    const cached = readCachedVectorEvidence(cacheKey);
+    if (cached) return cached;
     const providers = await resolveEmbeddingProviders(client, ownerId);
     const embedded = await embedWithFallback(providers, [question]);
     const vector = embedded.vectors[0];
@@ -73,16 +209,27 @@ async function retrievePublicVectorEvidence(
         }
       ];
     });
-    const reranked = await rerankCandidates(client, ownerId, question, candidates, 8);
-    return reranked.flatMap((item) => {
+    // Reranking improves precision when available, but it must not make a
+    // public visitor wait on a second remote model. Preserve vector order on
+    // timeout or provider failure.
+    const reranked = PUBLIC_CHAT_ENABLE_RERANKER
+      ? await withTimeout(
+          rerankCandidates(client, ownerId, question, candidates, 8),
+          2_500,
+          candidates.slice(0, 8)
+        )
+      : candidates.slice(0, 8);
+    const evidence = reranked.flatMap((item) => {
       const handle = issueEvidenceHandle({
         chunkId: item.publicEvidenceId,
         sourceVersionHash: item.sourceVersionHash,
         start: 0,
         end: item.excerpt.length
       });
-      return [{ handle, text: item.excerpt, source: item.source }];
+      return [{ handle, text: item.excerpt, source: item.source, semantic: true as const }];
     });
+    cacheVectorEvidence(cacheKey, evidence);
+    return evidence;
   } catch {
     // Public item retrieval and lexical retrieval remain available when the
     // configured embedding provider or public vector RPC is unavailable.
@@ -93,18 +240,25 @@ async function retrievePublicVectorEvidence(
 async function composeGroundedAnswer(
   question: string,
   result: ReturnType<typeof answerPublicQuestion>,
-  evidence: readonly { handle: string; text: string; source?: string }[],
+  evidence: readonly { handle: string; text: string; source?: string; semantic?: boolean }[],
   ownerId: string
-): Promise<ReturnType<typeof answerPublicQuestion>> {
+): Promise<PublicChatResult> {
   try {
     const providers = await resolveReasoningProviders(publicRuntimeClient(), ownerId, "public_qa");
+    const boundedProviders = publicChatProviders(providers);
     const cited = new Set(result.citations);
-    // Use lexical hits first, then a bounded slice of the published snapshot
-    // so the configured model can understand synonyms and conversational
-    // questions that do not share exact words with a portfolio item.
+    // Use lexical hits first, then a compact slice of the published snapshot
+    // so the configured model can understand synonyms without receiving a
+    // huge prompt that dilutes the relevant facts and increases latency.
+    // If lexical/semantic retrieval found nothing, do not feed unrelated
+    // vector hits to the model; that is how an identity question can drift
+    // into an unrelated project. The model may still use published summaries.
+    const groundedEvidence = result.citations.length
+      ? evidence
+      : evidence.filter((item) => item.semantic !== true);
     const context = [
-      ...evidence.filter((item) => cited.has(item.handle)),
-      ...evidence.filter((item) => !cited.has(item.handle))
+      ...groundedEvidence.filter((item) => cited.has(item.handle)),
+      ...groundedEvidence.filter((item) => !cited.has(item.handle))
     ]
       .filter(
         (item, index, values) =>
@@ -112,46 +266,56 @@ async function composeGroundedAnswer(
             (candidate) => candidate.handle === item.handle || candidate.text === item.text
           ) === index
       )
-      .slice(0, 12)
-      .map((item) => ({
+      .slice(0, 8)
+      .map((item, index) => ({
+        id: `S${index + 1}`,
         handle: item.handle,
         source: item.source ?? "Portfolio",
-        text: item.text.slice(0, 5_000)
+        text: item.text.slice(0, 2_800)
       }));
-    if (!context.length) return result;
+    if (!context.length)
+      return parsePublicChatAnswer({ answer: "No information", status: "abstained" }, []);
     const generated = await generateReasoningJson(
-      providers,
+      boundedProviders,
+      PUBLIC_CHAT_ANSWER_INSTRUCTION,
+      {
+        question,
+        mode: "retrieved_context",
+        context: context.map(({ handle: _handle, ...source }) => source)
+      },
+      { task: "public_qa" }
+    );
+    return parsePublicChatAnswer(generated.output, context);
+  } catch (error) {
+    captureSanitizedError(error, { route: "/api/v1/public/chat", stage: "compose_answer" });
+    // Retrieved CV fragments are context, not a substitute for an AI answer.
+    return publicChatUnavailable();
+  }
+}
+
+async function composeGeneralAnswer(question: string, ownerId: string): Promise<PublicChatResult> {
+  try {
+    const providers = await resolveReasoningProviders(publicRuntimeClient(), ownerId, "public_qa");
+    const boundedProviders = publicChatProviders(providers);
+    const generated = await generateReasoningJson(
+      boundedProviders,
       [
-        "You are Ask Basil, a public portfolio assistant.",
-        CAREER_OUTPUT_SCOPE_INSTRUCTION,
-        EMPLOYER_PRIVACY_INSTRUCTION,
-        "Answer the visitor's question using only the supplied published portfolio context.",
-        "Aggregate the relevant facts across context entries, then answer the exact question directly in concise, natural prose.",
-        "Prefer 1-3 short paragraphs or a compact list when the question asks for several examples. Do not dump or repeat the full context.",
-        "Do not invent employers, dates, metrics, tools, projects, or personal details.",
-        "Use Lead Software Engineer as the Bloom Institute of Technology role title; do not describe it as Technical Team Lead.",
-        "Wheretocode and Lambdadoor are professional team projects. Describe Basil's public project relationship as Contributor and answer with the supported work he contributed, without labelling either project personal.",
-        "The sources array must contain only exact evidence handles from the supplied context.",
-        "If the context does not support an answer, return an empty sources array and say you could not find enough information to answer that yet.",
-        "Return JSON only with answer, sources, confidence, status, and message."
+        "You are Ask Basil, a helpful conversational assistant.",
+        "This is a general question, not a request for Basil's private or portfolio information.",
+        "Answer clearly and naturally using your general knowledge.",
+        "Do not make claims about Basil and do not call any tools for this request.",
+        "Return JSON only with answer, sources, confidence, status, and message. Use an empty sources array."
       ].join("\n"),
-      { question, context },
+      { question, mode: "general" },
       { task: "public_qa" }
     );
     const answer =
       typeof generated.output.answer === "string" ? generated.output.answer.trim() : "";
-    const allowedHandles = new Set(context.map((item) => item.handle));
-    const sources = Array.isArray(generated.output.sources)
-      ? generated.output.sources.filter(
-          (value): value is string => typeof value === "string" && allowedHandles.has(value)
-        )
-      : [];
-    if (!answer || !sources.length) return result;
-    return { answer, citations: sources, abstained: false };
-  } catch {
-    // A provider outage must not prevent the public portfolio from answering
-    // from the already retrieved, published context.
-    return result;
+    if (!answer) throw new Error("GENERAL_ANSWER_EMPTY");
+    return { answer, citations: [], abstained: false };
+  } catch (error) {
+    captureSanitizedError(error, { route: "/api/v1/public/chat", stage: "general_answer" });
+    return publicChatUnavailable();
   }
 }
 
@@ -212,6 +376,12 @@ export async function POST(request: Request) {
       request,
       400
     );
+  const smallTalkAnswer = directSmallTalkAnswer(question);
+  if (smallTalkAnswer) {
+    if (request.headers.get("accept")?.includes("text/event-stream"))
+      return streamResponse(smallTalkAnswer, request, request.headers.get("last-event-id"));
+    return publicApiResponse(smallTalkAnswer, request, 200);
+  }
   const [snapshot, blogSnapshot] = await Promise.all([
     loadPublicPortfolio(),
     loadPublicBlogPostsWithStatus()
@@ -226,6 +396,54 @@ export async function POST(request: Request) {
     if (request.headers.get("accept")?.includes("text/event-stream"))
       return streamResponse(unavailable, request, request.headers.get("last-event-id"));
     return publicApiResponse(unavailable, request, 200);
+  }
+  const ownerId =
+    typeof snapshot.publication?.owner_id === "string" ? snapshot.publication.owner_id : "";
+  const publicationRevision =
+    typeof snapshot.publication?.content_hash === "string"
+      ? snapshot.publication.content_hash
+      : typeof snapshot.publication?.updated_at === "string"
+        ? snapshot.publication.updated_at
+        : typeof snapshot.publication?.id === "string"
+          ? snapshot.publication.id
+          : "public";
+  const cacheKey = [
+    PUBLIC_ANSWER_CACHE_VERSION,
+    ownerId || "public",
+    publicationRevision,
+    question.toLocaleLowerCase().replace(/\s+/g, " ").trim()
+  ].join(":");
+  const cached = readCachedPublicAnswer(cacheKey);
+  if (cached) {
+    if (request.headers.get("accept")?.includes("text/event-stream"))
+      return streamResponse(cached, request, request.headers.get("last-event-id"));
+    return publicApiResponse(cached, request, cached.abstained ? 200 : 201);
+  }
+  const directProfileAnswer = directPublicProfileAnswer(question, snapshot.publication);
+  if (directProfileAnswer) {
+    cachePublicAnswer(cacheKey, directProfileAnswer);
+    if (request.headers.get("accept")?.includes("text/event-stream"))
+      return streamResponse(directProfileAnswer, request, request.headers.get("last-event-id"));
+    return publicApiResponse(directProfileAnswer, request, 201);
+  }
+  if (!isPortfolioQuestion(question)) {
+    const generalAnswer = ownerId
+      ? await withTimeout(
+          composeGeneralAnswer(question, ownerId),
+          PUBLIC_CHAT_GENERATION_BUDGET_MS + 5_000,
+          publicChatUnavailable()
+        )
+      : {
+          answer:
+            "I can help with general questions, but the assistant is temporarily unavailable.",
+          citations: [],
+          abstained: true
+        };
+    if (generalAnswer.answer && !generalAnswer.abstained)
+      cachePublicAnswer(cacheKey, generalAnswer);
+    if (request.headers.get("accept")?.includes("text/event-stream"))
+      return streamResponse(generalAnswer, request, request.headers.get("last-event-id"));
+    return publicApiResponse(generalAnswer, request, generalAnswer.abstained ? 200 : 201);
   }
   const evidence = snapshot.evidence.flatMap((item) => {
     const evidenceType =
@@ -296,24 +514,58 @@ export async function POST(request: Request) {
           return [{ handle, text, source: `Blog · ${post.title}` }];
         })
       : [];
-  const ownerId =
-    typeof snapshot.publication?.owner_id === "string" ? snapshot.publication.owner_id : "";
+  const publishedProfileEvidence = (() => {
+    const publication = snapshot.publication;
+    const publicId = typeof publication?.id === "string" ? publication.id : "";
+    const profileText = [publication?.display_name, publication?.headline, publication?.bio]
+      .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+      .map((value) => expandTechnologyTerms(value.trim()))
+      .join("\n");
+    if (!publicId || !profileText) return [];
+    const handle = issueEvidenceHandle({
+      chunkId: `public-profile:${publicId}`,
+      sourceVersionHash:
+        typeof publication?.content_hash === "string" ? publication.content_hash : publicId,
+      start: 0,
+      end: profileText.length
+    });
+    return [{ handle, text: profileText, source: "Public profile" }];
+  })();
   const client = ownerId ? publicRuntimeClient() : null;
   const vectorEvidence = client
-    ? await retrievePublicVectorEvidence(ownerId, question, client)
+    ? await withTimeout(
+        retrievePublicVectorEvidence(ownerId, question, client, publicationRevision),
+        6_000,
+        []
+      )
     : [];
   // Semantic hits are preferred. If no close vector exists, the deterministic
   // fallback is limited to already-published career and blog content; it never
   // expands into private journals, analytics, or other private sources.
   const allEvidence = vectorEvidence.length
-    ? [...vectorEvidence, ...publishedItemEvidence, ...publishedBlogEvidence, ...evidence]
-    : [...publishedItemEvidence, ...publishedBlogEvidence, ...evidence];
+    ? [
+        ...vectorEvidence,
+        ...publishedProfileEvidence,
+        ...publishedItemEvidence,
+        ...publishedBlogEvidence,
+        ...evidence
+      ]
+    : [
+        ...publishedProfileEvidence,
+        ...publishedItemEvidence,
+        ...publishedBlogEvidence,
+        ...evidence
+      ];
   const retrieved = answerPublicQuestion(question, allEvidence);
   const result =
     ownerId && allEvidence.length
-      ? await composeGroundedAnswer(question, retrieved, allEvidence, ownerId)
-      : retrieved;
-  const safeResult = anonymizeEmployerReferences(result) as ReturnType<typeof answerPublicQuestion>;
+      ? await withTimeout(
+          composeGroundedAnswer(question, retrieved, allEvidence, ownerId),
+          PUBLIC_CHAT_GENERATION_BUDGET_MS + 5_000,
+          publicChatUnavailable()
+        )
+      : publicChatUnavailable();
+  const safeResult = anonymizeEmployerReferences(result) as PublicChatResult;
   const sourceByHandle = new Map(allEvidence.map((item) => [item.handle, item.source]));
   const responseResult = {
     ...safeResult,
@@ -322,6 +574,9 @@ export async function POST(request: Request) {
       (handle) => sourceByHandle.get(handle) ?? "Published portfolio"
     )
   };
+  if (responseResult.answer && !responseResult.abstained && !responseResult.unavailable) {
+    cachePublicAnswer(cacheKey, responseResult);
+  }
   if (request.headers.get("accept")?.includes("text/event-stream"))
     return streamResponse(responseResult, request, request.headers.get("last-event-id"));
   return publicApiResponse(responseResult, request, safeResult.abstained ? 200 : 201);

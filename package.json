@@ -11,6 +11,7 @@
     "dev": "node scripts/dev.mjs",
     "dev:web": "pnpm --filter @career-os/web dev",
     "dev:workflows": "pnpm --filter @career-os/web inngest:dev",
+    "mcp:supabase": "node packages/jobs/src/supabase-mcp-server.mjs",
     "build": "turbo build",
     "lint": "turbo lint",
     "typecheck": "turbo typecheck",

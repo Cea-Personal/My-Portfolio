@@ -3,7 +3,7 @@ import { withPrivateApi } from "@/lib/api/private";
 import {
   connectionInput,
   getJobSourceAdapter,
-  validateJobSourceEndpoint
+  resolveJobSourceEndpoint
 } from "@/lib/job-source-config";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -23,7 +23,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const rawConfig = Array.isArray(data.job_source_configs)
       ? data.job_source_configs[0]
       : data.job_source_configs;
-    const endpoint = validateJobSourceEndpoint(rawConfig?.endpoint);
+    // Existing rows created before endpoint presets were introduced may have
+    // a null endpoint. Resolve those through the same safe adapter preset used
+    // during source creation instead of reporting a misleading INVALID_ENDPOINT.
+    const endpoint = resolveJobSourceEndpoint(rawConfig?.endpoint, data.adapter_type);
     const adapter = getJobSourceAdapter(data.adapter_type, data.adapter_version);
     const testedAt = new Date().toISOString();
     const started = performance.now();
@@ -45,11 +48,27 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         code = "CONNECTED";
         recordCount = records.length;
       } catch (testError) {
-        code = testError instanceof Error ? testError.message.slice(0, 80) : "CONNECTION_FAILED";
+        code = testError instanceof Error ? testError.message.slice(0, 240) : "CONNECTION_FAILED";
       }
     }
     const latencyMs = Math.round(performance.now() - started);
-    const outcome = JSON.stringify({ code, recordCount, latencyMs, testedAt }).slice(0, 1000);
+    const diagnosticEndpoint = endpoint
+      ? (() => {
+          try {
+            const url = new URL(endpoint);
+            return { host: url.hostname, path: url.pathname };
+          } catch {
+            return undefined;
+          }
+        })()
+      : undefined;
+    const outcome = JSON.stringify({
+      code,
+      recordCount,
+      latencyMs,
+      testedAt,
+      endpoint: diagnosticEndpoint
+    }).slice(0, 1000);
     const sourceUpdate = await client
       .schema("app")
       .from("job_sources")
@@ -80,7 +99,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         latencyMs,
         code,
         testedAt,
-        credentialConfigured: Boolean(rawConfig?.secret_ref)
+        endpoint: diagnosticEndpoint,
+        // A shared RapidAPI key can be configured globally without storing a
+        // provider-specific secret reference on every source.
+        credentialConfigured: Boolean(rawConfig?.secret_ref) || Boolean(process.env.RAPIDAPI_KEY)
       },
       request,
       healthy ? 200 : 422

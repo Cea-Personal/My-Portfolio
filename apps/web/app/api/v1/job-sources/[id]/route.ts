@@ -1,6 +1,6 @@
 import { apiResponse } from "@/lib/api/response";
 import { withPrivateApi } from "@/lib/api/private";
-import { validateJobSourceEndpoint, validateSecretReference } from "@/lib/job-source-config";
+import { normalizeJobSourceEndpoint, validateSecretReference } from "@/lib/job-source-config";
 
 export function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   return withPrivateApi(request, async ({ client, ownerId }) => {
@@ -20,8 +20,6 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   return withPrivateApi(request, async ({ client, ownerId }) => {
     const { id } = await params;
     const body = await request.json().catch(() => ({}));
-    const endpoint =
-      body.endpoint === undefined ? undefined : validateJobSourceEndpoint(body.endpoint);
     const secretRef =
       body.secretRef === undefined ? undefined : validateSecretReference(body.secretRef);
     const applicationIdRef =
@@ -43,7 +41,6 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
           ? body.extractionConfig
           : null;
     if (
-      (body.endpoint !== undefined && !endpoint) ||
       (body.secretRef !== undefined && secretRef === undefined) ||
       (body.applicationIdRef !== undefined && applicationIdRef === undefined) ||
       (rateLimit !== undefined &&
@@ -58,34 +55,17 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const { data: existingSource } = await client
       .schema("app")
       .from("job_sources")
-      .select("adapter_type,terms_note")
+      .select("adapter_type")
       .eq("id", id)
       .eq("owner_id", ownerId)
       .maybeSingle();
     if (!existingSource) return apiResponse(null, request, 404);
-    if (
-      existingSource.adapter_type === "linkedin-authorized" &&
-      body.termsNote !== undefined &&
-      !(typeof body.termsNote === "string" && body.termsNote.trim())
-    )
-      return apiResponse(
-        { code: "TERMS_NOTE_REQUIRED", detail: "An authorization or licensing note is required." },
-        request,
-        400
-      );
-    if (
-      existingSource.adapter_type === "linkedin-authorized" &&
-      body.enabled === true &&
-      !(typeof body.termsNote === "string" ? body.termsNote.trim() : existingSource.terms_note)
-    )
-      return apiResponse(
-        {
-          code: "TERMS_NOTE_REQUIRED",
-          detail: "Add the authorized/licensed LinkedIn feed terms before enabling it."
-        },
-        request,
-        400
-      );
+    const endpoint =
+      body.endpoint === undefined
+        ? undefined
+        : normalizeJobSourceEndpoint(body.endpoint, existingSource.adapter_type);
+    if (body.endpoint !== undefined && !endpoint)
+      return apiResponse({ code: "INVALID_SOURCE_CONFIGURATION" }, request, 400);
     const { data, error } = await client
       .schema("app")
       .from("job_sources")
@@ -133,7 +113,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     const { data, error } = await client
       .schema("app")
       .from("job_sources")
-      .update({ enabled: false })
+      .delete()
       .eq("id", id)
       .eq("owner_id", ownerId)
       .select("id")

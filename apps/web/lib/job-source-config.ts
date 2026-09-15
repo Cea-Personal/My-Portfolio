@@ -1,9 +1,4 @@
 import {
-  ashbyAdapter,
-  customRestAdapter,
-  greenhouseAdapter,
-  leverAdapter,
-  linkedinAuthorizedAdapter,
   jobgetherAdapter,
   remoteOkAdapter,
   arbeitnowAdapter,
@@ -13,23 +8,11 @@ import {
   serpApiAdapter,
   theirStackAdapter,
   jobsPipeAdapter,
-  rssAdapter,
-  workableAdapter,
-  smartRecruitersAdapter,
-  teamtailorAdapter,
-  personioAdapter,
-  recruiteeAdapter,
-  structuredAdapter,
   type JobSourceAdapter,
   type JobSourceInput
 } from "@career-os/jobs";
 
 const adapters: Readonly<Record<string, JobSourceAdapter>> = {
-  ashby: ashbyAdapter,
-  "custom-rest": customRestAdapter,
-  greenhouse: greenhouseAdapter,
-  lever: leverAdapter,
-  "linkedin-authorized": linkedinAuthorizedAdapter,
   jobgether: jobgetherAdapter,
   remoteok: remoteOkAdapter,
   arbeitnow: arbeitnowAdapter,
@@ -38,34 +21,110 @@ const adapters: Readonly<Record<string, JobSourceAdapter>> = {
   flybyapis: flybyApisAdapter,
   serpapi: serpApiAdapter,
   theirstack: theirStackAdapter,
-  jobspipe: jobsPipeAdapter,
-  rss: rssAdapter,
-  workable: workableAdapter,
-  smartrecruiters: smartRecruitersAdapter,
-  teamtailor: teamtailorAdapter,
-  personio: personioAdapter,
-  recruitee: recruiteeAdapter,
-  structured: structuredAdapter
+  jobspipe: jobsPipeAdapter
 };
+
+// Accept the common transposition "arbietnow" for existing records and
+// manually submitted payloads, while persisting and displaying the canonical
+// adapter identifier.
+const sourceTypeAliases: Readonly<Record<string, string>> = {
+  arbietnow: "arbeitnow"
+};
+
+export function normalizeJobSourceType(value: unknown): string {
+  const type = typeof value === "string" ? value.trim().toLocaleLowerCase() : "";
+  return sourceTypeAliases[type] ?? type;
+}
 
 export const supportedJobSourceTypes = Object.keys(adapters);
 
 export function defaultJobSourceEndpoint(type: string): string | null {
-  return {
-    jobgether: "https://jobgether.com/api/v1/jobs",
-    remoteok: "https://remoteok.com/api",
-    arbeitnow: "https://www.arbeitnow.com/api/job-board-api",
-    adzuna: "https://api.adzuna.com/v1/api/jobs/gb/search/1",
-    jsearch: "https://jsearch.p.rapidapi.com/search",
-    flybyapis: "https://jobs-search-api.p.rapidapi.com/jobs/search",
-    serpapi: "https://serpapi.com/search.json",
-    theirstack: "https://api.theirstack.com/v1/jobs/search",
-    jobspipe: "https://api.jobspipe.dev/v1/jobs/search"
-  }[type] ?? null;
+  const canonicalType = normalizeJobSourceType(type);
+  return (
+    {
+      jobgether: "https://jobgether.com/api/v1/jobs",
+      remoteok: "https://remoteok-jobs-api.p.rapidapi.com/jobs",
+      arbeitnow: "https://www.arbeitnow.com/api/job-board-api",
+      adzuna: "https://api.adzuna.com/v1/api/jobs/gb/search/1",
+      jsearch: "https://jsearch.p.rapidapi.com/search",
+      flybyapis: "https://jobs-search-api.p.rapidapi.com/jobs/search",
+      serpapi: "https://serpapi.com/search.json",
+      theirstack: "https://api.theirstack.com/v1/jobs/search",
+      jobspipe: "https://mcp.jobspipe.dev/mcp"
+    }[canonicalType] ?? null
+  );
+}
+
+/** Resolve an optional form endpoint to the adapter's safe built-in preset. */
+export function normalizeJobSourceEndpoint(value: unknown, type: string): string | null {
+  const supplied = typeof value === "string" ? value.trim() : "";
+  if (!supplied) return null;
+  const canonicalType = normalizeJobSourceType(type);
+  let candidate = supplied;
+  if (canonicalType === "jsearch") {
+    try {
+      const url = new URL(candidate);
+      const hostname = url.hostname.toLowerCase();
+      // Owners often paste the OpenWeb Ninja documentation URL into the
+      // endpoint field. Convert that page (and the short API path) to the
+      // callable direct gateway instead of issuing a request to the website.
+      if (
+        (hostname === "www.openwebninja.com" || hostname === "openwebninja.com") &&
+        /^\/api\/jsearch(?:\/docs)?\/?$/i.test(url.pathname)
+      ) {
+        candidate = "https://api.openwebninja.com/jsearch/search-v2";
+      } else if (hostname === "api.openwebninja.com" && /^\/jsearch\/?$/i.test(url.pathname)) {
+        url.pathname = "/jsearch/search-v2";
+        candidate = url.toString();
+      }
+    } catch {
+      // Let validateJobSourceEndpoint return the normal invalid-endpoint result.
+    }
+  }
+  if (canonicalType === "adzuna") {
+    try {
+      const url = new URL(candidate);
+      // Adzuna's documentation still shows http://:80 examples. The API is
+      // available over HTTPS, so upgrade that exact public host before the
+      // shared SSRF-safe endpoint validation runs.
+      if (
+        url.hostname.toLowerCase() === "api.adzuna.com" &&
+        url.protocol === "http:" &&
+        (!url.port || url.port === "80")
+      ) {
+        url.protocol = "https:";
+        url.port = "";
+        candidate = url.toString();
+      }
+    } catch {
+      // Let validateJobSourceEndpoint return the normal invalid-endpoint result.
+    }
+  }
+  if (canonicalType === "jobspipe") {
+    try {
+      const url = new URL(candidate);
+      if (
+        url.hostname.toLowerCase() === "api.jobspipe.dev" &&
+        /^\/v1\/jobs\/search\/?$/i.test(url.pathname)
+      ) {
+        candidate = "https://mcp.jobspipe.dev/mcp";
+      }
+    } catch {
+      // Let validateJobSourceEndpoint return the normal invalid-endpoint result.
+    }
+  }
+  return validateJobSourceEndpoint(candidate);
+}
+
+export function resolveJobSourceEndpoint(value: unknown, type: string): string | null {
+  return (
+    normalizeJobSourceEndpoint(value, type) ??
+    validateJobSourceEndpoint(defaultJobSourceEndpoint(type))
+  );
 }
 
 export function getJobSourceAdapter(type: string, version: string): JobSourceAdapter | null {
-  const adapter = adapters[type];
+  const adapter = adapters[normalizeJobSourceType(type)];
   return adapter?.version === version ? adapter : null;
 }
 
@@ -152,6 +211,13 @@ export function connectionInput(
   return {
     endpoint,
     ...(secret ? { headers: { authorization: `Bearer ${secret}` } } : {}),
-    ...(applicationId ? { credentials: { applicationId } } : {})
+    ...(applicationId || secretRef
+      ? {
+          credentials: {
+            ...(applicationId ? { applicationId } : {}),
+            ...(secretRef ? { secretRef } : {})
+          }
+        }
+      : {})
   };
 }

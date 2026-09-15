@@ -56,3 +56,54 @@ config_file = "agents/portfolio-analytics.toml"
 [agents.image-generator]
 description = "Creates optional editorial project cover images from source-grounded project detail."
 config_file = "agents/image-generator.toml"
+
+[mcp_servers.jobspipe]
+url = "https://mcp.jobspipe.dev/mcp"
+bearer_token_env_var = "JOBSPIPE_KEY"
+enabled = true
+required = false
+enabled_tools = ["search_jobs"]
+default_tools_approval_mode = "prompt"
+startup_timeout_sec = 15
+tool_timeout_sec = 30
+
+# Local read-only bridge to the hosted Supabase career database. The server
+# reads these names from the local environment (or the repository .env.local)
+# and never stores credentials in Codex configuration.
+[mcp_servers.supabase]
+command = "node"
+args = ["packages/jobs/src/supabase-mcp-server.mjs"]
+cwd = "."
+env_vars = ["SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_OWNER_ID"]
+enabled = true
+required = false
+enabled_tools = ["search_career_knowledge", "get_career_context", "get_public_portfolio_context"]
+default_tools_approval_mode = "auto"
+startup_timeout_sec = 15
+tool_timeout_sec = 60
+
+[mcp_servers.supabase.tools.search_career_knowledge]
+approval_mode = "approve"
+
+[mcp_servers.supabase.tools.get_career_context]
+approval_mode = "approve"
+
+[mcp_servers.supabase.tools.get_public_portfolio_context]
+approval_mode = "auto"
+
+# Public portfolio Q&A receives a restricted server definition so the native
+# portfolio assistant cannot see private career-context tools at all.
+[mcp_servers.supabase_public]
+command = "node"
+args = ["packages/jobs/src/supabase-mcp-server.mjs"]
+cwd = "."
+env_vars = ["SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_OWNER_ID"]
+enabled = true
+required = false
+enabled_tools = ["get_public_portfolio_context"]
+default_tools_approval_mode = "auto"
+startup_timeout_sec = 15
+tool_timeout_sec = 20
+
+[mcp_servers.supabase_public.tools.get_public_portfolio_context]
+approval_mode = "auto"

@@ -17,6 +17,14 @@ export function ThemeToggle() {
     window.localStorage.setItem("basil-portfolio-theme", theme);
   }, [theme]);
 
+  useEffect(() => {
+    return () => {
+      // Do not leak the public portfolio theme attribute into the private
+      // workspace when navigating between route groups client-side.
+      delete document.documentElement.dataset.portfolioTheme;
+    };
+  }, []);
+
   const nextTheme = theme === "dark" ? "light" : "dark";
 
   return (

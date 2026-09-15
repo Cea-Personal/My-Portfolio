@@ -95,13 +95,6 @@ export default async function PublicPortfolioPage() {
     value && typeof value === "object" && !Array.isArray(value)
       ? (value as Record<string, unknown>)
       : {};
-  const objectList = (value: unknown) =>
-    Array.isArray(value)
-      ? value.filter(
-          (item): item is Record<string, unknown> =>
-            Boolean(item) && typeof item === "object" && !Array.isArray(item)
-        )
-      : [];
   const publishedCareerItems = items.filter((item) => {
     const isCareerItem =
       item.source_entity_type === "experience" ||
@@ -118,11 +111,6 @@ export default async function PublicPortfolioPage() {
       /one\s+acre\s+fund/i.test(organization) && /software\s+engineer\s*\(?.*backend/i.test(role)
     );
   });
-  const projectNameKey = (value: unknown) =>
-    text(value)
-      .toLocaleLowerCase()
-      .replace(/[^a-z0-9]+/g, " ")
-      .trim();
   const slugHref = (item: Record<string, unknown>) => {
     const slug = text(item.detail_slug, text(item.public_id));
     return slug ? `/projects/${encodeURIComponent(slug)}` : undefined;
@@ -207,78 +195,6 @@ export default async function PublicPortfolioPage() {
       const careerIdentity = careerIdentityForItem(item);
       const key = identities(item)[0] ?? "career stage";
       const structured = record(item.structured_content);
-      const declaredProjectKeys = [...list(structured.projects), ...list(item.projects)].map(
-        projectNameKey
-      );
-      const detailedWorkProjects = objectList(structured.workProjects).map((project) => ({
-        title: displayText(project.title, "Work project"),
-        summary: displayText(
-          project.summary,
-          displayText(project.outcome, "Delivered during this role.")
-        ),
-        ...(text(project.outcome) ? { outcome: displayText(project.outcome) } : {}),
-        ...(list(project.technologies).length
-          ? { technologies: expandTechnologyLabels(list(project.technologies)) }
-          : {})
-      }));
-      const detailedProjectNames = new Set(
-        detailedWorkProjects.map((project) => projectNameKey(project.title))
-      );
-      const embeddedProjects = list(structured.projects)
-        .filter((project) => !detailedProjectNames.has(projectNameKey(project)))
-        .map((project) => ({
-          title: expandTechnologyTerms(project),
-          summary: expandTechnologyTerms(project)
-        }));
-      const stageProjects = Array.from(
-        new Map(
-          [
-            ...detailedWorkProjects,
-            ...embeddedProjects,
-            ...projectItems
-              .filter((project) => {
-                const projectStructured = record(project.structured_content);
-                const projectKey = projectNameKey(project.title);
-                const confirmedPlacement = projectCareerPlacement(text(project.title));
-                if (confirmedPlacement)
-                  return sameCareerIdentity(careerIdentity, confirmedPlacement);
-                if (declaredProjectKeys.includes(projectKey)) return true;
-
-                // Source-document overlap is provenance, not ownership. Only an
-                // explicit role/career-stage plus a compatible employer can attach a
-                // standalone project to this timeline chapter.
-                const projectRole = text(
-                  project.career_stage,
-                  text(projectStructured.careerStage, text(projectStructured.role))
-                );
-                const projectOrganization = text(
-                  project.company_name,
-                  text(
-                    project.organization_name,
-                    text(projectStructured.organization, text(projectStructured.company))
-                  )
-                );
-                if (!projectRole) return false;
-                const roleMatches = [key, careerIdentity.role]
-                  .map(projectNameKey)
-                  .includes(projectNameKey(projectRole));
-                const organizationMatches =
-                  !projectOrganization ||
-                  projectNameKey(projectOrganization) ===
-                    projectNameKey(careerIdentity.organization);
-                return roleMatches && organizationMatches;
-              })
-              .map((project) => {
-                const href = slugHref(project);
-                return {
-                  title: displayText(project.title, "Project"),
-                  summary: displayText(project.public_summary),
-                  ...(href ? { href } : {})
-                };
-              })
-          ].map((project) => [projectNameKey(project.title), project])
-        ).values()
-      );
       const stageExperience = impactItems
         .filter((impact) => identities(impact).includes(key))
         .flatMap((impact) => [text(impact.display_metric, text(impact.public_summary))])
@@ -307,7 +223,6 @@ export default async function PublicPortfolioPage() {
         summary: displayText(item.public_summary),
         ...(careerIdentity.organization ? { company: careerIdentity.organization } : {}),
         ...(careerIdentity.period ? { period: careerIdentity.period } : {}),
-        ...(stageProjects.length ? { projects: stageProjects } : {}),
         ...(expandedExperience.length ? { experience: [...new Set(expandedExperience)] } : {}),
         ...(stageSkills.length ? { skills: [...new Set(stageSkills)] } : {})
       };

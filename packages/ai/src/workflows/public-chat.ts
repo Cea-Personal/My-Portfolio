@@ -92,10 +92,10 @@ function aggregatePublicEvidence(
       ? { answer: first.text.slice(0, 900), citations: [first.handle] }
       : { answer: "", citations: [] };
   }
-  const answer =
-    selected.length === 1
-      ? selected[0]!.fragment
-      : `From the published portfolio:\n${selected.map((item) => `• ${item.fragment}`).join("\n")}`;
+  // This is a bounded fallback for provider outages. Keep it as direct prose
+  // so visitors still receive an aggregated answer rather than a raw list of
+  // retrieved chunks. The model composer normally produces the richer answer.
+  const answer = selected.map((item) => item.fragment).join(" ");
   return {
     answer,
     citations: [...new Set(selected.map((candidate) => candidate.item.handle))]
@@ -104,7 +104,7 @@ function aggregatePublicEvidence(
 
 export function answerPublicQuestion(
   question: string,
-  evidence: readonly { handle: string; text: string; source?: string }[]
+  evidence: readonly { handle: string; text: string; source?: string; semantic?: boolean }[]
 ): { answer: string; citations: string[]; abstained: boolean } {
   const insufficientEvidence = () => "I couldn't find enough information to answer that yet.";
   if (hostilePublicInput(question))
@@ -114,7 +114,7 @@ export function answerPublicQuestion(
       abstained: true
     };
   const byHandle = new Map(evidence.map((item) => [item.handle, item]));
-  const selected = hybridPublicRetrieval(
+  const lexicalSelected = hybridPublicRetrieval(
     question,
     evidence.map((item) => ({
       id: item.handle,
@@ -127,6 +127,19 @@ export function answerPublicQuestion(
     const match = byHandle.get(candidate.id);
     return match ? [match] : [];
   });
+  // A semantic vector hit can be relevant even when the visitor uses different
+  // wording from the published text (for example, “what have you worked on?”).
+  // Keep those hits as a grounded fallback instead of returning an abstention
+  // merely because lexical terms did not overlap.
+  const asksAboutCareer =
+    /\b(?:career|experience|worked|built|project|skill|technology|tool|system|platform|engineering|data|software|ai|achievement|impact|outcome|responsibilit|background|role)\b/i.test(
+      question
+    );
+  const selected = lexicalSelected.length
+    ? lexicalSelected
+    : asksAboutCareer
+      ? evidence.filter((item) => item.semantic === true).slice(0, 6)
+      : [];
   const aggregated = aggregatePublicEvidence(question, selected);
   const citations = aggregated.citations;
   if (

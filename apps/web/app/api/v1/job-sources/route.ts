@@ -2,8 +2,9 @@ import { apiResponse } from "@/lib/api/response";
 import { withPrivateApi } from "@/lib/api/private";
 import {
   getJobSourceAdapter,
-  defaultJobSourceEndpoint,
-  validateJobSourceEndpoint,
+  normalizeJobSourceType,
+  resolveJobSourceEndpoint,
+  supportedJobSourceTypes,
   validateSecretReference
 } from "@/lib/job-source-config";
 
@@ -16,6 +17,9 @@ export function GET(request: Request) {
         "*, job_source_configs(endpoint,secret_ref,application_id_ref,rate_limit_per_minute,schedule_eligible,discovery_frequency_minutes,extraction_config,last_test_outcome)"
       )
       .eq("owner_id", ownerId)
+      // Keep the historical Arbeitnow spelling visible so it can continue to
+      // be edited or removed; new records are normalized to `arbeitnow`.
+      .in("adapter_type", [...supportedJobSourceTypes, "arbietnow"])
       .order("created_at", { ascending: false });
     if (error) throw error;
     return apiResponse({ sources: data ?? [] }, request);
@@ -25,13 +29,11 @@ export async function POST(request: Request) {
   return withPrivateApi(request, async ({ client, ownerId }) => {
     const body = await request.json().catch(() => ({}));
     const name = typeof body.name === "string" ? body.name.trim().slice(0, 160) : "";
-    const adapterType = typeof body.adapterType === "string" ? body.adapterType : "";
+    const adapterType = normalizeJobSourceType(body.adapterType);
     const adapterVersion = typeof body.adapterVersion === "string" ? body.adapterVersion : "v1";
-    const endpoint = validateJobSourceEndpoint(body.endpoint ?? defaultJobSourceEndpoint(adapterType));
+    const endpoint = resolveJobSourceEndpoint(body.endpoint, adapterType);
     const secretRef = validateSecretReference(body.secretRef);
     const applicationIdRef = validateSecretReference(body.applicationIdRef);
-    const termsNote =
-      typeof body.termsNote === "string" ? body.termsNote.trim().slice(0, 1000) : "";
     const rateLimit = Number(body.rateLimitPerMinute ?? 30);
     const discoveryFrequency = Number(body.discoveryFrequencyMinutes ?? 1440);
     const extractionConfig =
@@ -51,8 +53,7 @@ export async function POST(request: Request) {
       rateLimit > 300 ||
       !Number.isInteger(discoveryFrequency) ||
       discoveryFrequency < 15 ||
-      discoveryFrequency > 43200 ||
-      (adapterType === "linkedin-authorized" && !termsNote)
+      discoveryFrequency > 43200
     )
       return apiResponse({ code: "INVALID_SOURCE" }, request, 400);
     const { data, error } = await client
@@ -64,7 +65,8 @@ export async function POST(request: Request) {
         adapter_type: adapterType,
         adapter_version: adapterVersion,
         enabled: body.enabled === true,
-        terms_note: termsNote || null
+        terms_note:
+          typeof body.termsNote === "string" ? body.termsNote.trim().slice(0, 1000) || null : null
       })
       .select("*")
       .single();

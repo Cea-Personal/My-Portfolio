@@ -36,6 +36,14 @@ export interface JobSourceInput {
   method?: "GET" | "POST";
   body?: unknown;
   fetcher?: typeof fetch;
+  /** Optional MCP tool transport override used by adapter contract tests. */
+  mcpToolCaller?: (input: {
+    endpoint: string;
+    bearerToken: string;
+    tool: string;
+    arguments: Record<string, unknown>;
+    signal?: AbortSignal;
+  }) => Promise<unknown>;
   signal?: AbortSignal;
 }
 const registry = new Map<string, JobSourceAdapter>();
@@ -80,7 +88,13 @@ export async function fetchSourceJson(input: JobSourceInput): Promise<unknown> {
       redirect: "error",
       signal
     });
-    if (!response.ok) throw new Error(`SOURCE_HTTP_${response.status}`);
+    if (!response.ok) {
+      const detail = (await response.text().catch(() => ""))
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, 240);
+      throw new Error(`SOURCE_HTTP_${response.status}${detail ? `:${detail}` : ""}`);
+    }
     const length = Number(response.headers.get("content-length") ?? 0);
     if (length > 2_000_000) throw new Error("SOURCE_RESPONSE_TOO_LARGE");
     return await response.json();
@@ -112,7 +126,13 @@ export async function fetchSourceText(input: JobSourceInput): Promise<string> {
       redirect: "error",
       signal
     });
-    if (!response.ok) throw new Error(`SOURCE_HTTP_${response.status}`);
+    if (!response.ok) {
+      const detail = (await response.text().catch(() => ""))
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, 240);
+      throw new Error(`SOURCE_HTTP_${response.status}${detail ? `:${detail}` : ""}`);
+    }
     const text = await response.text();
     if (text.length > 2_000_000) throw new Error("SOURCE_RESPONSE_TOO_LARGE");
     return text;

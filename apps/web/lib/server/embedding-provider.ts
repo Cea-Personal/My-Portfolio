@@ -17,6 +17,12 @@ export interface ResolvedEmbeddingProvider extends ProviderRow {
   endpoint: string;
 }
 
+const PROVIDER_CACHE_TTL_MS = 60_000;
+const providerCache = new Map<
+  string,
+  { expiresAt: number; providers: ResolvedEmbeddingProvider[] }
+>();
+
 function endpointFor(provider: ProviderRow): string {
   const environmentName = `${provider.provider.toUpperCase().replace(/[^A-Z0-9]/g, "_")}_EMBEDDINGS_URL`;
   const configured = process.env[environmentName]?.trim();
@@ -41,6 +47,9 @@ export async function resolveEmbeddingProviders(
   client: SupabaseClient,
   ownerId: string
 ): Promise<ResolvedEmbeddingProvider[]> {
+  const cached = providerCache.get(ownerId);
+  if (cached && cached.expiresAt > Date.now()) return cached.providers;
+  if (cached) providerCache.delete(ownerId);
   const runtimeClient = aiRuntimeClient(client);
   const { data: capability, error } = await runtimeClient
     .schema("app")
@@ -74,6 +83,10 @@ export async function resolveEmbeddingProviders(
       return [{ ...row, apiKey, endpoint: endpointFor(row) }];
     });
   if (!resolved.length) throw new Error("EMBEDDING_PROVIDER_NOT_AVAILABLE");
+  providerCache.set(ownerId, {
+    expiresAt: Date.now() + PROVIDER_CACHE_TTL_MS,
+    providers: resolved
+  });
   return resolved;
 }
 

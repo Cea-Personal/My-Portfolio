@@ -1,6 +1,6 @@
 import { apiResponse } from "@/lib/api/response";
 import { withPrivateApi } from "@/lib/api/private";
-import { validateJobSourceEndpoint, validateLinkedInJobUrl } from "@/lib/job-source-config";
+import { validateLinkedInJobUrl } from "@/lib/job-source-config";
 import { createHash } from "node:crypto";
 
 export function GET(request: Request) {
@@ -33,27 +33,21 @@ export async function POST(request: Request) {
         request,
         400
       );
-    const sourceProvider = body.sourceProvider === "live_web" ? "live_web" : "manual";
     const sourceUrl =
       typeof body.sourceUrl === "string" && body.sourceUrl.trim()
-        ? sourceProvider === "live_web"
-          ? validateJobSourceEndpoint(body.sourceUrl)
-          : validateLinkedInJobUrl(body.sourceUrl)
+        ? validateLinkedInJobUrl(body.sourceUrl)
         : null;
     if (body.sourceUrl && !sourceUrl)
       return apiResponse(
         {
           code: "INVALID_SOURCE_URL",
           detail:
-            sourceProvider === "live_web"
-              ? "Use an HTTPS public listing URL returned by live discovery."
-              : "Use an HTTPS LinkedIn job URL supplied by the owner. The link is stored, not scraped."
+            "Use an HTTPS LinkedIn job URL supplied by the owner. The link is stored, not scraped."
         },
         request,
         400
       );
-    const persistedSourceProvider =
-      sourceProvider === "live_web" ? "live_web" : sourceUrl ? "linkedin_manual" : "manual";
+    const persistedSourceProvider = sourceUrl ? "linkedin_manual" : "manual";
     const { data, error } = await client
       .schema("app")
       .from("jobs")

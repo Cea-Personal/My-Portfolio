@@ -11,7 +11,10 @@ export const serpApiAdapter: JobSourceAdapter = contractAdapter({
     if (!key) throw new Error("SOURCE_CREDENTIALS_MISSING:SERPAPI_API_KEY");
     const endpoint = input.endpoint ?? "https://serpapi.com/search.json";
     const locations = profileQuery(input, "location");
-    const q = [searchText(input), locations.join(" ")].filter(Boolean).join(" in ") || "software engineer";
+    const remote = locations.some((location) => location.toLowerCase() === "remote");
+    const concreteLocations = locations.filter((location) => location.toLowerCase() !== "remote");
+    const q =
+      [searchText(input), locations.join(" ")].filter(Boolean).join(" in ") || "software engineer";
     const jobs: Record<string, unknown>[] = [];
     let nextPageToken: string | undefined;
     for (let page = 1; page <= 1; page += 1) {
@@ -22,7 +25,10 @@ export const serpApiAdapter: JobSourceAdapter = contractAdapter({
           engine: "google_jobs",
           q,
           api_key: key,
-          ...(locations[0] ? { location: locations[0] } : {}),
+          // SerpApi treats `Remote` as an invalid geographic location. Keep
+          // remote intent in the free-text query and only send a concrete
+          // geographic value through the location parameter.
+          ...(concreteLocations[0] ? { location: concreteLocations[0] } : {}),
           ...(nextPageToken ? { next_page_token: nextPageToken } : {})
         }
       })) as Record<string, unknown>;
@@ -31,14 +37,18 @@ export const serpApiAdapter: JobSourceAdapter = contractAdapter({
         if (!value || typeof value !== "object") continue;
         const job = value as Record<string, unknown>;
         const applyOptions = Array.isArray(job.apply_options) ? job.apply_options : [];
-        const firstApply = applyOptions.find((item) => item && typeof item === "object") as Record<string, unknown> | undefined;
+        const firstApply = applyOptions.find((item) => item && typeof item === "object") as
+          | Record<string, unknown>
+          | undefined;
         const highlights = Array.isArray(job.job_highlights)
           ? job.job_highlights
               .filter((item) => item && typeof item === "object")
               .map((item) => {
                 const record = item as Record<string, unknown>;
                 const title = typeof record.title === "string" ? record.title : "";
-                const items = Array.isArray(record.items) ? record.items.filter((text): text is string => typeof text === "string") : [];
+                const items = Array.isArray(record.items)
+                  ? record.items.filter((text): text is string => typeof text === "string")
+                  : [];
                 return [title, ...items].filter(Boolean).join("\n");
               })
               .filter(Boolean)
@@ -51,15 +61,17 @@ export const serpApiAdapter: JobSourceAdapter = contractAdapter({
           location: job.location,
           description: job.description ?? highlights,
           url: firstApply?.link ?? job.share_link ?? job.link,
-          postedAt: job.detected_extensions && typeof job.detected_extensions === "object"
-            ? (job.detected_extensions as Record<string, unknown>).posted_at
-            : undefined
+          postedAt:
+            job.detected_extensions && typeof job.detected_extensions === "object"
+              ? (job.detected_extensions as Record<string, unknown>).posted_at
+              : undefined
         });
       }
       const pagination = payload.serpapi_pagination;
-      nextPageToken = pagination && typeof pagination === "object"
-        ? (pagination as Record<string, unknown>).next_page_token as string | undefined
-        : undefined;
+      nextPageToken =
+        pagination && typeof pagination === "object"
+          ? ((pagination as Record<string, unknown>).next_page_token as string | undefined)
+          : undefined;
       if (!nextPageToken || !pageJobs.length) break;
     }
     return jobs;

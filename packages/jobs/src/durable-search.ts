@@ -1,10 +1,5 @@
 import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { ashbyAdapter } from "./adapters/ashby";
-import { customRestAdapter } from "./adapters/custom-rest";
-import { greenhouseAdapter } from "./adapters/greenhouse";
-import { leverAdapter } from "./adapters/lever";
-import { linkedinAuthorizedAdapter } from "./adapters/linkedin-authorized";
 import { jobgetherAdapter } from "./adapters/jobgether";
 import { remoteOkAdapter } from "./adapters/remoteok";
 import { arbeitnowAdapter } from "./adapters/arbeitnow";
@@ -14,15 +9,6 @@ import { flybyApisAdapter } from "./adapters/flybyapis";
 import { serpApiAdapter } from "./adapters/serpapi";
 import { theirStackAdapter } from "./adapters/theirstack";
 import { jobsPipeAdapter } from "./adapters/jobspipe";
-import { rssAdapter } from "./adapters/rss";
-import {
-  personioAdapter,
-  recruiteeAdapter,
-  smartRecruitersAdapter,
-  teamtailorAdapter,
-  workableAdapter
-} from "./adapters/ats";
-import { structuredAdapter } from "./adapters/structured";
 import { calculateCareerMatch } from "./career-match";
 import { calculateOpportunityScore } from "./opportunity-score";
 import { evaluateJobEligibility, type EligibilityProfile } from "./eligibility-filter";
@@ -30,27 +16,18 @@ import { runSearch, type SearchSourceResult } from "./search-run";
 import type { JobSourceAdapter, JobSourceInput } from "./adapters/registry";
 
 const adapters: Record<string, JobSourceAdapter> = {
-  ashby: ashbyAdapter,
-  "custom-rest": customRestAdapter,
-  greenhouse: greenhouseAdapter,
-  lever: leverAdapter,
-  "linkedin-authorized": linkedinAuthorizedAdapter,
   jobgether: jobgetherAdapter,
   remoteok: remoteOkAdapter,
   arbeitnow: arbeitnowAdapter,
+  // Backward compatibility for sources created with the common spelling
+  // transposition; new records use the canonical `arbeitnow` identifier.
+  arbietnow: arbeitnowAdapter,
   adzuna: adzunaAdapter,
   jsearch: jsearchAdapter,
   flybyapis: flybyApisAdapter,
   serpapi: serpApiAdapter,
   theirstack: theirStackAdapter,
-  jobspipe: jobsPipeAdapter,
-  rss: rssAdapter,
-  workable: workableAdapter,
-  smartrecruiters: smartRecruitersAdapter,
-  teamtailor: teamtailorAdapter,
-  personio: personioAdapter,
-  recruitee: recruiteeAdapter,
-  structured: structuredAdapter
+  jobspipe: jobsPipeAdapter
 };
 
 function failedAdapter(type: string, version: string, reason: string): JobSourceAdapter {
@@ -361,7 +338,14 @@ function adapterInput(config: Record<string, unknown>, profile: SearchProfile): 
     ...(endpoint ? { endpoint } : {}),
     ...(Object.keys(fieldMapping).length ? { fieldMapping } : {}),
     ...(secret ? { headers: { authorization: `Bearer ${secret}` } } : {}),
-    ...(applicationId ? { credentials: { applicationId } } : {}),
+    ...(applicationId || secretRef
+      ? {
+          credentials: {
+            ...(applicationId ? { applicationId } : {}),
+            ...(secretRef ? { secretRef } : {})
+          }
+        }
+      : {}),
     ...(Object.keys(query).length ? { query } : {})
   };
 }
@@ -378,6 +362,7 @@ async function loadSources(
     .select("id,adapter_type,adapter_version,enabled,last_run_at")
     .eq("owner_id", ownerId)
     .eq("enabled", true);
+  query = query.in("adapter_type", Object.keys(adapters));
   if (sourceIds?.length) query = query.in("id", [...sourceIds]);
   const sourcesResult = await query;
   if (sourcesResult.error) throw sourcesResult.error;
@@ -426,7 +411,10 @@ async function loadSources(
     result.push({
       id,
       adapter,
-      input: adapterInput({ ...asRecord(configResult.data), last_run_at: source.last_run_at }, profile)
+      input: adapterInput(
+        { ...asRecord(configResult.data), last_run_at: source.last_run_at },
+        profile
+      )
     });
   }
   return result;
@@ -446,11 +434,15 @@ export async function executePersistedSearch(input: DurableSearchInput): Promise
     .maybeSingle();
   if (runMeta.error) throw runMeta.error;
   const scheduledRun = runMeta.data?.trigger_type === "schedule";
-  const logicalDate = typeof runMeta.data?.logical_date === "string"
-    ? runMeta.data.logical_date
-    : new Date().toISOString().slice(0, 10);
+  const logicalDate =
+    typeof runMeta.data?.logical_date === "string"
+      ? runMeta.data.logical_date
+      : new Date().toISOString().slice(0, 10);
   const isWeekday = [1, 2, 3, 4, 5].includes(new Date(`${logicalDate}T00:00:00Z`).getUTCDay());
-  const dailyLimit = scheduledRun && isWeekday ? Math.max(1, input.dailyNewJobLimit ?? 10) : Number.POSITIVE_INFINITY;
+  const dailyLimit =
+    scheduledRun && isWeekday
+      ? Math.max(1, input.dailyNewJobLimit ?? 10)
+      : Number.POSITIVE_INFINITY;
   let dailyNewJobs = 0;
   let quotaSkipped = 0;
   const existingFingerprintsResult = await input.client
@@ -638,7 +630,11 @@ export async function executePersistedSearch(input: DurableSearchInput): Promise
     // Keep the opportunity list current without deleting history. Only jobs
     // still in the initial discovered state are eligible for reconciliation;
     // shortlisted/applied/interviewed jobs remain owner-controlled records.
-    if (sourceResult.status === "completed" && sourceResult.fetchedCount > 0 && quotaSkipped === 0) {
+    if (
+      sourceResult.status === "completed" &&
+      sourceResult.fetchedCount > 0 &&
+      quotaSkipped === 0
+    ) {
       const sourceRefs = await input.client
         .schema("app")
         .from("job_source_references")
@@ -671,15 +667,18 @@ export async function executePersistedSearch(input: DurableSearchInput): Promise
             .eq("status", "discovered")
             .in("id", staleIds);
           if (expired.error) throw expired.error;
-          const history = await input.client.schema("app").from("job_status_history").insert(
-            staleIds.map((jobId) => ({
-              job_id: jobId,
-              from_status: "discovered",
-              to_status: "expired",
-              actor_id: input.ownerId,
-              reason: "source_reconciliation_profile_filter"
-            }))
-          );
+          const history = await input.client
+            .schema("app")
+            .from("job_status_history")
+            .insert(
+              staleIds.map((jobId) => ({
+                job_id: jobId,
+                from_status: "discovered",
+                to_status: "expired",
+                actor_id: input.ownerId,
+                reason: "source_reconciliation_profile_filter"
+              }))
+            );
           if (history.error) throw history.error;
           expiredJobCount += staleIds.length;
         }

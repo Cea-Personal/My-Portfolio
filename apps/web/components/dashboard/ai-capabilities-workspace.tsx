@@ -546,32 +546,6 @@ export function AiCapabilitiesWorkspace({ view = "agents" }: { view?: "agents" |
               </select>
             </label>
             <label>
-              OpenAI live-search fallback (optional)
-              <select
-                name="fallbackProviderId"
-                defaultValue={orchestrator?.fallback_provider_id ?? ""}
-              >
-                <option value="">No fallback</option>
-                {providers
-                  .filter(
-                    (provider) =>
-                      provider.provider === "openai" &&
-                      provider.capabilities.some(
-                        (capability) => capability === "*" || capability === "reasoning"
-                      )
-                  )
-                  .map((provider) => (
-                    <option key={provider.id} value={provider.id}>
-                      {provider.provider} · {provider.model}
-                    </option>
-                  ))}
-              </select>
-              <small>
-                Live web discovery uses OpenAI&apos;s Responses web_search tool. Codex remains the
-                primary orchestrator for all other tasks.
-              </small>
-            </label>
-            <label>
               Model class
               <select name="modelClass" defaultValue={orchestrator?.model_class ?? "balanced"}>
                 <option value="fast">fast</option>
@@ -862,7 +836,8 @@ export function AiCapabilitiesWorkspace({ view = "agents" }: { view?: "agents" |
         );
         const imageProviders = providers.filter((provider) =>
           provider.capabilities.some(
-            (capability) => capability === "*" || /^(image|images|image_generation)$/i.test(capability)
+            (capability) =>
+              capability === "*" || /^(image|images|image_generation)$/i.test(capability)
           )
         );
         return (
@@ -871,7 +846,11 @@ export function AiCapabilitiesWorkspace({ view = "agents" }: { view?: "agents" |
             className="knowledge-entry-form"
             onSubmit={(event) => void configure(event, "image_generation")}
           >
-            <h2>{imageGeneration ? "Edit project image generation" : "Configure project image generation"}</h2>
+            <h2>
+              {imageGeneration
+                ? "Edit project image generation"
+                : "Configure project image generation"}
+            </h2>
             <p>
               Choose the model used to create optional project cover images. Generated images stay
               private until you approve one for a project; approving a replacement supersedes the
@@ -919,15 +898,17 @@ export function AiCapabilitiesWorkspace({ view = "agents" }: { view?: "agents" |
                 name="enabled"
                 type="checkbox"
                 defaultChecked={imageGeneration?.enabled ?? false}
-              /> Enable project image generation
+              />{" "}
+              Enable project image generation
             </label>
             <button type="submit" disabled={!imageProviders.length}>
               {imageGeneration ? "Save image generation changes" : "Enable image generation"}
             </button>
             {!imageProviders.length ? (
               <p role="note">
-                Register a provider with capability <code>image_generation</code> above first. OpenAI
-                uses <code>OPENAI_IMAGES_URL</code> when set, otherwise its Images API endpoint.
+                Register a provider with capability <code>image_generation</code> above first.
+                OpenAI uses <code>OPENAI_IMAGES_URL</code> when set, otherwise its Images API
+                endpoint.
               </p>
             ) : null}
           </form>

@@ -1,6 +1,7 @@
 import { expect, it } from "vitest";
-import { ashbyAdapter } from "@career-os/jobs";
+import { jobgetherAdapter } from "@career-os/jobs";
 
-it("treats an empty adapter response as a successful partial run", async () => {
-  expect(await ashbyAdapter.collect({})).toEqual([]);
+it("exposes the retained paginated job source adapter", () => {
+  expect(jobgetherAdapter.type).toBe("jobgether");
+  expect(jobgetherAdapter.capabilities).toContain("pagination");
 });
