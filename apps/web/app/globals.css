@@ -5899,7 +5899,18 @@ html[data-portfolio-theme="dark"] .project-category-tabs button.is-active {
   display: inline-block;
   margin-top: 1.25rem;
   color: #8ae6d0;
-  font-size: 0.85rem;
+  font-size: clamp(1.15rem, 2vw, 1.7rem);
+  font-weight: 700;
+}
+
+.contact-email-block {
+  align-self: center;
+  text-align: center;
+}
+
+.contact-email-block p {
+  font-size: clamp(1rem, 1.5vw, 1.25rem);
+  font-weight: 700;
 }
 
 .contact-form {
@@ -9700,4 +9711,70 @@ html[data-portfolio-theme="light"] .project-detail-section > div h3 {
 html[data-portfolio-theme="light"] .project-detail-section > p:not(.eyebrow),
 html[data-portfolio-theme="light"] .project-detail-section > div {
   color: #536173 !important;
+}
+
+/* Text-led portfolio hero: keep the existing content, but give it a stronger
+   editorial structure now that the portrait is no longer part of the header. */
+.portfolio-main .cinematic-hero {
+  min-height: clamp(42rem, calc(100dvh - 4rem), 58rem);
+  grid-template-rows: minmax(0, 1fr) auto;
+  align-content: stretch;
+  padding: clamp(3rem, 8vw, 7rem) clamp(1.25rem, 6vw, 6rem) clamp(1.5rem, 3vw, 2.5rem) !important;
+  background:
+    linear-gradient(90deg, rgb(12 16 23 / 97%) 0%, rgb(12 16 23 / 84%) 54%, rgb(12 16 23 / 42%) 100%),
+    radial-gradient(circle at 84% 22%, rgb(88 113 219 / 28%), transparent 24rem),
+    radial-gradient(circle at 20% 92%, rgb(138 230 208 / 12%), transparent 25rem),
+    #0c1017 !important;
+}
+
+.portfolio-main .cinematic-hero-content {
+  width: min(100%, 52rem);
+  justify-items: start;
+  align-self: center;
+  text-align: left;
+}
+
+.portfolio-main .cinematic-hero .hero-name {
+  padding-left: 1rem;
+  border-left: 2px solid #8ae6d0;
+  letter-spacing: 0.22em;
+}
+
+.portfolio-main .cinematic-hero h1 {
+  justify-items: start;
+  margin-top: clamp(2.5rem, 7vh, 5rem);
+  text-align: left;
+}
+
+.portfolio-main .cinematic-hero .hero-evolving-role {
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.portfolio-main .cinematic-hero .hero-actions {
+  justify-content: flex-start;
+}
+
+.portfolio-main .cinematic-hero .hero-career-link {
+  width: 100%;
+}
+
+@media (max-width: 50rem) {
+  .portfolio-main .cinematic-hero {
+    min-height: 42rem;
+    padding: 3rem 1.25rem 1.25rem !important;
+  }
+
+  .portfolio-main .cinematic-hero .hero-name {
+    padding-left: 0.75rem;
+    letter-spacing: 0.14em;
+  }
+
+  .portfolio-main .cinematic-hero h1 {
+    margin-top: 2.5rem;
+  }
+
+  .portfolio-main .cinematic-hero .hero-evolving-role {
+    justify-content: flex-start;
+  }
 }

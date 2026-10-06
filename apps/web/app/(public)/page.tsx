@@ -247,9 +247,6 @@ export default async function PublicPortfolioPage() {
   const selectedProjectItems = projectItems.filter(
     (project) => !nonProjectNarratives.has(text(project.title).trim().toLowerCase())
   );
-  // Use the included local portrait when a deployment does not supply an external image URL.
-  const profileImage =
-    process.env.NEXT_PUBLIC_PROFILE_IMAGE_URL?.trim() || "/images/basil-ogbonna.jpg";
   // Keep the two profile narratives independent. A portfolio summary belongs in
   // the fixed profile rail; the About section should only use the dedicated About
   // narrative (or the publication bio), never whichever profile item happens to
@@ -365,7 +362,6 @@ export default async function PublicPortfolioPage() {
         <div className="portfolio-layout">
           <ProfileRail
             name={displayName}
-            {...(profileImage ? { photoSrc: profileImage } : {})}
             links={profileLinks}
             className="desktop-profile-rail"
             {...(portfolioSummary ? { statement: portfolioSummary } : {})}
@@ -375,7 +371,6 @@ export default async function PublicPortfolioPage() {
             <div className="mobile-profile-rail">
               <ProfileRail
                 name={displayName}
-                {...(profileImage ? { photoSrc: profileImage } : {})}
                 links={profileLinks}
                 {...(portfolioSummary ? { statement: portfolioSummary } : {})}
               />
