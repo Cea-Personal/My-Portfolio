@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { RoleFit } from "./match-shell";
 
 const suggestions = [
   "What data systems has Basil built?",
@@ -21,7 +20,6 @@ type ConversationTurn = {
 };
 
 export function AskShell() {
-  const [mode, setMode] = useState<"question" | "fit">("question");
   const [question, setQuestion] = useState("");
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
   const latestTurn = conversation[conversation.length - 1];
@@ -97,37 +95,7 @@ export function AskShell() {
         </span>
       </header>
 
-      <div className="assistant-modes" role="tablist" aria-label="Ask Basil modes">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={mode === "question"}
-          aria-controls="portfolio-question-panel"
-          onClick={() => {
-            setMode("question");
-          }}
-        >
-          Ask the portfolio
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={mode === "fit"}
-          aria-controls="role-fit-panel"
-          onClick={() => {
-            setMode("fit");
-          }}
-        >
-          How do I fit?
-        </button>
-      </div>
-
-      <div
-        className="assistant-window"
-        id="portfolio-question-panel"
-        role="tabpanel"
-        hidden={mode !== "question"}
-      >
+      <div className="assistant-window" id="portfolio-question-panel">
         <div className="assistant-intro">
           <span aria-hidden="true">BO</span>
           <p>
@@ -189,7 +157,7 @@ export function AskShell() {
                 {turn.answer ? (
                   <div className="assistant-answer">
                     {turn.answer.split(/\n\s*\n/).map((paragraph, index) => (
-                      <p key={`${turn.id}-paragraph-${index}`}>{paragraph}</p>
+                      <p key={`${turn.id}-paragraph-${String(index)}`}>{paragraph}</p>
                     ))}
                     {turn.citations.length ? (
                       <details className="assistant-sources">
@@ -248,9 +216,6 @@ export function AskShell() {
             {status === "loading" ? "…" : "↑"}
           </button>
         </form>
-      </div>
-      <div className="assistant-window" id="role-fit-panel" role="tabpanel" hidden={mode !== "fit"}>
-        <RoleFit />
       </div>
     </section>
   );

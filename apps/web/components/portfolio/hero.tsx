@@ -27,7 +27,14 @@ const career = [
   "AI Engineer"
 ] as const;
 
-export function Hero({ name = "Basil Ogbonna" }: { name?: string; headline?: string }) {
+export function Hero({
+  name = "Basil Ogbonna",
+  showBlog = false
+}: {
+  name?: string;
+  headline?: string;
+  showBlog?: boolean;
+}) {
   const [roleIndex, setRoleIndex] = useState(0);
   const firstName = name.split(" ")[0] ?? name;
   const role = roles[roleIndex] ?? { label: "Data Engineer", core: "Data" };
@@ -82,9 +89,11 @@ export function Hero({ name = "Basil Ogbonna" }: { name?: string; headline?: str
           <a className="button-link" href="#projects">
             See the work <span aria-hidden="true">↓</span>
           </a>
-          <a className="text-link" href="#blog">
-            Read the blog <span aria-hidden="true">↗</span>
-          </a>
+          {showBlog ? (
+            <a className="text-link" href="#blog">
+              Read the blog <span aria-hidden="true">↗</span>
+            </a>
+          ) : null}
         </div>
       </div>
       <a

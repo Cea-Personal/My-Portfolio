@@ -1,5 +1,6 @@
 export * from "./aggregation";
 export * from "./application-funnel";
+export * from "./freelance-funnel";
 export * from "./career-gap";
 export * from "./gap-recommendations";
 export * from "./interview-analytics";

@@ -10,6 +10,7 @@ import { OwnerSignOutButton } from "../../components/auth/owner-sign-out-button"
 const links = [
   ["Career Brain", "/career-brain"],
   ["Jobs", "/jobs"],
+  ["Freelance", "/freelance"],
   ["Application Kit", "/applications"],
   ["Interview Kit", "/interviews"],
   ["Journals", "/journal"],

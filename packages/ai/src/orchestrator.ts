@@ -15,7 +15,10 @@ export type ReasoningTask =
   | "application_answers"
   | "compensation"
   | "interview_preparation"
-  | "writing_assistance";
+  | "writing_assistance"
+  | "freelance_opportunity_analysis"
+  | "freelance_evidence_gap"
+  | "freelance_proposal";
 export type CoordinatedTask = WorkflowPurpose | ReasoningTask;
 
 /**
@@ -74,7 +77,10 @@ export const subagentRoles: ReadonlyArray<{
     task: "writing_assistance",
     label: "Writing editor",
     description: "Helps shape clear, evidence-backed writing."
-  }
+  },
+  { task: "freelance_opportunity_analysis", label: "Freelance opportunity analyst", description: "Interprets freelance briefs and separates observed details, inferences, and unknowns." },
+  { task: "freelance_evidence_gap", label: "Freelance evidence matcher", description: "Maps freelance requirements to owner-scoped Career Brain evidence." },
+  { task: "freelance_proposal", label: "Freelance proposal writer", description: "Drafts concise client proposals with claim-level evidence references." }
 ];
 
 export function subagentForTask(task: string) {
@@ -101,7 +107,10 @@ const reasoning = new Set<ReasoningTask>([
   "application_answers",
   "compensation",
   "interview_preparation",
-  "writing_assistance"
+  "writing_assistance",
+  "freelance_opportunity_analysis",
+  "freelance_evidence_gap",
+  "freelance_proposal"
 ]);
 export function coordinateTask(task: string) {
   if (allowed.has(task as WorkflowPurpose))
@@ -117,7 +126,7 @@ export function coordinateTask(task: string) {
       delegation: "subagent" as const,
       orchestrator: "single_model" as const,
       subagent: subagentForTask(task),
-      consequential: ["document_composition", "application_answers"].includes(task)
+      consequential: ["document_composition", "application_answers", "freelance_proposal"].includes(task)
     };
   throw new Error("COORDINATED_TASK_NOT_ALLOWED");
 }

@@ -43,7 +43,7 @@ test("200 percent zoom preserves essential content without horizontal overflow",
   ).toBe(true);
 });
 
-test("keyboard and reduced-motion modes preserve navigation and role information", async ({
+test("keyboard and reduced-motion modes preserve navigation and Ask Basil", async ({
   page
 }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
@@ -53,8 +53,7 @@ test("keyboard and reduced-motion modes preserve navigation and role information
   await expect(page.getByRole("link", { name: "Skip to content" })).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(page.locator("#main-content")).toBeFocused();
-  await page.getByRole("tab", { name: "How do I fit?" }).focus();
-  await page.keyboard.press("Enter");
-  await page.locator("#match summary").click();
-  await expect(page.getByLabel("Role description")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Ask Basil" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "How do I fit?" })).toHaveCount(0);
+  await expect(page.getByPlaceholder("Ask something about Basil…")).toBeVisible();
 });

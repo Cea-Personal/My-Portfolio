@@ -22,7 +22,14 @@ test("public portfolio exposes semantic section anchors", async ({ page }) => {
   await expect(
     page.getByRole("heading", { name: "This portfolio is part of the work." })
   ).toBeVisible();
-  await expect(page.getByRole("heading", { name: /Notes from making solutions/i })).toBeVisible();
+  const blogLink = page
+    .getByRole("navigation", { name: "Portfolio sections" })
+    .getByRole("link", { name: "Blog" });
+  if (await blogLink.count()) {
+    await expect(page.getByRole("heading", { name: /Notes from making solutions/i })).toBeVisible();
+  } else {
+    await expect(page.getByRole("heading", { name: /Notes from making solutions/i })).toHaveCount(0);
+  }
   await expect(page.getByRole("heading", { name: /Data.*Engineer/ })).toBeVisible();
   await expect(page.getByRole("button", { name: "Switch to light mode" })).toBeVisible();
   await page.getByRole("button", { name: "Switch to light mode" }).click();
@@ -82,8 +89,14 @@ test("mobile portfolio keeps navigation visible and moves the profile below the 
 
   const navigation = page.getByRole("navigation", { name: "Portfolio sections" });
   await expect(navigation).toBeVisible();
-  for (const label of ["About", "Experience", "Projects", "Blog", "Let's talk"]) {
+  for (const label of ["About", "Experience", "Projects", "Let's talk"]) {
     await expect(navigation.getByRole("link", { name: label })).toBeVisible();
+  }
+  const blogLink = navigation.getByRole("link", { name: "Blog" });
+  if (await blogLink.count()) {
+    await expect(page.locator("#blog")).toBeVisible();
+  } else {
+    await expect(page.locator("#blog")).toHaveCount(0);
   }
   expect(await navigation.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(
     true
@@ -99,5 +112,7 @@ test("mobile portfolio keeps navigation visible and moves the profile below the 
   expect(profileBox).not.toBeNull();
   expect(profileBox?.y ?? 0).toBeGreaterThanOrEqual((heroBox?.y ?? 0) + (heroBox?.height ?? 0));
   await expect(mobileProfile.locator(".profile-portrait")).toHaveCSS("min-height", "352px");
-  await expect(page.locator(".contact-email")).toHaveCount(0);
+  await expect(page.locator(".contact-email")).toHaveCount(1);
+  await expect(page.locator(".contact-email")).toHaveAttribute("href", /^mailto:/);
+  await expect(page.locator(".contact-form")).toHaveCount(0);
 });

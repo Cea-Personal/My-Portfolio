@@ -1272,6 +1272,120 @@ body {
   box-shadow: var(--shadow);
 }
 
+.workspace-page > .workspace-card {
+  margin-block: 1.5rem;
+  padding: clamp(1.25rem, 3vw, 2rem);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.workspace-card {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem 1rem;
+}
+
+.form-grid label {
+  display: grid;
+  gap: 0.35rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.form-grid-wide {
+  grid-column: 1 / -1;
+}
+
+.form-grid input,
+.form-grid textarea,
+.form-grid select {
+  width: 100%;
+  padding: 0.65rem 0.75rem;
+  color: var(--ink);
+  background: var(--surface);
+}
+
+.workspace-card > label,
+.workspace-claim label {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.workspace-card > label textarea,
+.workspace-claim textarea,
+.workspace-claim select {
+  width: 100%;
+  padding: 0.7rem;
+  color: var(--ink);
+  background: var(--surface);
+}
+
+.workspace-claim {
+  display: grid;
+  gap: 0.65rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.workspace-stat {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 9rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.workspace-stat strong {
+  font-size: 2rem;
+}
+
+.workspace-stat span {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.workspace-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.7rem;
+  margin: 0;
+}
+
+.workspace-metrics div {
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.workspace-metrics dt,
+.workspace-metrics dd {
+  margin: 0;
+}
+
+.workspace-metrics dt {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.workspace-metrics dd {
+  margin-top: 0.25rem;
+  font-weight: 700;
+}
+
+.workspace-error {
+  color: #9f1239;
+}
+
 .knowledge-entry-form {
   display: grid;
   gap: 0.65rem;
@@ -2185,6 +2299,15 @@ html[data-portfolio-theme="dark"] .project-index-page > ul > li > a:hover {
 }
 
 @media (max-width: 50rem) {
+  .form-grid,
+  .workspace-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .form-grid-wide {
+    grid-column: auto;
+  }
+
   .career-experience-fields {
     grid-template-columns: 1fr;
   }

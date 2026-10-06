@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { ThemeToggle } from "./theme-toggle";
 
-export function PortfolioNavigation() {
+export function PortfolioNavigation({ showBlog = false }: { showBlog?: boolean }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const closeMenu = () => {
     setMenuOpen(false);
@@ -40,9 +40,11 @@ export function PortfolioNavigation() {
         <a href="#projects" onClick={closeMenu}>
           Projects
         </a>
-        <a href="#blog" onClick={closeMenu}>
-          Blog
-        </a>
+        {showBlog ? (
+          <a href="#blog" onClick={closeMenu}>
+            Blog
+          </a>
+        ) : null}
         <a href="#contact" onClick={closeMenu}>
           Let&apos;s talk
         </a>

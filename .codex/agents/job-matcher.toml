@@ -12,6 +12,7 @@ Responsibilities:
 - Retrieve owner-scoped career context and evidence through the `supabase` MCP server before matching requirements; never use arbitrary SQL.
 - Write PostgreSQL, Express.js, React.js, and Node.js in full whenever that stack is mentioned; do not abbreviate it.
 - Parse a job description into required, preferred, contextual, and inferred requirements.
+- For freelance opportunity analysis, distinguish directly quoted opportunity facts from inferences and unknowns. Preserve a source excerpt for each observed requirement and never infer client quality or project history.
 - Match each requirement against verified candidate evidence.
 - Separate strong matches, partial matches, transferable matches, evidence gaps, and true gaps.
 - Produce an explainable overall fit assessment rather than a superficial keyword score.

@@ -35,6 +35,7 @@ export default async function PublicPortfolioPage() {
     snapshot.source === "empty" && publishedPostsResult.source === "fallback"
       ? []
       : publishedPostsResult.posts;
+  const showBlog = publishedPostsResult.source === "live" && publishedPosts.length > 0;
   const publicReadIsStale =
     snapshot.stale || (snapshot.source !== "empty" && publishedPostsResult.stale);
   const items = snapshot.items;
@@ -273,8 +274,10 @@ export default async function PublicPortfolioPage() {
     const href = text(value).trim();
     return /^(?:https?:\/\/|mailto:)/i.test(href) ? href : "";
   };
-  const email = text(profile?.email, process.env.NEXT_PUBLIC_CONTACT_EMAIL).trim();
-  const contactHref = safeHref(profile?.contact_url) || (email ? `mailto:${email}` : "");
+  const email =
+    text(profile?.email, process.env.NEXT_PUBLIC_CONTACT_EMAIL).trim() ||
+    "ogbonna.basil3@gmail.com";
+  const contactHref = email ? `mailto:${email}` : safeHref(profile?.contact_url);
   const profileLinks = [
     {
       label: "LinkedIn",
@@ -341,10 +344,17 @@ export default async function PublicPortfolioPage() {
   return (
     <>
       <PublicEvents
-        sections={["about", "experience", "projects", "ask-basil", "blog", "contact"]}
+        sections={[
+          "about",
+          "experience",
+          "projects",
+          "ask-basil",
+          ...(showBlog ? ["blog"] : []),
+          "contact"
+        ]}
       />
       <PageIntro name={displayName} />
-      <PortfolioNavigation />
+      <PortfolioNavigation showBlog={showBlog} />
       {publicReadIsStale ? (
         <p className="portfolio-stale-notice" role="status">
           Showing the latest approved portfolio snapshot while live content reconnects.
@@ -361,7 +371,7 @@ export default async function PublicPortfolioPage() {
             {...(portfolioSummary ? { statement: portfolioSummary } : {})}
           />
           <div className="portfolio-stream">
-            <Hero name={displayName} headline={headline} />
+            <Hero name={displayName} headline={headline} showBlog={showBlog} />
             <div className="mobile-profile-rail">
               <ProfileRail
                 name={displayName}
@@ -393,45 +403,47 @@ export default async function PublicPortfolioPage() {
             <div className="intelligence-grid">
               <AskShell />
             </div>
-            <Writing
-              items={[
-                ...publishedPosts.map((post) => ({
-                  title: post.title,
-                  summary: post.excerpt,
-                  href: `/blog/${encodeURIComponent(post.slug)}`,
-                  meta: new Date(post.visible_at).toLocaleDateString()
-                })),
-                ...writingItems.map((item) => {
-                  const structured = record(item.structured_content);
-                  const externalUrl = safeHref(
-                    structured.externalUrl ??
-                      structured.external_url ??
-                      structured.canonicalUrl ??
-                      structured.sourceUrl ??
-                      structured.url
-                  );
-                  const detailSlug = text(item.detail_slug);
-                  return {
-                    title: text(item.title),
-                    summary: text(item.public_summary),
-                    ...(externalUrl
-                      ? { href: externalUrl, external: true }
-                      : detailSlug
-                        ? { href: `/blog/${encodeURIComponent(detailSlug)}` }
-                        : {}),
-                    ...(text(item.subtitle, text(structured.platform, text(structured.source)))
-                      ? {
-                          meta: text(
-                            item.subtitle,
-                            text(structured.platform, text(structured.source))
-                          )
-                        }
-                      : {})
-                  };
-                })
-              ]}
-            />
-            <Contact />
+            {showBlog ? (
+              <Writing
+                items={[
+                  ...publishedPosts.map((post) => ({
+                    title: post.title,
+                    summary: post.excerpt,
+                    href: `/blog/${encodeURIComponent(post.slug)}`,
+                    meta: new Date(post.visible_at).toLocaleDateString()
+                  })),
+                  ...writingItems.map((item) => {
+                    const structured = record(item.structured_content);
+                    const externalUrl = safeHref(
+                      structured.externalUrl ??
+                        structured.external_url ??
+                        structured.canonicalUrl ??
+                        structured.sourceUrl ??
+                        structured.url
+                    );
+                    const detailSlug = text(item.detail_slug);
+                    return {
+                      title: text(item.title),
+                      summary: text(item.public_summary),
+                      ...(externalUrl
+                        ? { href: externalUrl, external: true }
+                        : detailSlug
+                          ? { href: `/blog/${encodeURIComponent(detailSlug)}` }
+                          : {}),
+                      ...(text(item.subtitle, text(structured.platform, text(structured.source)))
+                        ? {
+                            meta: text(
+                              item.subtitle,
+                              text(structured.platform, text(structured.source))
+                            )
+                          }
+                        : {})
+                    };
+                  })
+                ]}
+              />
+            ) : null}
+            <Contact email={email} href={contactHref} />
           </div>
         </div>
       </main>

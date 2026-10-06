@@ -16,6 +16,7 @@ export default defineConfig({
       "@career-os/contracts": resolve(import.meta.dirname, "packages/contracts/src/index.ts"),
       "@career-os/database": resolve(import.meta.dirname, "packages/database/src/index.ts"),
       "@career-os/documents": resolve(import.meta.dirname, "packages/documents/src/index.ts"),
+      "@career-os/freelance": resolve(import.meta.dirname, "packages/freelance/src/index.ts"),
       "@career-os/interviews": resolve(import.meta.dirname, "packages/interviews/src/index.ts"),
       "@career-os/jobs": resolve(import.meta.dirname, "packages/jobs/src/index.ts"),
       "@career-os/knowledge": resolve(import.meta.dirname, "packages/knowledge/src/index.ts"),
