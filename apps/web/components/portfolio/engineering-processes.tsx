@@ -60,55 +60,61 @@ export function EngineeringProcesses() {
         <p>Engineering process</p>
         <h2 id="process-title">The work behind the outcome.</h2>
         <span>
-          Small, inspectable views into how I approach AI, data, and software systems. These are
-          process patterns—not performance claims.
+          Frame the problem, build with clear constraints, verify the result, and observe it in use.
         </span>
       </header>
-      <div className="process-switcher-shell">
-        <div className="process-switcher" role="tablist" aria-label="Engineering disciplines">
-          {(Object.keys(processes) as ProcessName[]).map((name) => (
-            <button
-              type="button"
-              role="tab"
-              aria-selected={active === name}
-              key={name}
-              onClick={() => {
-                setActive(name);
-              }}
-            >
-              {processes[name].label}
-            </button>
-          ))}
-        </div>
-        <span className="process-scroll-cue" aria-hidden="true">
-          Swipe <span>→</span>
-        </span>
-      </div>
-      <article className="process-stage" key={active} role="tabpanel">
-        <div className="process-flow">
-          <p>{process.statement}</p>
-          <ol>
-            {process.steps.map((step) => (
-              <li key={step}>{step}</li>
+      <details className="engineering-process-details">
+        <summary>Explore the software, data, platform, and AI processes</summary>
+        <p>
+          Small, inspectable views into how I approach AI, data, and software systems. These are
+          process patterns—not performance claims.
+        </p>
+        <div className="process-switcher-shell">
+          <div className="process-switcher" role="tablist" aria-label="Engineering disciplines">
+            {(Object.keys(processes) as ProcessName[]).map((name) => (
+              <button
+                type="button"
+                role="tab"
+                aria-selected={active === name}
+                key={name}
+                onClick={() => {
+                  setActive(name);
+                }}
+              >
+                {processes[name].label}
+              </button>
             ))}
-          </ol>
-        </div>
-        <div className="process-code" aria-label={`${process.label} process snippet`}>
-          <div>
-            <span />
-            <span />
-            <span />
-            <p>{active.toLowerCase()}.pipeline</p>
           </div>
-          <pre>
-            <code>
-              {process.snippet.map((line) => (
-                <span key={line}>{line}</span>
-              ))}
-            </code>
-          </pre>
+          <span className="process-scroll-cue" aria-hidden="true">
+            Swipe <span>→</span>
+          </span>
         </div>
-      </article>
+        <article className="process-stage" key={active} role="tabpanel">
+          <div className="process-flow">
+            <p>{process.statement}</p>
+            <ol>
+              {process.steps.map((step) => (
+                <li key={step}>{step}</li>
+              ))}
+            </ol>
+          </div>
+          <div className="process-code" aria-label={`${process.label} process snippet`}>
+            <div>
+              <span />
+              <span />
+              <span />
+              <p>{active.toLowerCase()}.pipeline</p>
+            </div>
+            <pre>
+              <code>
+                {process.snippet.map((line) => (
+                  <span key={line}>{line}</span>
+                ))}
+              </code>
+            </pre>
+          </div>
+        </article>
+      </details>
     </section>
   );
 }

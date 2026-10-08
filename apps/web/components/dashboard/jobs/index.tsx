@@ -358,11 +358,11 @@ export function JobsWorkspace({ initialJobId }: { initialJobId?: string } = {}) 
         <p className="eyebrow">Opportunity intelligence</p>
         <h1>Jobs</h1>
         <p>
-          Discover, compare, inspect the evidence behind scores, and move roles through a guarded
-          lifecycle.
+          Discover relevant roles, review the evidence, shortlist, and prepare your application.
         </p>
       </header>
-      <section aria-labelledby="discovery-health-title">
+      <details className="workspace-disclosure">
+        <summary>Source health and configuration</summary>
         <h2 id="discovery-health-title">Discovery sources</h2>
         <p>
           {String(sources.filter((source) => source.enabled).length)} enabled ·{" "}
@@ -392,7 +392,7 @@ export function JobsWorkspace({ initialJobId }: { initialJobId?: string } = {}) 
             Configure sources, selectors, cadence, and diagnostics →
           </a>
         </p>
-      </section>
+      </details>
       <section aria-labelledby="search-jobs-title">
         <h2 id="search-jobs-title">Run a search</h2>
         <form className="job-search-form" onSubmit={(event) => void startSearch(event)}>
@@ -471,7 +471,8 @@ export function JobsWorkspace({ initialJobId }: { initialJobId?: string } = {}) 
           )}
         </details>
       </section>
-      <section aria-labelledby="manual-job-title">
+      <details className="workspace-disclosure">
+        <summary>Add an opportunity manually</summary>
         <h2 id="manual-job-title">Add an opportunity manually</h2>
         <form className="knowledge-entry-form" onSubmit={(event) => void createJob(event)}>
           <label>
@@ -501,7 +502,7 @@ export function JobsWorkspace({ initialJobId }: { initialJobId?: string } = {}) 
           </label>
           <button type="submit">Save opportunity</button>
         </form>
-      </section>
+      </details>
       <section aria-labelledby="opportunity-list-title">
         <h2 id="opportunity-list-title">Opportunity pipeline</h2>
         <label>

@@ -18,10 +18,14 @@ export function CredentialsAndSkills({
 }) {
   if (!credentials.length && !skillGroups.length) return null;
   return (
-    <section className="public-knowledge" aria-labelledby="public-knowledge-title">
+    <section
+      id="capabilities"
+      className="public-knowledge"
+      aria-labelledby="public-knowledge-title"
+    >
       <header className="editorial-heading">
-        <p>Credentials &amp; technical practice</p>
-        <h2 id="public-knowledge-title">What I know, and what backs it.</h2>
+        <p>Technical capabilities</p>
+        <h2 id="public-knowledge-title">The skills behind the systems.</h2>
       </header>
       {skillGroups.length ? (
         <div className="public-skill-lines">
@@ -34,15 +38,18 @@ export function CredentialsAndSkills({
         </div>
       ) : null}
       {credentials.length ? (
-        <div className="public-credential-lines">
-          {credentials.map((credential) => (
-            <article key={`${credential.title}-${credential.issuer ?? ""}`}>
-              <h3>{credential.title}</h3>
-              {credential.issuer ? <strong>{credential.issuer}</strong> : null}
-              {credential.summary ? <p>{credential.summary}</p> : null}
-            </article>
-          ))}
-        </div>
+        <details className="public-credentials">
+          <summary>Education and certifications ({credentials.length})</summary>
+          <div className="public-credential-lines">
+            {credentials.map((credential) => (
+              <article key={`${credential.title}-${credential.issuer ?? ""}`}>
+                <h3>{credential.title}</h3>
+                {credential.issuer ? <strong>{credential.issuer}</strong> : null}
+                {credential.summary ? <p>{credential.summary}</p> : null}
+              </article>
+            ))}
+          </div>
+        </details>
       ) : null}
     </section>
   );

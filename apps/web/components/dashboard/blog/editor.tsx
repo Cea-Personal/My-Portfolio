@@ -192,7 +192,7 @@ export function BlogEditor() {
     <main className="workspace-page">
       <header className="workspace-heading">
         <p className="eyebrow">Evidence-safe publishing</p>
-        <h1>Blog</h1>
+        <h1>Writing</h1>
         <p>
           Create, preview, version, schedule, publish, republish, and archive technical articles.
         </p>

@@ -223,14 +223,15 @@ export function ApplicationsWorkspace() {
   return (
     <main className="workspace-page">
       <header className="workspace-heading">
-        <p className="eyebrow">Application operating system</p>
-        <h1>Application Kit</h1>
+        <p className="eyebrow">From evidence to application</p>
+        <h1>Applications</h1>
         <p>
           Prepare materials, answers, research, and a submission snapshot. Nothing is submitted
           externally by this application.
         </p>
       </header>
-      <section aria-labelledby="application-materials-title">
+      <details className="workspace-disclosure">
+        <summary>CV and cover-letter library</summary>
         <h2 id="application-materials-title">CVs and cover letters</h2>
         <p>
           Materials are created inside a selected application, remain versioned, and can be reviewed
@@ -266,7 +267,7 @@ export function ApplicationsWorkspace() {
         ) : (
           <p>No generated CVs or cover letters yet. Start from an eligible job below.</p>
         )}
-      </section>
+      </details>
       <section>
         <h2>Start from a job</h2>
         <label>
@@ -306,7 +307,8 @@ export function ApplicationsWorkspace() {
           <p>Move a job to Shortlisted or Interested before starting an application.</p>
         )}
       </section>
-      <section>
+      <details className="workspace-disclosure">
+        <summary>Reusable application profiles</summary>
         <h2>Reusable application profile</h2>
         <p>
           Approved values fill deterministic fields exactly as written; they are not rewritten by
@@ -484,7 +486,7 @@ export function ApplicationsWorkspace() {
         ) : (
           <p>No reusable profile yet.</p>
         )}
-      </section>
+      </details>
       <section>
         <h2>Application pipeline</h2>
         {state === "loading" ? <p role="status">Loading applications…</p> : null}
@@ -505,12 +507,12 @@ export function ApplicationsWorkspace() {
           ))}
         </ul>
       </section>
-        <WorkspaceToast
-          message={message}
-          onDismiss={() => {
-            setMessage("");
-          }}
-        />
+      <WorkspaceToast
+        message={message}
+        onDismiss={() => {
+          setMessage("");
+        }}
+      />
     </main>
   );
 }

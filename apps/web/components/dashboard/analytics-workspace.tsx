@@ -266,7 +266,9 @@ export function AnalyticsWorkspace() {
       };
       if (!response.ok) {
         throw new Error(
-          payload.data?.detail ?? payload.data?.code ?? `Request failed (${String(response.status)})`
+          payload.data?.detail ??
+            payload.data?.code ??
+            `Request failed (${String(response.status)})`
         );
       }
       if (!payload.data) throw new Error("The analytics subagent returned no output.");
@@ -285,9 +287,6 @@ export function AnalyticsWorkspace() {
       window.clearTimeout(timeout);
     }
   }, [query]);
-  useEffect(() => {
-    if (state === "ready" && portfolio) void loadInsights();
-  }, [loadInsights, portfolio, state]);
   function filter(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setQuery(paramsFrom(new FormData(event.currentTarget)).toString());
@@ -449,10 +448,14 @@ export function AnalyticsWorkspace() {
               <BarList title="Average seconds by page" values={pageAverageTime} suffix="s" />
               <BarList title="Total seconds by section" values={sectionTotalTime} suffix="s" />
             </div>
-            <section className="analytics-insights" aria-labelledby="portfolio-insights-title">
+            <details
+              className="analytics-insights workspace-disclosure"
+              aria-labelledby="portfolio-insights-title"
+            >
+              <summary>Advanced AI insights</summary>
               <div className="analytics-panel-heading">
                 <div>
-                  <span className="eyebrow">Subagent readout</span>
+                  <span className="eyebrow">On-demand readout</span>
                   <h3 id="portfolio-insights-title">What the portfolio signal suggests</h3>
                 </div>
                 <button
@@ -461,7 +464,7 @@ export function AnalyticsWorkspace() {
                   disabled={insightsState === "loading"}
                   onClick={() => void loadInsights()}
                 >
-                  {insightsState === "loading" ? "Analyzing…" : "Refresh insights"}
+                  {insightsState === "loading" ? "Analyzing…" : "Generate insights"}
                 </button>
               </div>
               {insightsState === "loading" ? (
@@ -514,7 +517,7 @@ export function AnalyticsWorkspace() {
                   </small>
                 </>
               ) : null}
-            </section>
+            </details>
           </section>
 
           <section className="analytics-panel analytics-wide">

@@ -6,6 +6,14 @@ describe("public analytics allowlist", () => {
       section: "experience"
     });
   });
+  it("accepts the V1 section anchors without weakening the private-data boundary", () => {
+    for (const section of ["impact", "capabilities", "ask", "ask-basil"]) {
+      expect(createPublicEvent("section_view", { section }).properties).toEqual({ section });
+    }
+    expect(() => createPublicEvent("section_view", { section: "career-brain" })).toThrow(
+      "EVENT_PROPERTY_NOT_ALLOWED"
+    );
+  });
   it("accepts bounded engagement and categorized acquisition metadata", () => {
     expect(createPublicEvent("page_view", { page: "home", source: "linkedin" }).properties).toEqual(
       { page: "home", source: "linkedin" }

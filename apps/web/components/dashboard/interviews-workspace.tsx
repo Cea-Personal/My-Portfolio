@@ -264,7 +264,7 @@ export function InterviewsWorkspace() {
     <main className="workspace-page">
       <header className="workspace-heading">
         <p className="eyebrow">Interview intelligence</p>
-        <h1>Interview Kit</h1>
+        <h1>Interviews</h1>
         <p>
           Select a job and the AI builds a private preparation package from its description,
           inferred interview stages, approved Career Brain evidence, and prior learning. No live

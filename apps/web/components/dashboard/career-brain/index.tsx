@@ -400,7 +400,7 @@ export function CareerBrain() {
   return (
     <main className="workspace-page career-brain" aria-labelledby="career-brain-title">
       <header className="workspace-heading career-brain-heading">
-        <p className="eyebrow">Private, evolving career intelligence</p>
+        <p className="eyebrow">Your career evidence</p>
         <h1 id="career-brain-title">Career Brain</h1>
         <p>
           One living profile synthesized from uploaded files, Google Drive, journals, manual facts,
@@ -408,6 +408,8 @@ export function CareerBrain() {
           activate a portfolio snapshot.
         </p>
         <div className="career-brain-actions">
+          <a href="/settings/documents">Documents</a>
+          <a href="/journal">Journal</a>
           <button disabled={generating} type="button" onClick={() => void regenerate()}>
             {generating ? "Re-synthesizing Career Brain…" : "Re-synthesize Career Brain"}
           </button>
@@ -457,7 +459,7 @@ export function CareerBrain() {
         <section className="career-brain-overview" aria-label="Career Brain overview">
           <div>
             <p className="eyebrow">Current profile</p>
-            <h2>A living view of your work.</h2>
+            <h2>Your evidence at a glance.</h2>
             <p>
               Review the synthesized profile below, then choose the parts that should move into the
               next public portfolio snapshot.

@@ -5,6 +5,7 @@ import { useState } from "react";
 const suggestions = [
   "What data systems has Basil built?",
   "How does Basil approach AI engineering?",
+  "How does Basil fit this role?",
   "Which experience best matches a senior data role?",
   "What makes this portfolio a working product?"
 ] as const;

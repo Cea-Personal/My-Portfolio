@@ -8,7 +8,7 @@ import { Writing } from "../../components/portfolio/writing";
 import { AskShell } from "../../components/portfolio/ask-shell";
 import { PortfolioMotion } from "../../components/portfolio/portfolio-motion";
 import { PageIntro } from "../../components/portfolio/page-intro";
-import { ProfileRail } from "../../components/portfolio/profile-rail";
+import { Impact } from "../../components/portfolio/impact";
 import { EngineeringProcesses } from "../../components/portfolio/engineering-processes";
 import type { CareerTimelineStage } from "../../components/portfolio/career-timeline";
 import { loadPublicBlogPostsWithStatus, loadPublicPortfolio } from "@/lib/api/public-data";
@@ -267,6 +267,58 @@ export default async function PublicPortfolioPage() {
   // it is separate from the About narrative below.
   const portfolioSummary = displayText(portfolioSummaryItem?.public_summary, text(profile?.bio));
   const bio = displayText(aboutItem?.public_summary, text(profile?.bio));
+  const heroStatement = portfolioSummary.match(/^.*?[.!?](?:\s|$)/)?.[0].trim() || portfolioSummary;
+  const publishedSkillGroups = skillItems
+    .filter((item) => !text(item.career_stage))
+    .map((item) => ({
+      title: text(item.title, "Technical skills"),
+      skills: expandTechnologyLabels(list(item.display_technologies))
+    }));
+  const roleSkillGroups = new Map<string, Set<string>>();
+  for (const stage of timelineStages) {
+    if (!stage.skills?.length) continue;
+    const title = stage.title.replace(/^(?:Senior|Lead)\s+/i, "");
+    const skills = roleSkillGroups.get(title) ?? new Set<string>();
+    for (const skill of stage.skills) skills.add(skill);
+    roleSkillGroups.set(title, skills);
+  }
+  const technicalSkillGroups = publishedSkillGroups.length
+    ? publishedSkillGroups
+    : Array.from(roleSkillGroups, ([title, skills]) => ({ title, skills: [...skills] }));
+  const selectedImpact = Array.from(
+    new Map(
+      [
+        ...impactItems,
+        ...careerItems.flatMap((item) => {
+          const structured = record(item.structured_content);
+          const explicit = [
+            text(item.display_metric),
+            ...list(structured.outcomes),
+            ...list(structured.impact),
+            ...list(structured.achievements)
+          ]
+            .filter(Boolean)
+            .map((outcome) => ({ display_metric: outcome, public_summary: "" }));
+          // Older approved snapshots keep measured outcomes in the experience list.
+          // Copy exact numeric signals and source sentences, never infer a metric.
+          const measured = list(structured.experience).flatMap((outcome) => {
+            const metrics = outcome.match(/\b\d+(?:\.\d+)?(?:%|\+)/g);
+            return metrics
+              ? [{ display_metric: metrics.join(" · "), public_summary: outcome }]
+              : [];
+          });
+          return [...explicit, ...measured];
+        })
+      ].flatMap((item) => {
+        const metric = displayText(item.display_metric).trim();
+        const summary = displayText(item.public_summary).trim();
+        const title = metric || summary;
+        return title
+          ? [[title, { title, ...(metric && summary !== metric ? { summary } : {}) }] as const]
+          : [];
+      })
+    ).values()
+  ).slice(0, 6);
   const safeHref = (value: unknown) => {
     const href = text(value).trim();
     return /^(?:https?:\/\/|mailto:)/i.test(href) ? href : "";
@@ -342,10 +394,12 @@ export default async function PublicPortfolioPage() {
     <>
       <PublicEvents
         sections={[
-          "about",
+          "impact",
           "experience",
           "projects",
-          "ask-basil",
+          "capabilities",
+          "about",
+          "ask",
           ...(showBlog ? ["blog"] : []),
           "contact"
         ]}
@@ -357,44 +411,40 @@ export default async function PublicPortfolioPage() {
           Showing the latest approved portfolio snapshot while live content reconnects.
         </p>
       ) : null}
-      <main id="main-content" className="portfolio-main" tabIndex={-1}>
+      <main id="main-content" className="portfolio-main portfolio-v1" tabIndex={-1}>
         <PortfolioMotion />
         <div className="portfolio-layout">
-          <ProfileRail
-            name={displayName}
-            links={profileLinks}
-            className="desktop-profile-rail"
-            {...(portfolioSummary ? { statement: portfolioSummary } : {})}
-          />
           <div className="portfolio-stream">
-            <Hero name={displayName} headline={headline} showBlog={showBlog} />
-            <div className="mobile-profile-rail">
-              <ProfileRail
-                name={displayName}
-                links={profileLinks}
-                {...(portfolioSummary ? { statement: portfolioSummary } : {})}
-              />
-            </div>
-            <About {...(bio ? { bio } : {})} />
-            <EngineeringProcesses />
+            <Hero
+              name={displayName}
+              headline={headline}
+              links={profileLinks}
+              showBlog={showBlog}
+              {...(heroStatement ? { statement: heroStatement } : {})}
+            />
+            <Impact items={selectedImpact} />
             <CareerTimeline stages={timelineStages} />
+            <Projects
+              items={renderedProjects}
+              {...(portfolioSourceUrl ? { portfolioSourceUrl } : {})}
+            />
             <CredentialsAndSkills
               credentials={certificationItems.map((item) => ({
                 title: displayText(item.title, "Certification"),
                 ...(text(item.subtitle) ? { issuer: displayText(item.subtitle) } : {}),
                 ...(text(item.public_summary) ? { summary: displayText(item.public_summary) } : {})
               }))}
-              skillGroups={skillItems
-                .filter((item) => !text(item.career_stage))
-                .map((item) => ({
-                  title: text(item.title, "Technical skills"),
-                  skills: expandTechnologyLabels(list(item.display_technologies))
-                }))}
+              skillGroups={technicalSkillGroups}
             />
-            <Projects
-              items={renderedProjects}
-              {...(portfolioSourceUrl ? { portfolioSourceUrl } : {})}
+            <About
+              {...(bio ? { bio } : {})}
+              {...(portfolioSummary &&
+              portfolioSummary !== bio &&
+              portfolioSummary !== heroStatement
+                ? { additionalSummary: portfolioSummary }
+                : {})}
             />
+            <EngineeringProcesses />
             <div className="intelligence-grid">
               <AskShell />
             </div>

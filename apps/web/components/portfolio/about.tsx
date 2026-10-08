@@ -1,7 +1,9 @@
 export function About({
-  bio = "A clear, fact-based view of the work behind the outcomes."
+  bio = "A clear, fact-based view of the work behind the outcomes.",
+  additionalSummary
 }: {
   bio?: string;
+  additionalSummary?: string;
 }) {
   return (
     <section id="about" className="about-section" aria-labelledby="about-title">
@@ -15,6 +17,12 @@ export function About({
         <p className="about-detail">
           I care about the full path from a difficult problem to a system people can trust and use.
         </p>
+        {additionalSummary ? (
+          <details className="about-full-summary">
+            <summary>More about the work</summary>
+            <p>{additionalSummary}</p>
+          </details>
+        ) : null}
       </div>
     </section>
   );

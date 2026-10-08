@@ -80,6 +80,23 @@ export default async function ProjectPage({ params }: { params: Promise<{ slug: 
   const approach = displayText(structured.approach);
   const role = displayText(structured.role, text(project.subtitle));
   const outcome = displayText(structured.outcome);
+  const storySections = [
+    ["Business context", structured.businessContext ?? structured.business_context],
+    ["Architecture", structured.architecture],
+    ["Decisions and trade-offs", structured.tradeoffs ?? structured.trade_offs],
+    ["Implementation", structured.implementation],
+    [
+      "Production considerations",
+      structured.productionConsiderations ?? structured.production_considerations
+    ]
+  ]
+    .map(([heading, value]) => ({
+      heading: String(heading),
+      paragraphs: (typeof value === "string" ? [value] : strings(value))
+        .map(expandTechnologyTerms)
+        .filter((paragraph) => paragraph.trim())
+    }))
+    .filter((section) => section.paragraphs.length);
   const points = Array.from(
     new Set([
       ...strings(structured.highlights),
@@ -176,6 +193,14 @@ export default async function ProjectPage({ params }: { params: Promise<{ slug: 
               <p>{approach}</p>
             </div>
           ) : null}
+          {storySections.map((section) => (
+            <div key={section.heading}>
+              <h3>{section.heading}</h3>
+              {section.paragraphs.map((paragraph) => (
+                <p key={paragraph}>{paragraph}</p>
+              ))}
+            </div>
+          ))}
           {outcome ? (
             <div>
               <h3>Outcome</h3>

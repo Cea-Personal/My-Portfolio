@@ -68,7 +68,7 @@ export function Projects({
       <div className="projects-index-shell">
         <header className="editorial-heading projects-heading">
           <p>Selected projects</p>
-          <h2 id="projects-title">A few things I&apos;ve made curious on purpose.</h2>
+          <h2 id="projects-title">Systems, decisions, and results.</h2>
           <span>
             Working systems and technical experiments, each with a public path to inspect or try it.
           </span>
@@ -153,9 +153,13 @@ export function Projects({
         <p className="project-category-empty">No published projects in this category yet.</p>
       ) : null}
 
-      <div className="projects-proof-shell">
+      <details className="projects-proof-shell">
+        <summary>
+          <strong>This portfolio is itself a software, data, and AI project.</strong>
+          <span>Explore the architecture and private Career OS →</span>
+        </summary>
         <PortfolioProof {...(portfolioSourceUrl ? { sourceUrl: portfolioSourceUrl } : {})} />
-      </div>
+      </details>
     </section>
   );
 }

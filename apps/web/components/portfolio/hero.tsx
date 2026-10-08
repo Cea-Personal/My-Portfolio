@@ -1,58 +1,21 @@
-"use client";
-
-import { useEffect, useState } from "react";
-
-interface HeroRole {
+interface HeroLink {
   label: string;
-  core: string;
-  leading?: string;
-  middle?: string;
+  href?: string;
 }
-
-const roles: readonly HeroRole[] = [
-  { label: "Data Engineer", core: "Data" },
-  { label: "Data Platform Engineer", core: "Data", middle: "Platform" },
-  { label: "AI Data Engineer", leading: "AI", core: "Data" },
-  { label: "AI Engineer", core: "AI" },
-  { label: "AI Software Engineer", leading: "AI", core: "Software" },
-  { label: "Software Engineer", core: "Software" }
-] as const;
-
-const career = [
-  "Web Developer",
-  "Software Engineer",
-  "Lead Software Engineer",
-  "Data Engineer",
-  "Senior Data Engineer",
-  "AI Engineer"
-] as const;
 
 export function Hero({
   name = "Basil Ogbonna",
+  headline = "Senior Data Engineer",
+  statement,
+  links = [],
   showBlog = false
 }: {
   name?: string;
   headline?: string;
+  statement?: string;
+  links?: readonly HeroLink[];
   showBlog?: boolean;
 }) {
-  const [roleIndex, setRoleIndex] = useState(0);
-  const firstName = name.split(" ")[0] ?? name;
-  const role = roles[roleIndex] ?? { label: "Data Engineer", core: "Data" };
-
-  useEffect(() => {
-    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-    if (reducedMotion.matches) {
-      setRoleIndex(0);
-      return;
-    }
-    const timer = window.setInterval(() => {
-      setRoleIndex((current) => (current + 1) % roles.length);
-    }, 3800);
-    return () => {
-      window.clearInterval(timer);
-    };
-  }, []);
-
   return (
     <section id="hero" className="hero-section cinematic-hero" aria-labelledby="hero-title">
       <div className="hero-signal-field" aria-hidden="true">
@@ -63,59 +26,40 @@ export function Hero({
         <i />
       </div>
       <div className="cinematic-hero-content">
-        <p className="hero-name">Basil Ogbonna</p>
-        <h1 id="hero-title">
-          <span className="sr-only" aria-live="polite">
-            {role.label}
-          </span>
-          <span className="hero-evolving-role" aria-hidden="true">
-            {role.leading ? (
-              <strong className="hero-role-token" key={`leading-${role.leading}`}>
-                {role.leading}
-              </strong>
-            ) : null}
-            <strong className="hero-role-token" key={`core-${role.core}`}>
-              {role.core}
-            </strong>
-            {role.middle ? (
-              <strong className="hero-role-token" key={`middle-${role.middle}`}>
-                {role.middle}
-              </strong>
-            ) : null}
-            <strong className="hero-engineer-role">Engineer</strong>
-          </span>
-        </h1>
+        <p className="hero-name">{name}</p>
+        <h1 id="hero-title">{headline}</h1>
+        {statement ? <p className="hero-value-statement">{statement}</p> : null}
         <div className="hero-actions" aria-label="Portfolio actions">
           <a className="button-link" href="#projects">
             See the work <span aria-hidden="true">↓</span>
           </a>
+          <a className="text-link" href="#contact">
+            Let&apos;s talk <span aria-hidden="true">↗</span>
+          </a>
           {showBlog ? (
             <a className="text-link" href="#blog">
-              Read the blog <span aria-hidden="true">↗</span>
+              Read the blog
             </a>
           ) : null}
         </div>
       </div>
-      <a
-        className="hero-career-link"
-        href="#experience"
-        aria-label={`Explore ${firstName}'s career journey`}
-      >
-        <span>Career signal</span>
-        <span className="hero-career-track-shell">
-          <span className="hero-career-track">
-            {career.map((stage) => (
-              <span key={stage}>{stage}</span>
+      <div className="hero-profile-footer">
+        <p className="profile-availability">
+          <span aria-hidden="true" /> Open to meaningful work
+        </p>
+        <nav className="hero-professional-links" aria-label={`${name} professional profiles`}>
+          {links
+            .filter((link) => link.href)
+            .map((link) => (
+              <a key={link.label} href={link.href}>
+                {link.label} <span aria-hidden="true">↗</span>
+              </a>
             ))}
-          </span>
-          <span className="hero-career-scroll-cue hero-career-scroll-cue-left" aria-hidden="true">
-            ←
-          </span>
-          <span className="hero-career-scroll-cue hero-career-scroll-cue-right" aria-hidden="true">
-            →
-          </span>
-        </span>
-      </a>
+          <a href="#experience">
+            Explore experience <span aria-hidden="true">↓</span>
+          </a>
+        </nav>
+      </div>
     </section>
   );
 }

@@ -4,6 +4,8 @@ This is Basil Ogbonna's Next.js portfolio and private career workspace backed by
 and an isolated Python worker. The public portfolio only reads the active, approved publication;
 career data, documents, applications, and workflow state remain owner-scoped.
 
+The [V1 operating agreement and feature freeze](docs/v1-feature-freeze.md) describes the simplified public journey, daily workspace navigation, preserved capabilities and 60–90 day evidence-gathering period.
+
 ## Prerequisites
 
 - Node.js 24.x and pnpm 11.25.x

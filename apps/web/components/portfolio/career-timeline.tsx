@@ -22,7 +22,7 @@ export function CareerTimeline({ stages = [] }: { stages?: readonly CareerTimeli
       <header className="editorial-heading">
         <p>Experience</p>
         <h2 id="career-title">The journey, company by company.</h2>
-        <span>A brief of every chapter is always visible. Open one to see the work behind it.</span>
+        <span>Selected work from each role. Open a chapter for the full experience and tools.</span>
       </header>
       {stages.length ? (
         <ol className="career-accordion" aria-label="Career chapters">
@@ -37,11 +37,21 @@ export function CareerTimeline({ stages = [] }: { stages?: readonly CareerTimeli
                   setOpenIndex((current) => (current === index ? null : index));
                 }}
               >
-                <strong>{stage.title}</strong>
-                <small>{stage.company ?? stage.period ?? "Career chapter"}</small>
+                <strong>{stage.company ?? stage.title}</strong>
+                <small>
+                  {stage.title}
+                  {stage.period ? ` · ${stage.period}` : ""}
+                </small>
                 <em>{stage.summary}</em>
                 <i aria-hidden="true">+</i>
               </button>
+              {stage.experience?.length || stage.impacts?.length ? (
+                <ul className="career-highlights" aria-label={`${stage.title} highlights`}>
+                  {(stage.impacts ?? stage.experience ?? []).slice(0, 3).map((detail) => (
+                    <li key={detail}>{detail}</li>
+                  ))}
+                </ul>
+              ) : null}
               {index === openIndex ? (
                 <article id={`career-detail-${String(index)}`} className="career-accordion-detail">
                   <div className="career-detail-intro">

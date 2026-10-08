@@ -1,71 +1,79 @@
-const settingsAreas = [
+const essentials = [
+  [
+    "Search profiles",
+    "/settings/search-profiles",
+    "Set the roles, locations, and work arrangements you want to pursue."
+  ],
+  [
+    "Scheduled job search",
+    "/settings/automations",
+    "Keep relevant opportunities arriving on your schedule."
+  ],
   [
     "Documents",
     "/settings/documents",
-    "Upload and reprocess private CVs, cover letters, and source files."
-  ],
+    "Upload career evidence or sync your selected Google Drive folder."
+  ]
+] as const;
+
+const administration = [
   [
     "Analytics",
     "/settings/analytics",
-    "Review private portfolio, application, interview, and career-gap signals."
-  ],
-  [
-    "Logs",
-    "/settings/logs",
-    "Filter successes, failures, system errors, AI runs, and grouped portfolio visits."
+    "Review portfolio engagement, application progress, and interview outcomes."
   ],
   [
     "AI providers",
     "/settings/providers",
-    "Register model connections, capabilities, versions, and secret environment references."
+    "Manage model connections and server-side credential references."
   ],
   [
     "Agents",
     "/settings/agents",
-    "Route tasks to primary and fallback models; control limits, retries, and execution health."
-  ],
-  [
-    "Automations",
-    "/settings/automations",
-    "Configure schedules, retries, and durable workflow runs."
-  ],
-  [
-    "Search profiles",
-    "/settings/search-profiles",
-    "Choose role, location, technology, and scoring preferences."
+    "Configure and verify the existing orchestrator, retrieval, and image models."
   ],
   [
     "Job sources",
     "/settings/job-sources",
-    "Connect lawful feeds and run sanitized source health checks."
+    "Configure and troubleshoot your existing discovery sources."
   ],
-  ["Data and exports", "/settings/data", "Request private exports and manage portability."]
+  ["Automation history", "/settings/automations", "Inspect runs, retries, and failed events."],
+  ["Logs", "/settings/logs", "Investigate system errors and AI execution diagnostics."],
+  ["Data and exports", "/settings/data", "Request an export of your private workspace data."]
 ] as const;
+
+function SettingsLinks({ areas }: { areas: readonly (readonly [string, string, string])[] }) {
+  return (
+    <ul className="workspace-list settings-links">
+      {areas.map(([label, href, description]) => (
+        <li key={label}>
+          <a href={href}>
+            <strong>{label}</strong>
+          </a>
+          <p>{description}</p>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 export default function SettingsPage() {
   return (
-    <main className="workspace-page">
+    <main className="workspace-page settings-page">
       <header className="workspace-heading">
-        <p className="eyebrow">Workspace configuration</p>
-        <h1>Settings</h1>
-        <p>
-          Everything that configures Career Brain, discovery, automation, and private data lives
-          here.
-        </p>
+        <p className="eyebrow">Workspace setup</p>
+        <h1>Settings / Admin</h1>
+        <p>Set your search preferences and keep your career evidence current.</p>
       </header>
-      <section aria-labelledby="settings-areas">
-        <h2 id="settings-areas">Manage your workspace</h2>
-        <ul className="workspace-list">
-          {settingsAreas.map(([label, href, description]) => (
-            <li key={href}>
-              <a href={href}>
-                <strong>{label}</strong>
-              </a>
-              <p>{description}</p>
-            </li>
-          ))}
-        </ul>
+      <section aria-labelledby="settings-essentials">
+        <h2 id="settings-essentials">Search and evidence</h2>
+        <SettingsLinks areas={essentials} />
       </section>
+      <details className="workspace-disclosure settings-administration">
+        <summary>Advanced administration</summary>
+        <p>Model setup, diagnostics, and reporting are here when you need them.</p>
+        <SettingsLinks areas={administration} />
+      </details>
     </main>
   );
 }

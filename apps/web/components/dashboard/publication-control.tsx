@@ -61,7 +61,7 @@ export function PublicationControl() {
   }
 
   return (
-    <section aria-labelledby="publication-title">
+    <section id="publication" aria-labelledby="publication-title">
       <h2 id="publication-title">Portfolio publication</h2>
       <p>
         Build an immutable preview from the Career Brain items you selected plus approved cited

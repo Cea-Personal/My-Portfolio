@@ -1,4 +1,4 @@
-const sections = /^(about|experience|projects|ask-basil|blog|contact)$/;
+const sections = /^(impact|about|experience|projects|capabilities|ask|ask-basil|blog|contact)$/;
 const pages = /^(home|blog|project)$/;
 const propertySchemas: Record<
   string,

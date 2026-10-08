@@ -104,7 +104,6 @@ export function PortfolioProof({ sourceUrl }: { sourceUrl?: string }) {
         <p>
           <span aria-hidden="true">●</span> Live modules
         </p>
-        <a href="#ask">Test role fit</a>
         <a href="#ask">Ask the portfolio</a>
         {sourceUrl ? (
           <a href={sourceUrl}>Inspect the source ↗</a>

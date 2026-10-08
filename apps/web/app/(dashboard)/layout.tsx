@@ -5,19 +5,7 @@ import { createServerSupabaseClient } from "@career-os/database";
 import { getOwnerSession } from "@career-os/auth";
 import { parsePublicEnv } from "@career-os/config";
 import { PrivateWorkspaceGate } from "../../components/auth/private-workspace-gate";
-import { OwnerSignOutButton } from "../../components/auth/owner-sign-out-button";
-
-const links = [
-  ["Career Brain", "/career-brain"],
-  ["Jobs", "/jobs"],
-  ["Freelance", "/freelance"],
-  ["Application Kit", "/applications"],
-  ["Interview Kit", "/interviews"],
-  ["Journals", "/journal"],
-  ["Blog", "/blogs"],
-  ["Settings", "/settings"],
-  ["Portfolio", "/"]
-] as const;
+import { WorkspaceNavigation } from "../../components/dashboard/workspace-navigation";
 
 export default async function DashboardLayout({ children }: Readonly<{ children: ReactNode }>) {
   const env = parsePublicEnv();
@@ -32,15 +20,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
   if (!session) redirect("/sign-in?error=not_authorized&next=/dashboard");
   return (
     <PrivateWorkspaceGate>
-      <nav aria-label="Private workspace">
-        <a href="/dashboard">Basil Ogbonna · Workspace</a>
-        {links.map(([label, href]) => (
-          <a key={href} href={href}>
-            {label}
-          </a>
-        ))}
-        <OwnerSignOutButton />
-      </nav>
+      <WorkspaceNavigation />
       {children}
     </PrivateWorkspaceGate>
   );

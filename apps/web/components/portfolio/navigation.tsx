@@ -31,14 +31,17 @@ export function PortfolioNavigation({ showBlog = false }: { showBlog?: boolean }
         id="portfolio-mobile-menu"
         className={menuOpen ? "portfolio-nav-links is-open" : "portfolio-nav-links"}
       >
-        <a href="#about" onClick={closeMenu}>
-          About
-        </a>
         <a href="#experience" onClick={closeMenu}>
           Experience
         </a>
         <a href="#projects" onClick={closeMenu}>
           Projects
+        </a>
+        <a href="#about" onClick={closeMenu}>
+          About
+        </a>
+        <a href="#ask" onClick={closeMenu}>
+          Ask Basil
         </a>
         {showBlog ? (
           <a href="#blog" onClick={closeMenu}>

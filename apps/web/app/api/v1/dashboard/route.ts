@@ -1,77 +1,118 @@
 import { apiResponse } from "@/lib/api/response";
 import { withPrivateApi } from "@/lib/api/private";
-
-function display(value: unknown, fallback: string): string {
-  return typeof value === "string" && value.trim() ? value : fallback;
-}
+import { buildDashboardActions } from "@/lib/dashboard-actions";
 
 export function GET(request: Request) {
   return withPrivateApi(request, async ({ client, ownerId }) => {
-    const load = async (table: string, columns: string, limit = 100) => {
+    const unavailable: string[] = [];
+    const load = async (
+      table: string,
+      columns: string,
+      label: string,
+      order: string,
+      limit = 500,
+      schema = "app"
+    ) => {
       const result = await client
-        .schema("app")
+        .schema(schema)
         .from(table)
         .select(columns)
         .eq("owner_id", ownerId)
+        .order(order, { ascending: false })
         .limit(limit);
-      return result.error ? [] : ((result.data ?? []) as unknown as Record<string, unknown>[]);
+      if (result.error) {
+        unavailable.push(label);
+        return [];
+      }
+      return (result.data ?? []) as unknown as Record<string, unknown>[];
     };
-    const [facts, runs, jobs, applications, stages, projections, posts] = await Promise.all([
-      load("career_facts", "id, review_status, visibility, updated_at", 100),
-      load("automation_runs", "id, workflow_name, status, created_at", 100),
-      load("jobs", "id, canonical_title, canonical_company, status, discovered_at", 100),
-      load("applications", "id, status, created_at", 100),
-      load("interview_stages", "id, name, status, scheduled_at", 100),
+    const [
+      jobs,
+      applications,
+      processes,
+      opportunities,
+      scores,
+      proposals,
+      facts,
+      publications,
+      debriefs
+    ] = await Promise.all([
       load(
-        "portfolio_projection_rules",
-        "id, source_entity_type, public_eligible, updated_at",
-        100
+        "jobs",
+        "id, canonical_title, canonical_company, status, opportunity_domain, discovered_at, job_scores(score_type, numeric_score, created_at)",
+        "job matches",
+        "discovered_at"
       ),
-      load("posts", "id, slug, status, created_at", 100)
+      load(
+        "applications",
+        "id, job_id, status, applied_at, created_at, application_kind, jobs(canonical_title, canonical_company)",
+        "applications",
+        "created_at"
+      ),
+      // Stages have no owner_id: scope through their owner's interview process.
+      load(
+        "interview_processes",
+        "id, applications(jobs(canonical_title, canonical_company)), interview_stages(id, name, status, scheduled_at, preparation_kits(id, status))",
+        "interviews",
+        "created_at",
+        200
+      ),
+      load(
+        "freelance_opportunities",
+        "id, job_id, created_at",
+        "freelance opportunities",
+        "created_at"
+      ),
+      load(
+        "freelance_opportunity_scores",
+        "opportunity_id, recommendation, total_score, created_at",
+        "freelance scores",
+        "created_at",
+        1000
+      ),
+      load(
+        "freelance_proposals",
+        "id, opportunity_id, approval_state, crm_status, updated_at",
+        "proposals",
+        "updated_at"
+      ),
+      load(
+        "career_facts",
+        "id, review_status, currentVersion:career_fact_versions!career_facts_current_version_fk(statement)",
+        "career evidence",
+        "updated_at"
+      ),
+      load(
+        "portfolio_publications",
+        "id, version, status, created_at",
+        "portfolio approvals",
+        "created_at",
+        100,
+        "published"
+      ),
+      load(
+        "interview_debriefs",
+        "id, stage_id, follow_ups, created_at",
+        "interview follow-ups",
+        "created_at",
+        200
+      )
     ]);
-    const pendingFacts = facts.filter((fact) =>
-      ["candidate", "in_review", "deferred"].includes(String(fact.review_status))
-    );
-    const activeJobs = jobs.filter((job) =>
-      ["discovered", "reviewing", "interested"].includes(String(job.status))
-    );
-    const awaitingApplications = applications.filter((application) =>
-      ["draft", "preparing", "ready_to_apply"].includes(String(application.status))
-    );
-    const upcomingInterviews = stages.filter((stage) =>
-      ["planned", "scheduled"].includes(String(stage.status))
-    );
-    const draftPosts = posts.filter((post) => String(post.status) === "draft");
-    const actions = [
-      ...pendingFacts.slice(0, 5).map((fact) => ({
-        type: "fact_review",
-        label: "Review career fact",
-        href: `/career-brain/${String(fact.id)}`
-      })),
-      ...activeJobs.slice(0, 5).map((job) => ({
-        type: "job",
-        label: `${display(job.canonical_title, "Role")} at ${display(job.canonical_company, "Company")}`,
-        href: `/jobs/${display(job.id, "")}`
-      })),
-      ...awaitingApplications.slice(0, 5).map((application) => ({
-        type: "application",
-        label: "Continue application workspace",
-        href: `/applications/${display(application.id, "")}`
-      }))
-    ];
     return apiResponse(
       {
-        actions,
-        counts: {
-          highFitJobs: activeJobs.length,
-          applicationsAwaitingAction: awaitingApplications.length,
-          upcomingInterviews: upcomingInterviews.length,
-          pendingPreparation: upcomingInterviews.filter((stage) => !stage.scheduled_at).length,
-          reviewableFacts: pendingFacts.length,
-          portfolioActivity: projections.length,
-          draftContent: draftPosts.length
-        },
-        summary: { facts: facts.slice(0, 5), runs: runs.slice(0, 5) }
+        ...buildDashboardActions({
+          jobs,
+          applications,
+          processes,
+          opportunities,
+          scores,
+          proposals,
+          facts,
+          publications,
+          debriefs
+        }),
+        unavailable,
+        scope: "Recent records; open each workspace for full history."
       },
       request
     );
